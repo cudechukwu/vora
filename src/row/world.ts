@@ -9,7 +9,7 @@ import {
   CROSSWALK_W, Crossing, FAR_WALK, FRONT_X, PATH_HALF, ROAD, RowStop, WALK_MAX_Z, WALK_MIN_Z,
 } from './layout';
 import { noise2, rng } from '../noise';
-import { HOUSE } from './house/plan';
+import { DRIVEWAYS, HOUSE } from './house/plan';
 
 // ─── The ground around the row ─────────────────────────────────────────
 // Lawn in front of the buildings, the walk, a tree line along the field
@@ -249,7 +249,8 @@ export class World {
     }
     for (let z = WALK_MIN_Z + 20; z > WALK_MAX_Z - 40; z -= 13) {
       const tz = z - rng(id + 1) * 6;
-      if (Math.abs(tz - HOUSE.zc) > 13) list.push({ x: 26 + rng(id) * 4, z: tz, s: 1.3 + rng(id + 2) * 0.6, id }); // (not in your front yard)
+      const yard = Math.max(...DRIVEWAYS.map((d) => Math.max(-d.v0, d.v1))) + 3; // not in your front yard or the driveways
+      if (Math.abs(tz - HOUSE.zc) > yard) list.push({ x: 26 + rng(id) * 4, z: tz, s: 1.3 + rng(id + 2) * 0.6, id });
       id++;
       list.push({ x: 48 + rng(id + 3) * 20, z: z - rng(id + 4) * 6, s: 1.6 + rng(id + 5) * 0.8, id: id++ });
     }
@@ -294,7 +295,11 @@ export class World {
       spots.push({ x: -PATH_HALF - 0.7, z, h: 4, arm: 0 }, { x: PATH_HALF + 0.7, z: z - 12, h: 4, arm: 0 });
     }
     for (let z = WALK_MIN_Z + 40; z > WALK_MAX_Z - 40; z -= 30) {
-      spots.push({ x: ROAD.x0 - 0.5, z, h: 7.5, arm: 2.6 }, { x: ROAD.x1 + 0.5, z: z - 15, h: 7.5, arm: -2.6 });
+      // never in the mouth of a driveway: slide it along to just beside one
+      let fz = z - 15;
+      const drive = DRIVEWAYS.find((d) => fz > HOUSE.zc + d.v0 - 1.5 && fz < HOUSE.zc + d.v1 + 1.5);
+      if (drive) fz = HOUSE.zc + (fz > HOUSE.zc + (drive.v0 + drive.v1) / 2 ? drive.v1 + 1.6 : drive.v0 - 1.6);
+      spots.push({ x: ROAD.x0 - 0.5, z, h: 7.5, arm: 2.6 }, { x: ROAD.x1 + 0.5, z: fz, h: 7.5, arm: -2.6 });
     }
     return spots;
   }

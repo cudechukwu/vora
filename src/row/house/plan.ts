@@ -152,6 +152,17 @@ export const PORCH: Rect = { u0: -2.6, u1: 0, v0: -9, v1: 9 };
 export const PORCH_STEPS = { v0: 2.6, v1: 5.4 };
 export const LOT: Rect = { u0: FAR_WALK.x1 - 0.4 - HOUSE.x0, u1: HOUSE.depth + 2, v0: -11, v1: 11 };
 
+/**
+ * Two driveways, one each side of the house, from the sidewalk back to the side of the house.
+ * Seen from the street, yours is on the left (−v), kofi's on the right (+v).
+ */
+export interface Driveway extends Rect { owner: 'you' | RoommateId; park: { u: number; v: number } }
+const DRIVE_W = 3.4, DRIVE_V = 12.8, DRIVE_U0 = FAR_WALK.x1 - 0.5 - HOUSE.x0, DRIVE_U1 = 12;
+export const DRIVEWAYS: Driveway[] = [
+  { owner: 'you', u0: DRIVE_U0, u1: DRIVE_U1, v0: -DRIVE_V - DRIVE_W / 2, v1: -DRIVE_V + DRIVE_W / 2, park: { u: 5, v: -DRIVE_V } },
+  { owner: 'kofi', u0: DRIVE_U0, u1: DRIVE_U1, v0: DRIVE_V - DRIVE_W / 2, v1: DRIVE_V + DRIVE_W / 2, park: { u: 5, v: DRIVE_V } },
+];
+
 /** Inside the walls (not the porch). */
 export const insideHouse = (u: number, v: number) => u > 0 && u < HOUSE.depth && v > -HOUSE.width / 2 && v < HOUSE.width / 2;
 

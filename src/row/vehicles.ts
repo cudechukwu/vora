@@ -6,6 +6,7 @@ import { lambert, PAL } from './kit';
 import { CROSSWALK_W, Crossing, ROAD } from './layout';
 import { Person, randomLook } from './people';
 import { LANES, Light, TrafficState, Vehicle, lightAt } from './traffic';
+import type { Car, Garage } from './cars';
 
 // ─── Drawing High Street ───────────────────────────────────────────────
 // Meshes for the vehicles + traffic signals, driven by traffic.ts state.
@@ -57,6 +58,7 @@ export class Traffic {
     for (const s of [-1, 1]) {
       const h = new Mesh(new BoxGeometry(0.34, 0.16, 0.06), this.head);
       h.position.set(s * halfW, y, front);
+      h.userData.head = true;
       const t = new Mesh(new BoxGeometry(0.3, 0.14, 0.06), this.tail);
       t.position.set(s * halfW, y, back);
       const halo = new Sprite(this.haloMat);
@@ -65,16 +67,56 @@ export class Traffic {
       const th = new Sprite(this.tailHaloMat);
       th.position.set(s * halfW, y, back - 0.1);
       th.scale.set(0.7, 0.7, 1);
+      halo.userData.lamp = th.userData.lamp = true;
       root.add(h, t, halo, th);
     }
     // light thrown on the road ahead
     const beam = new Mesh(new PlaneGeometry(3.2, 9).rotateX(-Math.PI / 2), this.beamMat);
     beam.position.set(0, 0.06, front + 4.8);
     beam.renderOrder = 2;
+    beam.userData.lamp = true;
     root.add(beam);
   }
 
   private build(v: Vehicle): Drawn {
+    const { root, wheels, rider } = this.body(v.kind, v.color, v.len, 700 + v.id);
+    root.rotation.y = LANES[v.lane].dir > 0 ? 0 : Math.PI;
+    this.group.add(root);
+    return { v, root, rider, wheels };
+  }
+
+  /** A car or truck that isn't in traffic (parked, or yours to drive): same look, lamps off. */
+  makeCar(kind: 'car' | 'truck', color: number, len: number): Group {
+    const { root, wheels } = this.body(kind, color, len, 0);
+    root.userData.wheels = wheels;
+    lit(root, false);
+    return root;
+  }
+
+  /** Take a vehicle's mesh out of traffic (it's been jacked). The caller now owns it. */
+  release(vehicleId: number): Group | undefined {
+    const i = this.drawn.findIndex((d) => d.v.id === vehicleId);
+    if (i < 0) return undefined;
+    const [d] = this.drawn.splice(i, 1);
+    this.group.remove(d.root);
+    d.root.userData.wheels = d.wheels;
+    return d.root;
+  }
+
+  /** Hand a car's mesh back to traffic, driving as `v`. */
+  adopt(v: Vehicle, root: Group) {
+    lit(root, true);
+    alarm(root, false, this.head);
+    this.drawn.push({ v, root, wheels: root.userData.wheels ?? [] });
+    root.rotation.set(0, LANES[v.lane].dir > 0 ? 0 : Math.PI, 0);
+    this.group.add(root);
+  }
+
+  /** Light that flashes the headlights of a car whose alarm is going. */
+  readonly alarmMat = new MeshBasicMaterial({ color: 0xffb02e });
+
+  private body(kind: Vehicle['kind'], color: number, len: number, seed: number): { root: Group; wheels: Mesh[]; rider?: Person } {
+    const v = { kind, color, len };
     const root = new Group();
     const wheels: Mesh[] = [];
     const wheel = (x: number, z: number, geo = wheelGeo) => {
@@ -112,7 +154,7 @@ export class Traffic {
       root.add(frame, bar);
       wheel(0, 0.62, bikeWheelGeo);
       wheel(0, -0.62, bikeWheelGeo);
-      rider = new Person(randomLook(700 + v.id));
+      rider = new Person(randomLook(seed));
       rider.root.position.z = -0.1;
       root.add(rider.root);
       const lamp = new Sprite(this.haloMat);
@@ -121,10 +163,11 @@ export class Traffic {
       root.add(lamp);
     }
     root.traverse((o) => { if ((o as Mesh).isMesh && (o as Mesh).material !== this.beamMat) o.castShadow = true; });
-    root.rotation.y = LANES[v.lane].dir > 0 ? 0 : Math.PI;
-    this.group.add(root);
-    return { v, root, rider, wheels };
+    return { root, wheels, rider };
   }
+
+  /** The material a headlight shows when it isn't flashing. */
+  get headMat() { return this.head; }
 
   /** Mast-arm signals over the road on both approaches + walk signals at the curbs. */
   private signal(c: Crossing) {
@@ -185,5 +228,61 @@ export class Traffic {
       this.sig[l].color.set(base[l]).multiplyScalar(l === light ? 1 : dim);
     }
     this.walkSig.color.set(light === 'red' ? 0xf4f4f0 : 0xff8a1c).multiplyScalar(light === 'red' ? 1 : 0.8);
+  }
+}
+
+/** Headlight glow + beam on or off (parked cars sit dark). */
+export function lit(root: Group, on: boolean) {
+  root.traverse((o) => { if (o.userData.lamp) o.visible = on; });
+}
+
+/** Car alarm: headlights flash amber (call every frame with `on` toggling). */
+export function alarm(root: Group, on: boolean, normal: MeshBasicMaterial, flash?: MeshBasicMaterial) {
+  root.traverse((o) => { if (o.userData.head) (o as Mesh).material = on && flash ? flash : normal; });
+}
+
+/** Parked + driven cars (yours, kofi's, anything you've taken). Keeps one mesh per car. */
+export class CarsView {
+  readonly group = new Group();
+  private meshes = new Map<number, Group>();
+  private alarms = new Map<number, number>(); // car id → seconds of alarm left
+
+  constructor(private traffic: Traffic) {}
+
+  /** Use this mesh for a car (e.g. one just pulled out of traffic). */
+  take(carId: number, root: Group) {
+    this.meshes.set(carId, root);
+    this.group.add(root);
+  }
+
+  /** Give up a car's mesh (it's going back into traffic, or away). */
+  give(carId: number): Group | undefined {
+    const root = this.meshes.get(carId);
+    if (!root) return undefined;
+    this.meshes.delete(carId);
+    this.alarms.delete(carId);
+    this.group.remove(root);
+    return root;
+  }
+
+  soundAlarm(carId: number, secs = 3) { this.alarms.set(carId, secs); }
+
+  update(g: Garage, dt: number, now: number) {
+    for (const c of g.cars) {
+      let root = this.meshes.get(c.id);
+      if (!root) { root = this.traffic.makeCar(c.kind, c.color, c.len); this.take(c.id, root); }
+      this.place(root, c, dt, c.id === g.driving);
+      const left = (this.alarms.get(c.id) ?? 0) - dt;
+      if (left > 0) this.alarms.set(c.id, left); else this.alarms.delete(c.id);
+      alarm(root, left > 0 && Math.floor(now * 5) % 2 === 0, this.traffic.headMat, this.traffic.alarmMat);
+    }
+    for (const id of [...this.meshes.keys()]) if (!g.cars.some((c) => c.id === id)) this.give(id);
+  }
+
+  private place(root: Group, c: Car, dt: number, driving: boolean) {
+    root.position.set(c.x, 0, c.z);
+    root.rotation.set(0, c.heading, 0);
+    lit(root, driving);
+    for (const w of (root.userData.wheels ?? []) as Mesh[]) w.rotation.x += (c.speed * dt) / 0.34;
   }
 }

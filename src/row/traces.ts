@@ -36,6 +36,12 @@ export class Labels {
     return el;
   }
 
+  /** Take a label away for good. */
+  remove(el: HTMLElement) {
+    this.list = this.list.filter((l) => l.el !== el);
+    el.remove();
+  }
+
   update(cam: PerspectiveCamera, from: Vector3, w: number, h: number) {
     for (const l of this.list) {
       if ((!l.anywhere && this.where === 'in') || (l.when && !l.when())) { l.el.style.opacity = '0'; continue; }

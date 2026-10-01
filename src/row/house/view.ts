@@ -5,7 +5,7 @@ import {
 import { WindowBank, lambert, prism, PAL, worldUV } from '../kit';
 import { FAR_WALK } from '../layout';
 import {
-  FRONT_DOOR, FURNITURE, Furniture, HOUSE, Level, PORCH, PORCH_STEPS, ROOM_DOORS, STAIRS, STAIRWELL, TV,
+  DRIVEWAYS, FRONT_DOOR, FURNITURE, Furniture, HOUSE, Level, PORCH, PORCH_STEPS, ROOM_DOORS, STAIRS, STAIRWELL, TV,
   UPSTAIRS_Y, WALLS, WALL_H, Wall, toWorld,
 } from './plan';
 
@@ -263,6 +263,20 @@ export class HouseView {
     const p = lbox(start, PORCH.u0 - 0.6, PORCH_STEPS.v0 + 0.3, PORCH_STEPS.v1 - 0.3, 0, 0.035, lambert(PAL.path));
     p.castShadow = false;
     this.exterior.add(p);
+    // a driveway each side of the house: concrete, with a dropped apron across the sidewalk
+    const concrete = lambert(0xbab4a7), apron = lambert(0xa9a397);
+    for (const d of DRIVEWAYS) {
+      const slab = lbox(d.u0, d.u1, d.v0, d.v1, 0, 0.045, concrete);
+      const lip = lbox(FAR_WALK.x0 - HOUSE.x0, d.u0, d.v0 - 0.4, d.v1 + 0.4, 0, 0.04, apron);
+      slab.castShadow = lip.castShadow = false;
+      this.exterior.add(slab, lip);
+      // expansion joints
+      for (let u = d.u0 + 3; u < d.u1 - 0.5; u += 3) {
+        const j = lbox(u - 0.03, u + 0.03, d.v0, d.v1, 0.045, 0.05, lambert(0x8f897d));
+        j.castShadow = false;
+        this.exterior.add(j);
+      }
+    }
   }
 
   private roofAndGable(ext: Material) {

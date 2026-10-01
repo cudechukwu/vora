@@ -18,13 +18,18 @@ import { homecoming, listNames } from './house/routine';
 import { floorY, houseExtra, levelAt } from './house/collide';
 import { BED_SPOT, FRONT_DOOR, Level, SEATS, Seat, insideHouse, toLocal, toWorld } from './house/plan';
 import { ENTER_AT, EXIT_AT, Where, cameraClearance, nearDoor as byTheDoor, portalAt } from './house/portal';
-import { LANES, createTraffic, lightAt, stepTraffic } from './traffic';
-import { Traffic } from './vehicles';
+import { LANES, Obstacle, createTraffic, lightAt, stepTraffic } from './traffic';
+import { CarsView, Traffic } from './vehicles';
+import {
+  Car, carAt, carExtra, carjack, clearRoad, createGarage, driveMove, driven, footprint, getIn, getOut, jackable,
+  loadMine, missing, roadBlocks, saveMine, stepCar,
+} from './cars';
 import { START_HOUR, advance, formatHour, nextPreset, periodOf, wrapHour } from './clock';
 import { Person, discGeometry, randomLook } from './people';
 import { Labels, Note, Trail, buildTrails } from './traces';
 import { Input } from './controls';
 import { CameraRig, wrap } from './camera';
+import { ROAD } from './layout';
 import { rng } from '../noise';
 
 // ─── College Row — vibe test ───────────────────────────────────────────
@@ -100,6 +105,23 @@ const mob = createMobility(stops, crossings, SPAWN);
 const mover = newMover();
 const rideView = new RideView(mob);
 scene.add(rideView.group);
+
+// ── cars: yours + kofi's in the driveways, and whatever you take off High Street ──
+const CAR_KEY = 'vora.row.car';
+let savedCar: string | null = null;
+try { savedCar = localStorage.getItem(CAR_KEY); } catch { /* storage unavailable */ }
+const garage = createGarage(loadMine(savedCar));
+const carsView = new CarsView(trafficView);
+scene.add(carsView.group);
+const saveCar = () => { try { localStorage.setItem(CAR_KEY, saveMine(garage)); } catch { /* ignore */ } };
+addEventListener('pagehide', saveCar);
+
+/** Drivers you've pulled out of their cars: knocked down, up again, then off down the sidewalk, yelling. */
+interface Fleer { p: Person; x: number; z: number; out: { x: number; z: number }; t: number; bubble: HTMLElement }
+const fleers: Fleer[] = [];
+const YELLS = ['hey!! that\'s my car!', 'are you serious?!', 'somebody stop them!', 'my groceries are in there!', 'i just got that washed!'];
+let jacks = 0;
+
 const actBtn = document.getElementById('act')!;
 let actKey = '';
 const lastDir = new Vector3(0, 0, 1);
@@ -229,6 +251,20 @@ const porchSign = toWorld(-0.6, FRONT_DOOR.v1 + 0.6);
 labels.add('🏠 your house<em>High St · 5 roommates</em>', new Vector3(porchSign.x, 3.6, porchSign.z), 45, undefined, undefined,
   () => !insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v));
 const fade = document.getElementById('fade')!;
+const toastEl = document.getElementById('toast')!;
+let toastTimer = 0;
+function toast(text: string, secs = 2.6) {
+  toastEl.textContent = text;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => toastEl.classList.remove('show'), secs * 1000);
+}
+// whose car is whose
+for (const c of garage.cars) {
+  if (!c.owner) continue;
+  const label = c.owner === 'you' ? '🚗 your car' : `${c.owner}'s car`;
+  labels.add(label, new Vector3(), 24, undefined, () => new Vector3(c.x, 2.2, c.z), () => garage.driving !== c.id);
+}
 
 // ── mood ──
 let lastHour = -1;
@@ -311,7 +347,7 @@ function sleep() {
 /** Everything you can bump into right now: the house (by floor), and outside, nearby trunks, posts, benches and traffic. */
 const VEHICLE_HALF_W = { car: 0.95, truck: 1.2, bike: 0.35 } as const;
 function collisions() {
-  const base = houseExtra(level, mover.riding !== null);
+  const base = houseExtra(level, mover.riding !== null || garage.driving !== null);
   if (where === 'in') return base;
   const near = (b: { x0: number; x1: number; z0: number; z1: number }) =>
     b.x1 > pos.x - 12 && b.x0 < pos.x + 12 && b.z1 > pos.z - 12 && b.z0 < pos.z + 12;
@@ -319,6 +355,11 @@ function collisions() {
   for (const v of traffic.vehicles) {
     const x = LANES[v.lane].x, hw = VEHICLE_HALF_W[v.kind] + 0.3, hl = v.len / 2 + 0.3;
     const b = { x0: x - hw, x1: x + hw, z0: v.z - hl, z1: v.z + hl };
+    if (near(b)) solids.push(b);
+  }
+  for (const c of garage.cars) {
+    if (c.id === garage.driving) continue;
+    const b = footprint(c, 0.3);
     if (near(b)) solids.push(b);
   }
   return { ...base, solids };
@@ -355,11 +396,97 @@ function welcomeHome() {
   clearTimeout(welcomeTimer);
   welcomeTimer = window.setTimeout(() => welcome.classList.remove('show'), 3600);
   if (h.greeter) setTimeout(() => roommates.say(h.greeter!, h.line), 700);
+  // took kofi's car? he's noticed
+  if (h.home.includes('kofi') && missing(garage, 'kofi')) {
+    setTimeout(() => roommates.say('kofi', pick(['wait… where\'s my car??', 'did you take my car?', 'bro. my car. where is it.'])), h.greeter === 'kofi' ? 3200 : 1800);
+  }
+}
+
+const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
+
+function enterCar(c: Car) {
+  const wasMine = c.owner === 'you';
+  getIn(garage, c.id);
+  mover.speed = 0;
+  pos.set(c.x, 0, c.z);
+  me.face(c.heading);
+  me.root.visible = false;
+  if (!wasMine) {
+    carsView.soundAlarm(c.id);
+    toast(c.owner ? `😈 you took ${c.owner}'s car` : '😈 you stole a car');
+  }
+}
+
+function leaveCar() {
+  const at = getOut(garage);
+  if (!at) return;
+  const r = resolveMove(pos, at, stops, collisions());
+  pos.set(r.x, 0, r.z);
+  mover.speed = 0;
+  me.root.visible = true;
+}
+
+function jack(vehicleId: number) {
+  const r = carjack(traffic, garage, vehicleId);
+  if (!r) return;
+  const mesh = trafficView.release(vehicleId);
+  if (mesh) carsView.take(r.car.id, mesh);
+  pos.set(r.car.x, 0, r.car.z);
+  me.face(r.car.heading);
+  me.root.visible = false;
+  mover.speed = 0;
+  // the driver goes flying
+  const p = new Person(randomLook(800 + jacks++));
+  p.root.rotation.order = 'YXZ';
+  p.face(r.driver.heading + Math.PI); // looking back at their car as they land
+  const out = { x: Math.sin(r.driver.heading), z: Math.cos(r.driver.heading) };
+  const f: Fleer = { p, x: r.driver.x - out.x * 0.8, z: r.driver.z - out.z * 0.8, out, t: 0, bubble: null! };
+  f.bubble = labels.add(pick(YELLS), new Vector3(), 22, undefined,
+    () => p.root.position.clone().setY(2.5), () => f.t > 0.5 && f.t < 4.5);
+  f.bubble.classList.add('say');
+  scene.add(p.root);
+  fleers.push(f);
+  toast('👊 carjacked');
+}
+
+function updateFleers(dt: number) {
+  for (const f of [...fleers]) {
+    f.t += dt;
+    const p = f.p;
+    if (f.t < 0.35) { // thrown: flies out and tips over backwards
+      const k = f.t / 0.35;
+      f.x += f.out.x * dt * 4.5; f.z += f.out.z * dt * 4.5;
+      p.root.rotation.x = -1.45 * k;
+      p.root.position.set(f.x, Math.sin(k * Math.PI) * 0.5, f.z);
+      p.walk(dt, 0);
+    } else if (f.t < 1.7) { // down… then back up
+      const k = f.t < 1.2 ? 1 : 1 - (f.t - 1.2) / 0.5;
+      p.root.rotation.x = -1.45 * k;
+      p.root.position.set(f.x, 0.12 * k, f.z);
+    } else { // run: off the road to the nearest sidewalk, then away down it
+      p.root.rotation.x = 0;
+      const curb = f.x > (ROAD.x0 + ROAD.x1) / 2 ? 21.9 : 3;
+      const away = Math.sign(f.z - pos.z) || 1;
+      const dx = curb - f.x, dirX = Math.abs(dx) > 0.3 ? Math.sign(dx) : 0;
+      const dirZ = dirX ? away * 0.35 : away;
+      const n = Math.hypot(dirX, dirZ);
+      f.x += (dirX / n) * 6 * dt; f.z += (dirZ / n) * 6 * dt;
+      p.face(Math.atan2(dirX, dirZ));
+      p.root.position.set(f.x, 0, f.z);
+      p.walk(dt, 6);
+    }
+    if (f.t > 16) {
+      scene.remove(p.root);
+      labels.remove(f.bubble);
+      fleers.splice(fleers.indexOf(f), 1);
+    }
+  }
 }
 
 /** What the action button does right now — the closest thing you can do. */
 function currentAction(): Act | null {
   if (sittingOn) return { key: 'getup', label: 'Get up', dist: 0, run: standUp };
+  if (garage.driving !== null) return { key: 'getout', label: '🚪  Get out', dist: 0, run: leaveCar };
   const ride = actionAt(mob, mover, pos);
   if (mover.riding !== null && ride) {
     return {
@@ -391,6 +518,15 @@ function currentAction(): Act | null {
       },
     });
   }
+  if (where === 'out' && mover.riding === null) {
+    const c = carAt(garage, pos);
+    if (c) {
+      const label = c.owner === 'you' ? '🔑  Drive' : c.owner ? `😈  Steal ${c.owner}'s car` : '😈  Steal car';
+      options.push({ key: `car-${c.id}`, label, dist: 0.5, run: () => enterCar(c) });
+    }
+    const v = jackable(traffic, pos);
+    if (v) options.push({ key: `jack-${v.id}`, label: '👊  Carjack', dist: 0.4, run: () => jack(v.id) });
+  }
   const taken = roommates.seatsTaken();
   for (const seat of SEATS) {
     if (seat.level !== level || taken.has(seat.id)) continue;
@@ -418,7 +554,7 @@ function frame(now: number) {
 
   if (!frozen) hour = advance(hour, dt);
   if (Math.abs(hour - lastHour) > 0.004) { applyMood(hour); lastHour = hour; }
-  if (!frozen && now - savedAt > 5000) { saveHour(); savedAt = now; }
+  if (now - savedAt > 5000) { if (!frozen) saveHour(); saveCar(); savedAt = now; }
 
   // you
   const secs = now / 1000;
@@ -431,9 +567,20 @@ function frame(now: number) {
   move.set(mv.x, 0, mv.z);
   const mag = Math.min(1, move.length());
   if (sittingOn && mag > 0.5) standUp(); // push the stick to get up
-  const speed = sittingOn ? 0 : stepMover(mover, dt, mag);
-  if (mag > 0.01) lastDir.copy(move).normalize();
-  if (speed > 0.01) {
+  const car = driven(garage);
+  let speed: number;
+  if (car) {
+    // driving: the car steers toward where you push, reverses if you push behind it
+    const r = driveMove(car, stepCar(car, dt, { x: move.x, z: move.z }), stops, carExtra(collisions(), car.kind));
+    if (r.hit) car.speed = 0;
+    car.x = r.x; car.z = r.z;
+    pos.set(car.x, 0, car.z);
+    me.face(car.heading);
+    lastDir.set(Math.sin(car.heading), 0, Math.cos(car.heading));
+    speed = mover.speed = Math.abs(car.speed);
+  } else speed = sittingOn ? 0 : stepMover(mover, dt, mag);
+  if (!car && mag > 0.01) lastDir.copy(move).normalize();
+  if (!car && speed > 0.01) {
     // keep rolling along your last direction as you slow down
     const step = speed * dt;
     const next = resolveMove(pos, { x: pos.x + lastDir.x * step, z: pos.z + lastDir.z * step }, stops, collisions());
@@ -450,7 +597,7 @@ function frame(now: number) {
   right.set(Math.cos(rig.yaw), 0, -Math.sin(rig.yaw));
   pos.y = floorY(level, pos.x, pos.z);
   me.root.position.copy(pos);
-  if (sittingOn) { /* pose set when you sat down */ }
+  if (sittingOn || car) { /* pose set when you sat down; hidden in a car */ }
   else if (mover.mode === 'bike') me.ride(dt, speed);
   else if (mover.mode === 'scooter') me.scoot(dt, speed);
   else me.walk(dt, speed);
@@ -463,6 +610,8 @@ function frame(now: number) {
   }
   carry(mob, mover, pos, me.heading);
   rideView.update(mob, mover.riding, speed, dt);
+  carsView.update(garage, dt, secs);
+  updateFleers(dt);
   const act = currentAction();
   const key = act ? act.key : '';
   if (key !== actKey) {
@@ -473,7 +622,7 @@ function frame(now: number) {
 
   // your house: through the door, roommates, the cut-away
   let local = toLocal(pos.x, pos.z);
-  const through = mover.riding === null ? portalAt(where, local.u, local.v) : null;
+  const through = mover.riding === null && garage.driving === null ? portalAt(where, local.u, local.v) : null;
   if (through) { goThrough(through); local = toLocal(pos.x, pos.z); }
   const indoors = where === 'in';
   const door = toWorld(0, (FRONT_DOOR.v0 + FRONT_DOOR.v1) / 2);
@@ -488,16 +637,27 @@ function frame(now: number) {
     if (w.z > WALK_MIN_Z + 30) w.z = WALK_MAX_Z - 30;
     // step aside for you
     const dx = w.x - pos.x, dz = w.z - pos.z;
-    const near = Math.abs(dz) < 2.2 && Math.abs(dx) < 1.1 && Math.abs(pos.x) < PATH_HALF + 1;
-    const x = near ? w.x + Math.sign(dx || 1) * (1.1 - Math.abs(dx)) : w.x;
+    const room = garage.driving !== null ? 2.4 : 1.1; // jump well clear of a car
+    const near = Math.abs(dz) < room * 2 && Math.abs(dx) < room && Math.abs(pos.x) < PATH_HALF + room;
+    const x = near ? w.x + Math.sign(dx || 1) * (room - Math.abs(dx)) : w.x;
     w.p.root.position.set(x, 0, w.z);
     w.p.face(w.dir > 0 ? Math.PI : 0);
     w.p.walk(dt, w.speed);
   }
 
   // High Street
-  stepTraffic(traffic, dt, [pos]);
+  const inRoad: Obstacle[] = [...roadBlocks(garage), ...fleers.map((f) => ({ x: f.x, z: f.z }))];
+  if (garage.driving === null) inRoad.push(pos);
+  stepTraffic(traffic, dt, inRoad);
   trafficView.update(dt);
+  // cars left in the road get moved once you've walked off
+  if (frames % 30 === 0) {
+    for (const done of clearRoad(garage, traffic, pos)) {
+      if (done.fate === 'towed') continue;
+      const mesh = carsView.give(done.car.id);
+      if (done.fate === 'traffic' && mesh) trafficView.adopt(done.vehicle!, mesh);
+    }
+  }
 
   // frisbee: 2.4s per throw, alternating
   const ft = (now / 1000) % 4.8;
@@ -513,7 +673,7 @@ function frame(now: number) {
   // camera: intro swoop, then follow
   const portrait = innerWidth < innerHeight;
   // sit a little out over the field (+x) and look back across the facades
-  const fast = 1 + Math.max(0, mover.speed - 3) / 22; // pull back a little when you're moving fast
+  const fast = (1 + Math.max(0, mover.speed - 3) / 22) * (car ? 1.3 : 1); // pull back a little when you're moving fast
   // indoors: closer and higher, looking down into the room (walls in the way are cut away)
   const dist = indoors ? 5.2 : (portrait ? 9 : 8.6) * fast;
   const up = (indoors ? 7.4 : (portrait ? 6 : 4.4) * fast) * (1 + rig.pitch);
@@ -563,7 +723,9 @@ Object.assign(window, {
   __vora: {
     pos, stops, crossings, traffic, benches: world.benches,
     get yaw() { return rig.yaw; },
-    mob, mover, roommates,
+    mob, mover, roommates, garage, obstacles: world.obstacles,
+    get driving() { return garage.driving; },
+    get fleeing() { return fleers.length; },
     get level() { return level; },
     get indoors() { const l = toLocal(pos.x, pos.z); return insideHouse(l.u, l.v); },
     get sitting() { return sittingOn?.id ?? null; },

@@ -14,8 +14,8 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 
 ## How to run
 - `npm run dev` → http://localhost:5173/row.html. This is the game. `/` is the old Pixi Foss Hill greybox, which is still working but parked.
-- `npm test`: Vitest unit tests (108, about 6 s).
-- `npm run test:e2e`: Playwright browser tests (33, about 5 min). They use the installed Google Chrome with SwiftShader WebGL and their own Vite on port 5188.
+- `npm test`: Vitest unit tests (143, about 7 s).
+- `npm run test:e2e`: Playwright browser tests (38, about 5 min). They use the installed Google Chrome with SwiftShader WebGL and their own Vite on port 5188.
 - `npm run check`: tsc, then the unit tests, then the browser tests. **Keep it green.** The user asked for everything to be tested comprehensively.
 - URL debug params: `?t=17.3` freezes the game hour, `?x=&z=` sets the start position, `?yaw=` sets the camera direction, `?level=1` starts upstairs, `?intro=0` skips the camera swoop.
 - `window.__vora` is a read-only debug hook (pos, level, where, mover, traffic, roommates, `sample()` pixel check, and more). The e2e tests rely on it.
@@ -41,6 +41,7 @@ You spawn at the south end by **Usdan** and walk **+z** along the High Street si
 | `collide.ts` | `resolveMove(prev, want, stops, extra?)`. Building slabs, plus `extra` solids, walkable areas and lots, axis sliding, and a safety net so you're never frozen inside something (pure). |
 | `traffic.ts` / `vehicles.ts` | Four-lane sim (cars, trucks, bikes), signals at the walkways (green 16 s, yellow 3 s, red 11 s); vehicles stop for you. Pure sim / meshes. |
 | `mobility.ts` / `rideables.ts` | Walk, then run after holding the stick 2 s (`RUN_AFTER`); bikes and scooters in racks or loose; ride, park in a rack, or leave anywhere. |
+| `cars.ts` | Cars you own, drive, steal and carjack (pure). `owner` is `'you'`, a roommate id, or null (a stranger's). One-thumb driving: the car steers toward the stick, and pointing behind it reverses. `jackable` lets you take a car in traffic going under 3 m/s within 3 m (step in front of one and it stops). A stranger's car left in the road rejoins traffic once you're 40 m away; owned cars get towed home. Your car's spot is saved in localStorage (`vora.row.car`). Meshes: `CarsView` in `vehicles.ts`, which reuses the jacked car's own mesh. |
 | `camera.ts` / `controls.ts` | Camera rig: follows you, direction locks while your thumb is down, look via the eye button or top strip, ←/→ or Q/E, double-tap snaps behind you. Input: walk by dragging anywhere; action button (F/Space). |
 | `clock.ts` / `sky.ts` | Game time runs about 60× real (1 real second = 1 game minute), nights 2× faster, starts at 15:30, saved in localStorage, tapping the clock skips to the next preset. Sky, lighting and colour mood by hour. |
 | `world.ts` / `buildings.ts` / `kit.ts` | Ground, field, walks, trees, lamps, benches, street and houses; building kits; instanced window and box banks. |
@@ -49,12 +50,12 @@ You spawn at the south end by **Usdan** and walk **+z** along the High Street si
 
 ### Your house (`src/row/house/`)
 A two-storey wood frame across High Street (local coordinates: `u` from the front, `v` across; `plan.ts` has an ASCII map).
-- **`plan.ts`:** walls, doors, furniture, seats, stairs, 6 bedrooms (yours is R1), and 5 roommates: jules, kofi, ines, nico, ama.
+- **`plan.ts`:** walls, doors, furniture, seats, stairs, 6 bedrooms (yours is R1), and 5 roommates: jules, kofi, ines, nico, ama. `DRIVEWAYS` has two: yours is on the left (−v) seen from the street, kofi's on the right. They're added to the walkable lots, and trees and lamps are kept out of them (there's a test).
 - **`collide.ts`:** per-floor solids. Upstairs uses walkable areas. The stairs lane (`STAIRS_CHANNEL`) must stay identical on both floors; there's a regression test for the bug where you got stuck in the wall halfway down.
 - **`portal.ts`:** the front door is a portal. Inside is its **own scene** (`homeScene` in main.ts, no street or sky). Walking out puts you at the foot of the porch steps facing the street. `cameraClearance` keeps the camera out of the house.
 - **`routine.ts` / `roommates.ts`:** each roommate has a daily schedule on the game clock (kitchen, out at class, porch, couch, room). There's a waypoint graph for walking around, a who's-home card when you enter, and greeting speech bubbles.
 - **`view.ts`:** a closed `exterior` (siding, porch, roof) and the `interior`, with a cut-away so walls between the camera and you hide. The TV and lamps light up at night.
-- **Actions:** Sit (couch, dining chairs, porch bench), Sleep (skips to 07:30), Go inside/outside, Ride/Park/Get off.
+- **Actions:** Sit (couch, dining chairs, porch bench), Sleep (skips to 07:30), Go inside/outside, Ride/Park/Get off, Drive/Steal car/Carjack/Get out. If you've taken kofi's car, he asks about it when you get home.
 
 ## Open items / next ideas
 - Git repo initialised 2026-10-01 (branch `main`). The remote is https://github.com/cudechukwu/vora. The user said nothing here is private, so the brief and photos are committed. Still ask before pushing.

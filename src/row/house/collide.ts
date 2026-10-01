@@ -1,6 +1,6 @@
 import type { Box, Extra } from '../collide';
 import {
-  FRONT_DOOR, FURNITURE, Level, LOT, PORCH, PORCH_STEPS, R, ROOM_DOORS, STAIRS, STAIRWELL, UPSTAIRS_Y,
+  DRIVEWAYS, FRONT_DOOR, FURNITURE, Level, LOT, PORCH, PORCH_STEPS, R, ROOM_DOORS, STAIRS, STAIRWELL, UPSTAIRS_Y,
   WALLS, Wall, inStairs, stairY, toLocal, toWorld,
 } from './plan';
 
@@ -61,8 +61,8 @@ const UPSTAIRS_FLOOR: Box[] = [
   box(r1u - 0.35, r1u + 0.35, 0.9, 2.1), // your door
 ];
 
-/** The world past the far sidewalk is only open on your lot. */
-const LOTS: Box[] = [box(LOT.u0, LOT.u1, LOT.v0, LOT.v1)];
+/** The world past the far sidewalk is only open on your lot (and the driveways either side of it). */
+export const LOTS: Box[] = [box(LOT.u0, LOT.u1, LOT.v0, LOT.v1), ...DRIVEWAYS.map((d) => box(d.u0, d.u1, d.v0, d.v1))];
 
 export function houseExtra(level: Level, riding: boolean): Extra {
   if (level === 1) return { walkable: UPSTAIRS_FLOOR, solids: furniture(1), lots: LOTS };

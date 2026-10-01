@@ -2,6 +2,7 @@ import { Page, expect, test } from '@playwright/test';
 import { byId, layoutRow } from '../../src/row/layout';
 import { LANES, PED_GAP } from '../../src/row/traffic';
 import { EXIT_AT } from '../../src/row/house/portal';
+import { DRIVEWAYS } from '../../src/row/house/plan';
 
 // End-to-end: the real page, real WebGL (SwiftShader), real input.
 // window.__vora is a read-only debug hook exposed by src/row/main.ts.
@@ -434,4 +435,101 @@ test("walking in shows who's home, and someone says hi", async ({ page }) => {
   await expect(page.locator('#welcome')).toHaveClass(/show/);
   await expect(page.locator('#welcome .s')).toContainText('home');
   await expect.poll(() => page.evaluate(() => (window as any).__vora.roommates.list.some((m: any) => m.sayUntil > performance.now())), { timeout: 5000 }).toBe(true);
+});
+
+// ── cars: yours, kofi's, and whatever you take off High Street ──
+
+const drv = (page: Page) => page.evaluate(() => {
+  const v = (window as any).__vora;
+  const c = v.garage.cars.find((x: any) => x.id === v.driving);
+  return { driving: v.driving as number | null, x: v.pos.x as number, z: v.pos.z as number, action: v.action as string, car: c ? { x: c.x, z: c.z, owner: c.owner, stolen: c.stolen } : null };
+});
+
+test('your car is in your driveway: Drive, go, get out', async ({ page }) => {
+  const errors = await open(page, `${hw(5, -12.8 + 2.4)}&yaw=${-Math.PI / 2}`); // beside it, driver's side
+  await expect(page.locator('#act')).toContainText('Drive');
+  await page.keyboard.press('f');
+  await expect.poll(async () => (await drv(page)).driving).toBe(0);
+  const start = await drv(page);
+  expect(start.car!.stolen).toBe(false);
+  await expect(page.locator('#act')).toContainText('Get out');
+  // looking at the house (+x), S backs you toward High Street: out of the driveway, nose first
+  await page.keyboard.down('s');
+  await page.waitForFunction((x) => (window as any).__vora.pos.x < x, start.x - 5, { timeout: 45_000 });
+  await page.keyboard.up('s');
+  await page.keyboard.press('f');
+  await expect.poll(async () => (await drv(page)).driving).toBeNull();
+  // the car stayed where you left it, and you're standing beside it
+  const after = await page.evaluate(() => { const v = (window as any).__vora; const c = v.garage.cars[0]; return { cx: c.x, cz: c.z, x: v.pos.x, z: v.pos.z }; });
+  expect(after.cx).toBeLessThan(start.x - 4);
+  expect(Math.hypot(after.x - after.cx, after.z - after.cz)).toBeGreaterThan(1.2);
+  expect(Math.hypot(after.x - after.cx, after.z - after.cz)).toBeLessThan(3);
+  expect(errors).toEqual([]);
+});
+
+test('nothing solid (trees, lamps) stands in either driveway or its mouth', async ({ page }) => {
+  await open(page);
+  const blocked = await page.evaluate((drives) => {
+    const v = (window as any).__vora;
+    return drives.filter((d: any) => v.obstacles.some((b: any) => b.x1 > 20 && b.x0 < d.x1 && b.z1 > d.z0 - 1 && b.z0 < d.z1 + 1));
+  }, DRIVEWAYS.map((d) => ({ x1: HX0 + d.u1, z0: HZC + d.v0, z1: HZC + d.v1 })));
+  expect(blocked).toEqual([]);
+});
+
+test('parked cars are solid: you walk into one and stop', async ({ page }) => {
+  await open(page, `${hw(5, -12.8 + 3)}&yaw=${Math.PI}`); // looking +z… so S walks you −z, into your car
+  await hold(page, 's', 3);
+  const s = await state(page);
+  expect(s.z).toBeGreaterThan(HZC - 12.8 + 1.2); // stopped at its side (half its width + your radius)
+});
+
+test("taking kofi's car is stealing it — and he notices when you get home", async ({ page }) => {
+  await open(page, `t=21.5&${hw(5, 12.8 + 2.4)}&yaw=${-Math.PI / 2}`);
+  await expect(page.locator('#act')).toContainText("Steal kofi's car");
+  await page.keyboard.press('f');
+  await expect.poll(async () => (await drv(page)).car?.stolen).toBe(true);
+  await expect(page.locator('#toast')).toContainText("kofi's car");
+  const start = await drv(page);
+  await page.keyboard.down('s');
+  await page.waitForFunction((x) => (window as any).__vora.pos.x < x, start.x - 5, { timeout: 45_000 });
+  await page.keyboard.up('s');
+  await page.keyboard.press('f');
+  await expect.poll(async () => (await drv(page)).driving).toBeNull();
+  // go home (teleport to the porch, as the walk is covered elsewhere) and in
+  await page.evaluate(([x, z]) => (window as any).__vora.pos.set(x, 0, z), [HX0 - 1.3, HZC + 4]);
+  await expect(page.locator('#act')).toContainText('Go inside');
+  await page.keyboard.press('f');
+  await expect.poll(() => page.locator('.tag.say').allTextContents().then((t) => t.join(' ')), { timeout: 10_000 }).toMatch(/car/);
+});
+
+test('carjack: step out in front of a car, it stops, you pull the driver out and drive off in it', async ({ page }) => {
+  const errors = await open(page, `x=${LANES[0].x}&z=-200`); // standing in the near lane
+  await page.waitForFunction(() => (window as any).__vora.action.startsWith('jack-'), null, { timeout: 50_000 });
+  const before = await page.evaluate(() => {
+    const v = (window as any).__vora;
+    const car = v.traffic.vehicles.find((x: any) => `jack-${x.id}` === v.action);
+    return { color: car.color as number, n: v.traffic.vehicles.length as number };
+  });
+  await expect(page.locator('#act')).toContainText('Carjack');
+  await page.keyboard.press('f');
+  await expect.poll(async () => (await drv(page)).driving).not.toBeNull();
+  const jacked = await page.evaluate(() => {
+    const v = (window as any).__vora;
+    const c = v.garage.cars.find((x: any) => x.id === v.driving);
+    return { n: v.traffic.vehicles.length, color: c.color, owner: c.owner, fleeing: v.fleeing };
+  });
+  expect(jacked.n).toBe(before.n - 1);
+  expect(jacked.color).toBe(before.color);
+  expect(jacked.owner).toBeNull();
+  expect(jacked.fleeing).toBe(1);
+  await expect(page.locator('#toast')).toContainText('carjacked');
+  // the driver yells at you
+  await expect.poll(() => page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.tag.say')]
+    .some((el) => /car|serious|stop|washed|groceries/.test(el.textContent ?? '') && parseFloat(el.style.opacity) > 0)), { timeout: 5000 }).toBe(true);
+  // and it drives: W is down the road (+z)
+  const s0 = await drv(page);
+  await page.keyboard.down('w');
+  await page.waitForFunction((z) => (window as any).__vora.pos.z > z, s0.z + 6, { timeout: 45_000 });
+  await page.keyboard.up('w');
+  expect(errors).toEqual([]);
 });

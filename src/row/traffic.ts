@@ -100,8 +100,11 @@ export function createTraffic(crossings: Crossing[], perLane = 5, bikesPerLane =
   return { t: 0, vehicles, crossings, zMin, zMax };
 }
 
-/** Advance the world by dt seconds. `people` are pedestrians the traffic must not hit. */
-export function stepTraffic(s: TrafficState, dt: number, people: XZ[] = []): void {
+/** Something in the road traffic must stop for: a person (a point), or a parked car (hl/hw: half length/width). */
+export interface Obstacle extends XZ { hl?: number; hw?: number }
+
+/** Advance the world by dt seconds. `people` are pedestrians (and stopped cars) the traffic must not hit. */
+export function stepTraffic(s: TrafficState, dt: number, people: Obstacle[] = []): void {
   s.t += dt;
   const light = lightAt(s.t);
   const yLeft = yellowLeft(s.t);
@@ -130,9 +133,10 @@ export function stepTraffic(s: TrafficState, dt: number, people: XZ[] = []): voi
 
       const halfW = v.kind === 'bike' ? 0.9 : 1.6;
       for (const p of people) {
-        if (Math.abs(p.x - lane.x) > halfW + 0.4) continue;
-        const ahead = (p.z - front) * d;
-        if (ahead < -v.len || ahead > LOOKAHEAD) continue;
+        const hl = p.hl ?? 0;
+        if (Math.abs(p.x - lane.x) > halfW + 0.4 + (p.hw ?? 0)) continue;
+        const ahead = (p.z - front) * d - hl;
+        if (ahead < -v.len - 2 * hl || ahead > LOOKAHEAD) continue;
         room = Math.min(room, ahead - PED_GAP);
       }
 
@@ -158,3 +162,17 @@ export function stepTraffic(s: TrafficState, dt: number, people: XZ[] = []): voi
 
 /** World x of a vehicle (lane centre). */
 export const laneX = (v: Vehicle) => LANES[v.lane].x;
+
+/** Take a vehicle out of the simulation (someone's taken it). */
+export function removeVehicle(s: TrafficState, id: number): Vehicle | undefined {
+  const i = s.vehicles.findIndex((v) => v.id === id);
+  return i < 0 ? undefined : s.vehicles.splice(i, 1)[0];
+}
+
+/** Put a vehicle (back) into a lane at z, at a standstill. Gets a fresh id. */
+export function addVehicle(s: TrafficState, v: Omit<Vehicle, 'id' | 'speed'>): Vehicle {
+  const id = s.vehicles.reduce((m, o) => Math.max(m, o.id), -1) + 1;
+  const nv: Vehicle = { ...v, id, speed: 0 };
+  s.vehicles.push(nv);
+  return nv;
+}
