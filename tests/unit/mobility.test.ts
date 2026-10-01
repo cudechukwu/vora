@@ -3,7 +3,7 @@ import {
   MOUNT_RADIUS, RACK_RADIUS, RUN_AFTER, SPEED, actionAt, carry, createMobility, dismount, freeSlot,
   isRunning, mount, newMover, slotPos, stepMover,
 } from '../../src/row/mobility';
-import { ROAD, SPAWN, layoutRow } from '../../src/row/layout';
+import { ROAD, ROW_ENTRY as SPAWN, layoutRow } from '../../src/row/layout';
 
 const { stops, crossings } = layoutRow();
 

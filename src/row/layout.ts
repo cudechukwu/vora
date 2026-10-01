@@ -89,17 +89,29 @@ export const ROW_END_Z = ROW.reduce((z, s) => z - s.w - s.gap, ROW_START_Z);
 export const WALK_MIN_Z = ROW_START_Z + 30; // +z end of the walk
 export const WALK_MAX_Z = ROW_END_Z - 70; // −z end of the walk: lawn north of Boger, toward Wyllys Ave
 
-/** Where you start: just short of Boger, the row ahead on your right. */
-export const SPAWN = { x: -0.6, z: ROW_END_Z } as const;
+/** The north end of the walk, just short of Boger, the row ahead on your right (bikes in a rack here). */
+export const ROW_ENTRY = { x: -0.6, z: ROW_END_Z } as const;
+// (where you start the game — outside your house — is HOME_SPAWN in house/plan.ts)
 
 // ── Usdan University Center: a big triangle behind Boger, between it and Andrus Field ──
 export interface XZ { x: number; z: number }
-/** Its footprint, going round: north-east corner, down the east side (behind Boger), along the south side, the west tip. */
+/**
+ * Its footprint, going round: north-east corner, down the east face (which looks across the plaza at
+ * Boger, the back path running straight into it), along the south side, the west tip.
+ */
 export const USDAN: XZ[] = [
-  { x: -46, z: -228 }, { x: -37, z: -177 }, { x: -58, z: -175 }, { x: -88, z: -181 }, { x: -98, z: -198 },
+  { x: -62, z: -238 }, { x: -60, z: -178 }, { x: -80, z: -176 }, { x: -104, z: -182 }, { x: -114, z: -201 },
 ];
 /** The courtyard cut into the middle of it (open to the sky; you can't get in). */
-export const USDAN_COURT: XZ[] = [{ x: -68, z: -201 }, { x: -55, z: -208 }, { x: -53, z: -194 }];
+export const USDAN_COURT: XZ[] = [{ x: -84, z: -204 }, { x: -71, z: -211 }, { x: -69, z: -197 }];
+
+/**
+ * The plaza between Usdan and Boger: speckled concrete slabs, trees in stone-chip pits, granite
+ * benches and tables, outdoor tables and chairs. Fills the space between Usdan's east face and
+ * the back of Boger, and spills round Boger's south end into the walkway to High Street.
+ */
+export const PLAZA = { x0: -60, x1: -32, z0: -240, z1: -163 } as const;
+export const PLAZA_GAP = { x0: -32, x1: -15.5, z0: -178.6, z1: -161.4 } as const; // between Boger and South College
 export const USDAN_NAME = 'Usdan University Center';
 
 /** Is p inside the polygon? (even–odd) */

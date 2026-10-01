@@ -163,6 +163,16 @@ export const DRIVEWAYS: Driveway[] = [
   { owner: 'kofi', u0: DRIVE_U0, u1: DRIVE_U1, v0: DRIVE_V - DRIVE_W / 2, v1: DRIVE_V + DRIVE_W / 2, park: { u: 5, v: DRIVE_V } },
 ];
 
+/**
+ * Where the game starts: on the sidewalk outside your house, at the end of your front path,
+ * looking up High Street (+z) with College Row across the road on your left.
+ */
+export const HOME_SPAWN = {
+  x: (FAR_WALK.x0 + FAR_WALK.x1) / 2,
+  z: HOUSE.zc + (PORCH_STEPS.v0 + PORCH_STEPS.v1) / 2,
+  heading: 0,
+} as const;
+
 /** Inside the walls (not the porch). */
 export const insideHouse = (u: number, v: number) => u > 0 && u < HOUSE.depth && v > -HOUSE.width / 2 && v < HOUSE.width / 2;
 

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BACK_PATH, FAR_WALK, FIELD_X, PATH_HALF, ROAD, ROW, ROW_END_Z, SPAWN, USDAN, USDAN_COURT, WALK_MAX_Z, WALK_MIN_Z,
+  BACK_PATH, FAR_WALK, FIELD_X, PATH_HALF, ROAD, ROW, ROW_END_Z, ROW_ENTRY, USDAN, USDAN_COURT, WALK_MAX_Z, WALK_MIN_Z,
   byId, inPoly, layoutRow,
 } from '../../src/row/layout';
 import { resolveMove } from '../../src/row/collide';
+import { HOME_SPAWN, PORCH_STEPS, toLocal } from '../../src/row/house/plan';
+import { houseExtra } from '../../src/row/house/collide';
 
 const { stops, crossings } = layoutRow();
 
@@ -76,10 +78,20 @@ describe('behind the row', () => {
   const boger = byId(stops, 'boger'), south = byId(stops, 'south');
   const byUsdan = crossings[crossings.length - 1];
 
-  it('Boger is the first building on the row; you start just short of it', () => {
+  it('Boger is the first building on the row; the walk starts just short of it', () => {
     expect(stops[stops.length - 1].id).toBe('boger');
-    expect(SPAWN.z).toBeLessThan(boger.z1);
-    expect(boger.z1 - SPAWN.z).toBeLessThan(15);
+    expect(ROW_ENTRY.z).toBeLessThan(boger.z1);
+    expect(boger.z1 - ROW_ENTRY.z).toBeLessThan(15);
+  });
+
+  it('you start the game outside your house: on the far sidewalk, at the end of your front path', () => {
+    expect(HOME_SPAWN.x).toBeGreaterThan(FAR_WALK.x0);
+    expect(HOME_SPAWN.x).toBeLessThan(FAR_WALK.x1);
+    const { u, v } = toLocal(HOME_SPAWN.x, HOME_SPAWN.z);
+    expect(v).toBeGreaterThan(PORCH_STEPS.v0);
+    expect(v).toBeLessThan(PORCH_STEPS.v1); // in line with the steps up to your porch
+    expect(u).toBeLessThan(-4); // out on the sidewalk, not in the yard
+    expect(resolveMove(HOME_SPAWN, HOME_SPAWN, stops, houseExtra(0, false))).toEqual({ x: HOME_SPAWN.x, z: HOME_SPAWN.z });
   });
 
   it('Usdan is behind Boger — not on the row — between it and the field, its south side on the Boger–South walkway', () => {

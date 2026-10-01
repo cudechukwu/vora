@@ -14,23 +14,28 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 
 ## How to run
 - `npm run dev` → http://localhost:5173/row.html. This is the game. `/` is the old Pixi Foss Hill greybox, which is still working but parked.
-- `npm test`: Vitest unit tests (182, about 8 s).
-- `npm run test:e2e`: Playwright browser tests (46, about 10 min; run it in the background). They use the installed Google Chrome with SwiftShader WebGL and their own Vite on port 5188.
-- `npm run check`: tsc, then the unit tests, then the browser tests. **Keep it green.** The user asked for everything to be tested comprehensively.
+- `npm test`: Vitest unit tests (193, about 8 s).
+- Browser tests (Playwright, 47) run against a **built copy** (`vite build` into `dist-e2e/`, served by `vite preview` on port 5189), snapshotted when the run starts. So you **can keep editing source while they run**. They use the installed Google Chrome with SwiftShader WebGL, 2 workers (`-- --workers=1` when the machine is busy).
+  - `npm run test:smoke`: 8 key tests tagged `@smoke`, about 3 min. Run after each feature.
+  - `npm run test:e2e -- -g carjack`: just the tests whose names match.
+  - `npm run test:e2e`: everything, 10+ min. Run it in the background.
+- `npm run check:quick`: tsc + unit tests + smoke. `npm run check`: tsc + unit + all browser tests, before commits. **Keep it green.** The user asked for everything to be tested comprehensively. The agreed workflow (2026-10-01) is unit tests on every change, smoke after each feature, the full suite in the background before commits.
 - URL debug params: `?t=17.3` freezes the game hour, `?x=&z=` sets the start position, `?yaw=` sets the camera direction, `?level=1` starts upstairs, `?intro=0` skips the camera swoop.
 - `window.__vora` is a read-only debug hook (pos, level, where, mover, traffic, roommates, `sample()` pixel check, and more). The e2e tests rely on it.
 
 ### Testing gotchas
-- **Never edit source files while the e2e suite is running.** Vite hot-reloads the pages mid-test and the results become meaningless.
+- The e2e suite tests a build, so edits during a run don't affect it. But a `vite.config.ts` change only takes effect on the next run.
+- The `hold()` helper in the spec counts *rendered frames*, not wall time, before deciding you've stopped. Under load, SwiftShader can drop to 1–4 fps.
+- `__vora.stats` gives draw calls and triangles for the last frame. Scenes run about 400–1500 draw calls, mostly from people (about 11 meshes each, plus shadows). Watch this on iPhone.
 - The machine sometimes runs heavy background load (`routined`, `contactsd`), with load averages up to 100+. When that happens the e2e tests time out for reasons unrelated to the code. Check `uptime` before blaming the code.
 - Screenshot/visual checks: launch Playwright with `channel: 'chrome'`, args `--use-angle=swiftshader --enable-unsafe-swiftshader`, viewport 390×844, and use the URL params above.
 
 ## The world (all in `src/row/`)
-You spawn at the north end (−z is north) just short of **Boger** and walk **+z** along the High Street side of **College Row**:
+You **start the game outside your house**, on the sidewalk at the end of your front path (`HOME_SPAWN` in `house/plan.ts`), looking up High Street (+z, with −z as north). The opening camera swoop starts across the street, looking back at you and the house. The tests' `open()` helper starts at `ROW_ENTRY` (the north end of the walk, just short of **Boger**) unless told `home`. Walk **+z** along the High Street side of **College Row**:
 - The **buildings are on your right (−x)**, in this order: Boger → South College (belfry) → North College (green-domed cupola) → Zelnick Pavilion (glass link) → Memorial Chapel (red-striped roof, spire) → Judd → Allbritton.
-- **Usdan is not on the row.** Per the user's Google Maps screenshot, it's a big triangle *behind Boger*, north of the field, with a courtyard. It's `USDAN` (a polygon) in `layout.ts`, solid via `inUsdan`. A narrow path runs between Boger and Usdan. The Boger–South walkway passes Usdan's south side. The **burrito truck** (white, 10:30–15:30, with a line of students and a cooler) parks there: `foodtruck.ts` + `campus.ts`.
+- **Usdan is not on the row.** Per the user's Google Maps screenshot and photos, it's a big triangle *behind and west of Boger*, north of the field, with a courtyard, brick, deep dark eaves and glass clerestories on top. It's `USDAN` (a polygon) in `layout.ts`, solid via `inUsdan`. Between Usdan's east face and Boger is a **wide plaza** (`PLAZA` / `PLAZA_GAP`, contents in `plaza.ts`). It has speckled concrete slabs, trees in red stone-chip pits, granite benches and an oval table, grey outdoor tables with people at them, mum planters, bollards and a blue-lidded bin. The back path runs north into it. The Boger–South walkway passes Usdan's south side. The **burrito truck** (white, 10:30–15:30, with a line of students and a cooler) parks there: `foodtruck.ts` + `campus.ts`.
 - **High Street** (road, traffic, a far sidewalk, wood-frame houses) is on your left (+x).
-- Behind the row there's a wide **coal-tar path** (`BACK_PATH`): no lines and no crosswalks (the user was specific). Students walk it, and **Physical Plant's golf cart** (`cart.ts`) drives up and down it. Then comes **Andrus Field** (football field with stands, ball diamond). You reach it through two walkways: Allbritton–Judd and South–Boger. Each building has its own `depth` in `layout.ts`, matching what's drawn.
+- Behind the row there's a wide **coal-tar path** (`BACK_PATH`): no lines and no crosswalks (the user was specific). It has granite curbs, hosta beds on the building side, and teak benches, Bigbelly bins and a hydrant near Judd. A low chain-link fence runs round the football field, with gates, and Corwin Stadium's press box is black with a W sign. South College is brownstone. Students walk it, and **Physical Plant's golf cart** (`cart.ts`) drives up and down it. Then comes **Andrus Field** (football field with stands, ball diamond). You reach it through two walkways: Allbritton–Judd and South–Boger. Each building has its own `depth` in `layout.ts`, matching what's drawn.
 - The user confirmed this layout matches the real campus.
 - Planned next to the world: **Foss Hill** beyond Andrus Field.
 

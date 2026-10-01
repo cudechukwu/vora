@@ -5,7 +5,7 @@ import {
 import { Sky, moodAt } from './sky';
 import { BoxBank, WindowBank, lambert } from './kit';
 import { buildRow } from './buildings';
-import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, SPAWN, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
+import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, ROW_ENTRY, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
 import { World } from './world';
 import { resolveMove } from './collide';
 import {
@@ -16,7 +16,7 @@ import { HouseView } from './house/view';
 import { Roommates } from './house/roommates';
 import { homecoming, listNames } from './house/routine';
 import { floorY, houseExtra, levelAt } from './house/collide';
-import { BED_SPOT, FRONT_DOOR, Level, SEATS, Seat, insideHouse, toLocal, toWorld } from './house/plan';
+import { BED_SPOT, FRONT_DOOR, HOME_SPAWN, Level, SEATS, Seat, insideHouse, toLocal, toWorld } from './house/plan';
 import { ENTER_AT, EXIT_AT, Where, cameraClearance, nearDoor as byTheDoor, portalAt } from './house/portal';
 import { LANES, Obstacle, createTraffic, lightAt, stepTraffic } from './traffic';
 import { CarsView, Traffic } from './vehicles';
@@ -30,6 +30,7 @@ import {
 import { START_HOUR, advance, formatHour, nextPreset, periodOf, wakeFrom, wrapHour } from './clock';
 import { Person, discGeometry, randomLook } from './people';
 import { Knock, OUCH, hits, launch, stepKnock } from './knock';
+import { ITEMS, SITTERS, chairs } from './plaza';
 import { Labels, Note, Trail, buildTrails } from './traces';
 import { Input } from './controls';
 import { CameraRig, wrap } from './camera';
@@ -92,19 +93,20 @@ homeScene.add(homeHemi, homeDay, homeDay.target, house.interior);
 
 // ── people ──
 const me = new Person({ skin: 0x6b3e26, hair: 0x121212, hairStyle: 'short', top: 0xc8302a, legs: 0x2b2b30, pack: 0x2b3a66 });
-// spawn just short of Boger, the row ahead on your right (Usdan behind it); ?x= / ?z= to start elsewhere
-const pos = new Vector3(parseFloat(params.get('x') ?? String(SPAWN.x)), 0, parseFloat(params.get('z') ?? String(SPAWN.z)));
+// you start the day outside your house, on the sidewalk; ?x= / ?z= to start elsewhere
+const atHomeStart = !params.has('x') && !params.has('z');
+const pos = new Vector3(parseFloat(params.get('x') ?? String(HOME_SPAWN.x)), 0, parseFloat(params.get('z') ?? String(HOME_SPAWN.z)));
 let level: Level = params.get('level') === '1' ? 1 : 0; // which floor you're on (only matters in your house)
 pos.y = floorY(level, pos.x, pos.z);
 me.root.position.copy(pos);
-me.face(0); // facing +z, down the row
+me.face(HOME_SPAWN.heading); // facing +z, up High Street
 scene.add(me.root);
 let sittingOn: Seat | null = null;
 // which world you're in: the street, or inside your house (?x/?z can start you inside)
 let where: Where = insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v) ? 'in' : 'out';
 
 // ── getting around: walk → run, bikes + scooters in racks and loose on the walk ──
-const mob = createMobility(stops, crossings, SPAWN);
+const mob = createMobility(stops, crossings, ROW_ENTRY);
 const mover = newMover();
 const rideView = new RideView(mob);
 scene.add(rideView.group);
@@ -188,6 +190,11 @@ const sitAt = (p: Person, x: number, z: number, heading: number, seatY: number) 
 world.benches.slice(0, 6).forEach((b, i) => {
   if (i % 2 === 0) sitAt(new Person(randomLook(300 + i)), b.x + 0.05, b.z - 0.45, Math.PI / 2, 0.5);
   if (i % 3 === 0) sitAt(new Person(randomLook(320 + i)), b.x + 0.05, b.z + 0.5, Math.PI / 2, 0.5);
+});
+// out on the plaza between Usdan and Boger: a few people at the tables
+SITTERS.forEach(([t, c], i) => {
+  const at = chairs(ITEMS[t])[c];
+  sitAt(new Person(randomLook(760 + i * 3)), at.x, at.z, at.heading, 0.46);
 });
 // hangs on the grass
 const circles: [number, number, number][] = [
@@ -371,8 +378,10 @@ function applyMood(h: number) {
 // ── input + camera ──
 const input = new Input();
 input.onFirstMove = () => setTimeout(() => hint.classList.add('gone'), 2500);
-const rig = new CameraRig(parseFloat(params.get('yaw') ?? String(Math.PI))); // π = looking +z, down the row from Usdan; ?yaw= for screenshots
-const camPos = new Vector3(pos.x + 60, 70, pos.z - 90);
+const rig = new CameraRig(parseFloat(params.get('yaw') ?? String(Math.PI))); // π = looking +z, up High Street / down the row; ?yaw= for screenshots
+// the opening swoop: at home, from across the street looking back at you in front of your house; else from high over the row
+const camPos = atHomeStart ? new Vector3(pos.x - 24, 11, pos.z + 6) : new Vector3(pos.x + 60, 70, pos.z - 90);
+const HOUSE_LOOK = new Vector3(toWorld(3, 0).x, 4, toWorld(3, 0).z); // the front of your house
 const lookAt = new Vector3();
 const fwd = new Vector3(), right = new Vector3(), move = new Vector3(), want = new Vector3();
 let snapCamera = false; // jump the camera (after going through a door) instead of gliding
@@ -866,6 +875,8 @@ function frame(now: number) {
   // look ahead of you — less so when the camera's had to tuck in close, so you stay on screen
   const ahead = indoors ? 2.5 : 9 * Math.max(0.15, clear);
   lookAt.copy(pos).addScaledVector(fwd, ahead).addScaledVector(right, -1.8 * side * clear).setY(pos.y + 1.1 - rig.pitch * 1.5);
+  // the opening shot at home: start on your house, then turn to the street as the camera comes round behind you
+  if (atHomeStart && introT < 1) lookAt.lerpVectors(HOUSE_LOOK, lookAt, k);
   camera.lookAt(lookAt);
 
   // light + sky follow you
@@ -880,7 +891,7 @@ function frame(now: number) {
   // "now passing"
   const byUsdan = inPoly(pos, USDAN) || distToPoly(pos, USDAN) < 9;
   const stop = pos.x < 8 && !byUsdan ? stops.find((s) => pos.z <= s.z0 + 2 && pos.z >= s.z1 - 2) : undefined;
-  const atHome = local.u > -6 && local.u < 18 && Math.abs(local.v) < 12;
+  const atHome = local.u > -8 && local.u < 18 && Math.abs(local.v) < 12; // (includes the sidewalk out front)
   const onField = pos.x < FIELD_X && !byUsdan;
   const here = indoors ? null : byUsdan ? USDAN_NAME : onField ? 'Andrus Field' : stop?.name ?? (atHome ? 'your house' : null); // (inside, the welcome card says it)
   if (here) { passingName.textContent = here; passing.classList.add('show'); }
@@ -929,13 +940,15 @@ Object.assign(window, {
     get night() { return night; },
     get light() { return lightAt(traffic.t); },
     get frames() { return frames; },
+    /** Draw calls + triangles in the last frame (for chasing slow views). */
+    get stats() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; },
   },
 });
 
 applyMood(hour);
 lastHour = hour;
 if (where === 'in') homeScene.add(me.root, fill);
-if (introT === 1) camPos.set(pos.x + 2.2, 6, pos.z - 9);
+if (introT === 1) camPos.set(pos.x + Math.sin(rig.yaw) * 9, 6, pos.z + Math.cos(rig.yaw) * 9); // already behind you
 requestAnimationFrame(frame);
 const boot = document.getElementById('boot')!;
 setTimeout(() => { boot.classList.add('hide'); hud.classList.add('show'); }, 500);

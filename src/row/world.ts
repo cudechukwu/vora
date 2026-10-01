@@ -6,7 +6,10 @@ import {
 import { BoxBank, PAL, lambert, prism } from './kit';
 import type { Box } from './collide';
 import {
-  BACK_PATH, CROSSWALK_W, Crossing, FAR_WALK, FIELD_X, PATH_HALF, ROAD, RowStop, USDAN, WALK_MAX_Z, WALK_MIN_Z,
+  BED, FOOTBALL, ITEMS, Item, PATH_ITEMS, chairs, fenceObstacles, fenceRuns, half, pathObstacles, plazaObstacles,
+} from './plaza';
+import {
+  BACK_PATH, PLAZA, PLAZA_GAP, CROSSWALK_W, Crossing, FAR_WALK, FIELD_X, PATH_HALF, ROAD, RowStop, USDAN, WALK_MAX_Z, WALK_MIN_Z,
   inUsdan,
 } from './layout';
 import { noise2, rng } from '../noise';
@@ -20,6 +23,9 @@ import { DRIVEWAYS, HOUSE } from './house/plan';
 
 
 export interface Bench { x: number; z: number }
+
+const inPlaza = (p: { x: number; z: number }) =>
+  [PLAZA, PLAZA_GAP].some((b) => p.x > b.x0 - 2 && p.x < b.x1 + 2 && p.z > b.z0 - 2 && p.z < b.z1 + 2);
 export interface Lamp { x: number; z: number; h: number; arm: number }
 
 export class World {
@@ -32,6 +38,7 @@ export class World {
   private glowMat!: SpriteMaterial;
   private poolMat!: MeshBasicMaterial;
   private spots: Lamp[] = [];
+  private fz = -60; // centre of the football field (z)
   private lampOn = 0;
   /** Real lights, moved to whichever street lamps are nearest you (so people + walls light up, not just the ground). */
   readonly lampLights: PointLight[] = [0, 1, 2, 3].map(() => new PointLight(0xffd59a, 0, 18, 1.4));
@@ -39,13 +46,17 @@ export class World {
   constructor(stops: RowStop[], private crossings: Crossing[], box: BoxBank) {
     const chapel = stops.find((s) => s.name === 'Memorial Chapel');
     this.ground();
-    this.field(chapel ? chapel.doorZ : -60, box);
+    this.fz = chapel ? chapel.doorZ : -60;
+    this.field(this.fz, box);
     this.walks(stops);
     this.street(box);
     this.backPath(stops);
     this.trees(stops);
     this.lamps();
     this.benchesAlongLawn(box);
+    this.plaza(box);
+    this.pathSide(box);
+    this.obstacles.push(...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, this.fz));
   }
 
   private ground() {
@@ -107,7 +118,7 @@ export class World {
 
   /** Football field behind the chapel, with goalposts and the red-trimmed stands on the far side. */
   private football(fz: number, box: BoxBank) {
-    const W = 49, L = 110, cx = FIELD_X - 7 - W / 2;
+    const { W, L } = FOOTBALL, cx = FIELD_X - FOOTBALL.gap - W / 2;
     const cv = document.createElement('canvas');
     cv.width = 128; cv.height = 288;
     const g = cv.getContext('2d')!;
@@ -144,7 +155,166 @@ export class World {
     }
     box.add(sx + 0.5, 0.45, fz, 0.2, 0.9, sl, 0xb8352c); // red front wall
     box.add(sx - 3.5, 1.8, fz, 7, 3.6, sl, 0x6a7074); // understructure
-    box.add(sx - 6.8, 5.6, fz, 2.4, 2.4, 10, 0xe8e2d4); // press box
+    box.add(sx - 6.8, 5.6, fz, 2.4, 2.4, 10, 0x1d1f22); // black press box (Corwin Stadium)
+    box.add(sx - 6.8, 7.0, fz, 2.6, 0.3, 10.4, 0xf1f1ee); // its white roof
+    for (let i = -4; i <= 4; i++) box.add(sx - 5.58, 5.5, fz + i * 1.05, 0.02, 0.6, 0.8, 0x8a9aa6); // windows
+    box.add(sx - 5.56, 6.35, fz, 0.03, 0.55, 3.2, 0xf1f1ee); // the sign…
+    box.add(sx - 5.54, 6.35, fz, 0.03, 0.35, 0.5, 0xb8352c); // …with its red W
+    // a low chain-link fence round the field: posts, a top rail, and see-through mesh
+    const mesh = new MeshBasicMaterial({ color: 0x8a9096, transparent: true, opacity: 0.3, depthWrite: false });
+    for (const [x0, z0, x1, z1] of fenceRuns(FIELD_X, fz)) {
+      const len = Math.hypot(x1 - x0, z1 - z0), alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
+      const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+      box.add(mx, 1.25, mz, alongX ? len : 0.05, 0.05, alongX ? 0.05 : len, 0x9aa0a4);
+      const n = Math.max(1, Math.round(len / 3));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        box.add(x0 + (x1 - x0) * t, 0.64, z0 + (z1 - z0) * t, 0.06, 1.28, 0.06, 0x9aa0a4);
+      }
+      const m = new Mesh(new PlaneGeometry(len, 1.2), mesh);
+      m.position.set(mx, 0.62, mz);
+      m.rotation.y = alongX ? 0 : Math.PI / 2;
+      this.group.add(m);
+    }
+  }
+
+  /** The plaza between Usdan and Boger: speckled concrete slabs and everything on them (see plaza.ts). */
+  private plaza(box: BoxBank) {
+    // slabs in a running bond, speckled, with darker joints
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 256;
+    const g = cv.getContext('2d')!;
+    g.fillStyle = '#c9bea7'; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 2600; i++) {
+      g.fillStyle = rng(i * 7 + 1) < 0.5 ? 'rgba(70,62,52,.45)' : 'rgba(240,234,220,.5)';
+      g.fillRect(rng(i * 7 + 2) * 256, rng(i * 7 + 3) * 256, 1.5, 1.5);
+    }
+    g.strokeStyle = 'rgba(90,80,66,.55)'; g.lineWidth = 2;
+    for (let r = 0; r < 4; r++) {
+      g.beginPath(); g.moveTo(0, r * 64); g.lineTo(256, r * 64); g.stroke();
+      for (let c = 0; c < 2; c++) { const x = c * 128 + (r % 2) * 64; g.beginPath(); g.moveTo(x, r * 64); g.lineTo(x, r * 64 + 64); g.stroke(); }
+    }
+    const tex = new CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = RepeatWrapping;
+    tex.colorSpace = SRGBColorSpace;
+    for (const p of [PLAZA, PLAZA_GAP]) {
+      const t = tex.clone();
+      t.needsUpdate = true;
+      t.repeat.set((p.x1 - p.x0) / 4, (p.z1 - p.z0) / 4); // one tile = 4m × 4m (slabs ~2m × 1m)
+      const m = new Mesh(new PlaneGeometry(p.x1 - p.x0, p.z1 - p.z0), new MeshLambertMaterial({ map: t }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set((p.x0 + p.x1) / 2, 0.034, (p.z0 + p.z1) / 2);
+      m.receiveShadow = true;
+      this.group.add(m);
+    }
+    // a pale granite band where the plaza meets the walkway
+    box.add((PLAZA.x0 + PLAZA_GAP.x1) / 2, 0.04, PLAZA_GAP.z0 - 0.2, PLAZA_GAP.x1 - PLAZA.x0, 0.02, 0.45, 0xb9b8b1);
+
+    const granite = 0xaeada7, grey = 0xb6babd, slat = 0x7d8286;
+    const draw = (it: Item) => {
+      const [hx, hz] = half(it);
+      const r = it.alongZ ? Math.PI / 2 : 0;
+      const along = (d: number) => (it.alongZ ? [0, d] : [d, 0]);
+      switch (it.kind) {
+        case 'tree':
+          box.add(it.x, 0.045, it.z, 3, 0.02, 3, 0x5c2f29); // square pit of red stone chips
+          break;
+        case 'bench': { // a rounded granite slab on three round legs
+          box.add(it.x, 0.45, it.z, 2.2, 0.22, 0.6, granite, r);
+          for (const d of [-0.75, 0, 0.75]) { const [ox, oz] = along(d); box.add(it.x + ox, 0.18, it.z + oz, 0.42, 0.36, 0.42, 0x9d9c96); }
+          break;
+        }
+        case 'oval':
+          box.add(it.x, 0.72, it.z, 2.6, 0.16, 1.2, granite, r);
+          for (const d of [-0.7, 0.7]) { const [ox, oz] = along(d); box.add(it.x + ox, 0.32, it.z + oz, 0.6, 0.64, 0.6, 0x9d9c96); }
+          break;
+        case 'table': {
+          box.add(it.x, 0.74, it.z, hx * 2, 0.05, hz * 2, grey);
+          for (const dx of [-hx + 0.1, hx - 0.1]) for (const dz of [-hz + 0.1, hz - 0.1]) box.add(it.x + dx, 0.37, it.z + dz, 0.05, 0.74, 0.05, grey);
+          for (const c of chairs(it)) chair(c.x, c.z, c.heading, grey, slat);
+          break;
+        }
+        case 'woodTable':
+          box.add(it.x, 0.74, it.z, 1.2, 0.06, 1.2, 0x6b5a48);
+          box.add(it.x, 0.37, it.z, 0.18, 0.74, 0.18, 0x3b3128);
+          for (const c of chairs(it)) chair(c.x, c.z, c.heading, 0x6b5a48, 0x58493a);
+          break;
+        case 'planter': { // a round concrete bowl of red and yellow mums
+          const bowl = new Mesh(new CylinderGeometry(0.62, 0.48, 0.62, 14), lambert(0xd9d4c9));
+          bowl.position.set(it.x, 0.31, it.z);
+          bowl.castShadow = true;
+          this.group.add(bowl);
+          for (let k = 0; k < 14; k++) {
+            const a = k * 2.4, rr = 0.15 + (k % 4) * 0.12;
+            box.add(it.x + Math.sin(a) * rr, 0.68 + (k % 3) * 0.04, it.z + Math.cos(a) * rr, 0.22, 0.16, 0.22, k % 3 ? 0xa81c22 : 0xe8d27a, a);
+          }
+          box.add(it.x, 0.64, it.z, 0.9, 0.08, 0.9, 0x3d5a2f); // leaves under the flowers
+          break;
+        }
+        case 'bollard': {
+          const b = new Mesh(new CylinderGeometry(0.19, 0.21, 0.9, 10), lambert(0xc4c2bb));
+          b.position.set(it.x, 0.45, it.z);
+          b.castShadow = true;
+          this.group.add(b);
+          break;
+        }
+        case 'bin': {
+          const b = new Mesh(new CylinderGeometry(0.28, 0.25, 0.85, 12), lambert(0x8a8f94));
+          b.position.set(it.x, 0.43, it.z);
+          const lid = new Mesh(new CylinderGeometry(0.3, 0.3, 0.12, 12), lambert(0x1f5fbf));
+          lid.position.set(it.x, 0.9, it.z);
+          this.group.add(b, lid);
+          break;
+        }
+      }
+      void hx; void hz;
+    };
+    const chair = (x: number, z: number, heading: number, frame: number, seat: number) => {
+      // seat + back, behind the sitter (heading points at the table)
+      const bx = x - Math.sin(heading) * 0.22, bz = z - Math.cos(heading) * 0.22;
+      box.add(x, 0.46, z, 0.46, 0.05, 0.46, seat, heading);
+      box.add(bx, 0.72, bz, 0.46, 0.46, 0.04, frame, heading);
+      box.add(x, 0.23, z, 0.42, 0.46, 0.04, frame, heading);
+    };
+    for (const it of ITEMS) draw(it);
+  }
+
+  /** Along the back path: granite curbs, hosta beds, and up by Judd the benches, bins and a hydrant. */
+  private pathSide(box: BoxBank) {
+    const { z0, z1 } = World.backPathZ(this.crossings);
+    // where walkways cross the path, the curbs and beds stop
+    const open = (z: number) => this.crossings.some((c) => Math.abs(c.z - z) < c.w / 2 + 0.3);
+    const runs: [number, number][] = [];
+    let start: number | null = null;
+    for (let z = z0; z <= z1; z += 0.5) {
+      if (!open(z) && start === null) start = z;
+      if ((open(z) || z + 0.5 > z1) && start !== null) { runs.push([start, z]); start = null; }
+    }
+    const items = PATH_ITEMS.map((p) => p.z);
+    for (const [a, b] of runs) {
+      const mid = (a + b) / 2, len = b - a;
+      for (const x of [BACK_PATH.x0, BACK_PATH.x1]) box.add(x, 0.07, mid, 0.3, 0.14, len, 0xb9b8b1); // curbs
+      box.add((BED.x0 + BED.x1) / 2, 0.04, mid, BED.x1 - BED.x0, 0.03, len, 0x4a3426); // mulch
+      for (let z = a + 1; z < b - 1; z += 1.7) { // hostas, round and low
+        if (items.some((iz) => Math.abs(iz - z) < 1.6)) continue;
+        const k = Math.floor(rng(z * 3.1) * 3);
+        box.add(BED.x0 + 0.9 + rng(z) * 0.4, 0.2, z, 0.75, 0.38, 0.75, [0x4e7a35, 0x6a8f3e, 0x3f6a32][k], rng(z * 1.7) * 3);
+      }
+    }
+    for (const it of PATH_ITEMS) {
+      if (it.kind === 'teakBench') { // facing the path (−x)
+        box.add(it.x, 0.44, it.z, 0.5, 0.06, 1.8, 0x9a8a72);
+        box.add(it.x + 0.24, 0.72, it.z, 0.06, 0.5, 1.8, 0x9a8a72);
+        for (const d of [-0.8, 0.8]) box.add(it.x, 0.22, it.z + d, 0.5, 0.44, 0.06, 0x7d6f5c);
+      } else if (it.kind === 'bigbelly') {
+        box.add(it.x, 0.62, it.z, 0.72, 1.24, 0.72, 0x1c1e20);
+        box.add(it.x - 0.37, 0.8, it.z, 0.02, 0.3, 0.42, 0xe9e9e4); // the label
+      } else {
+        box.add(it.x, 0.32, it.z, 0.24, 0.64, 0.24, 0xc8241f);
+        box.add(it.x, 0.68, it.z, 0.3, 0.1, 0.3, 0xc8241f);
+        box.add(it.x, 0.4, it.z, 0.42, 0.1, 0.12, 0xc8241f);
+      }
+    }
   }
 
   /** High Street: the road on the open side of the walk, with old houses across it. */
@@ -298,7 +468,9 @@ export class World {
       list.push({ x: x + rng(id + 3) * 4, z: WALK_MIN_Z + 45 + rng(id + 4) * 20, s: 1.6 + rng(id + 5), id: id++ });
     }
 
-    for (let i = list.length - 1; i >= 0; i--) if (inUsdan(list[i], 3)) list.splice(i, 1); // not inside Usdan
+    for (let i = list.length - 1; i >= 0; i--) if (inUsdan(list[i], 3) || inPlaza(list[i])) list.splice(i, 1); // not in Usdan or on the plaza
+    // the plaza's own trees, in their pits
+    for (const it of ITEMS) if (it.kind === 'tree') list.push({ x: it.x, z: it.z, s: it.size ?? 1.1, id: id++ });
 
     // early-fall Connecticut: mostly green, some already turning
     const leaves = [0x5a9a38, 0x4a8a30, 0x6aa840, 0x5a9a38, 0x4a8a30, 0xd9a032, 0xd9782b, 0xb8452a, 0xe6c147];

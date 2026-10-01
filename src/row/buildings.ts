@@ -190,7 +190,7 @@ function chapel(k: Kit, zRow: number) {
 
 function southCollege(k: Kit, zc: number) {
   const w = 24;
-  const h = hall(k, { zc, w, d: 16, floors: 4, floorH: 3.4, wall: 'brick', color: PAL.brickDeep, window: 'rect', roof: 'hip', roofH: 3 });
+  const h = hall(k, { zc, w, d: 16, floors: 4, floorH: 3.4, wall: 'stone', color: PAL.brownstone, window: 'rect', roof: 'hip', roofH: 3 });
   cupola(k, h.cx, h.top + 2.2, zc, true);
 }
 
@@ -278,16 +278,33 @@ function slab(poly: XZ[], y0: number, h: number, grow = 0, hole?: XZ[]) {
   return geo;
 }
 
+/** The raised glass clerestories on Usdan's roof: one along the east wing (over the plaza), one over the west. */
+const USDAN_LANTERNS: XZ[][] = [
+  [{ x: -68, z: -229 }, { x: -64.5, z: -229 }, { x: -63, z: -186 }, { x: -67, z: -186 }],
+  [{ x: -106, z: -197 }, { x: -93, z: -197 }, { x: -93, z: -187 }, { x: -102, z: -187 }],
+];
+
 /** Usdan: a big low triangle behind Boger — brick ground floor, a band of glass above, pale green roof, courtyard in the middle. */
 function usdan(k: Kit) {
   const { g, win, box } = k;
   const brick = lambert(PAL.brick, brickMap(), 'brick');
-  g.add(new Mesh(slab(USDAN, 0, 4.6, 0, USDAN_COURT), brick));
-  g.add(new Mesh(slab(USDAN, 4.6, 4.4, -0.4, USDAN_COURT), lambert(0x34444e)));
-  g.add(new Mesh(slab(USDAN, 9.0, 0.45, 1.2, USDAN_COURT), lambert(0xa8bfa0)));
+  g.add(new Mesh(slab(USDAN, 0, 9.0, 0, USDAN_COURT), brick)); // brick, two tall storeys
+  g.add(new Mesh(slab(USDAN, 4.5, 0.25, 0.12, USDAN_COURT), lambert(PAL.brickDeep))); // a darker band between them
+  // deep dark eaves all round, then raised glass clerestories with their own overhanging roofs (the pagoda look)
+  const roof = lambert(0x50575d);
+  g.add(new Mesh(slab(USDAN, 9.0, 0.4, 1.8, USDAN_COURT), roof));
+  for (const lantern of USDAN_LANTERNS) {
+    g.add(new Mesh(slab(lantern, 9.4, 1.9, -0.2), lambert(0x8fa6b2)));
+    g.add(new Mesh(slab(lantern, 11.3, 0.35, 1.1), roof));
+    for (let i = 0; i < lantern.length; i++) { // mullions
+      const a = lantern[i], b = lantern[(i + 1) % lantern.length];
+      const n = Math.max(2, Math.floor(Math.hypot(b.x - a.x, b.z - a.z) / 2.2));
+      for (let j = 0; j <= n; j++) box.add(a.x + (b.x - a.x) * (j / n), 10.35, a.z + (b.z - a.z) * (j / n), 0.12, 1.9, 0.12, 0x3c4348);
+    }
+  }
   // windows all the way round: tall glass above, a few big ones below
   const area = USDAN.reduce((a, p, i) => { const q = USDAN[(i + 1) % USDAN.length]; return a + p.x * q.z - q.x * p.z; }, 0);
-  const sign = area > 0 ? -1 : 1; // which side of each edge is outside
+  const sign = area > 0 ? 1 : -1; // which side of each edge is outside
   USDAN.forEach((a, i) => {
     const b = USDAN[(i + 1) % USDAN.length];
     const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
@@ -296,7 +313,7 @@ function usdan(k: Kit) {
     const n = Math.max(2, Math.floor(len / 3.2));
     for (let j = 0; j < n; j++) {
       const t = (j + 0.5) / n, x = a.x + dx * t, z = a.z + dz * t;
-      win.add('rect', x + nx * -0.37, 6.8, z + nz * -0.37, len / n - 0.35, 3.4, face);
+      win.add('rect', x + nx * 0.03, 6.7, z + nz * 0.03, Math.min(2.4, len / n - 0.8), 2.8, face);
       if (j % 2 === 0) win.add('rect', x + nx * 0.03, 2.4, z + nz * 0.03, 2.2, 2.6, face);
     }
   });

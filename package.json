@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "tsc --noEmit && vitest run && playwright test"
+    "check": "tsc --noEmit && vitest run && playwright test",
+    "test:smoke": "playwright test --grep @smoke",
+    "check:quick": "tsc --noEmit && vitest run && playwright test --grep @smoke"
   },
   "dependencies": {
     "@types/three": "^0.186.0",

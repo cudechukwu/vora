@@ -1,5 +1,6 @@
 import { Page, expect, test } from '@playwright/test';
-import { SPAWN, byId, layoutRow } from '../../src/row/layout';
+import { ROW_ENTRY, byId, layoutRow } from '../../src/row/layout';
+import { HOME_SPAWN } from '../../src/row/house/plan';
 import { LANES, PED_GAP } from '../../src/row/traffic';
 import { EXIT_AT } from '../../src/row/house/portal';
 import { DRIVEWAYS } from '../../src/row/house/plan';
@@ -9,7 +10,16 @@ import { DRIVEWAYS } from '../../src/row/house/plan';
 
 const { stops, crossings } = layoutRow();
 
-async function open(page: Page, query = '') {
+/**
+ * Open the game. Most tests are about College Row, so unless the query says where to stand (x/z),
+ * this starts you at the north end of the walk, looking down the row — pass `home` to start where the
+ * game really does: outside your house.
+ */
+async function open(page: Page, query = '', home = false) {
+  if (!home) {
+    if (!/(^|&)x=/.test(query)) query += `&x=${ROW_ENTRY.x}`;
+    if (!/(^|&)z=/.test(query)) query += `&z=${ROW_ENTRY.z}`;
+  }
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
@@ -27,31 +37,34 @@ const state = (page: Page) => page.evaluate(() => {
 async function hold(page: Page, key: string, metres: number) {
   const start = await state(page);
   await page.keyboard.down(key);
-  // 4 m/s; wait until we've moved `metres` or stopped changing for a while
+  // wait until we've moved `metres`, or stopped moving for 8 frames that actually rendered
+  // (count frames, not wall-clock time: a loaded machine can render only a few frames a second)
   let last = start, still = 0;
-  for (let i = 0; i < 400 && still < 8; i++) {
+  for (let i = 0; i < 600 && still < 8; i++) {
     await page.waitForTimeout(100);
     const s = await state(page);
     const moved = Math.hypot(s.x - start.x, s.z - start.z);
     if (moved >= metres) break;
-    still = Math.hypot(s.x - last.x, s.z - last.z) < 1e-3 ? still + 1 : 0;
+    if (s.frames > last.frames) still = Math.hypot(s.x - last.x, s.z - last.z) < 1e-3 ? still + 1 : 0;
     last = s;
   }
   await page.keyboard.up(key);
   return state(page);
 }
 
-test('boots cleanly and draws a real scene', async ({ page }) => {
-  const errors = await open(page);
+test('boots cleanly and draws a real scene @smoke', async ({ page }) => {
+  const errors = await open(page, '', true);
   await expect(page.locator('#hud')).toHaveClass(/show/);
   await expect(page.locator('#boot')).toHaveCount(0, { timeout: 5000 });
   const colours = await page.evaluate(() => (window as any).__vora.sample());
   expect(colours).toBeGreaterThan(25);
   await expect(page.locator('#presence')).toContainText('on the row');
-  // nobody touched anything: you're exactly where you spawned (regression: a negative first frame once slid you backwards)
+  // nobody touched anything: you're exactly where you spawned — outside your house (regression: a negative first frame once slid you backwards)
   const s = await state(page);
-  expect(s.z).toBe(SPAWN.z);
-  expect(s.x).toBe(-0.6);
+  expect(s.z).toBe(HOME_SPAWN.z);
+  expect(s.x).toBe(HOME_SPAWN.x);
+  await expect(page.locator('#passing .v')).toHaveText('your house');
+  expect(await page.evaluate(() => (window as any).__vora.where)).toBe('out');
   expect(errors).toEqual([]);
 });
 
@@ -72,7 +85,7 @@ test('dragging up walks you forward and hides the hint', async ({ page }) => {
   expect(b.z).toBeCloseTo(a.z, 5);
 });
 
-test('keyboard walks too (W forward)', async ({ page }) => {
+test('keyboard walks too (W forward) @smoke', async ({ page }) => {
   await open(page);
   const before = await state(page);
   const after = await hold(page, 'w', 3);
@@ -276,7 +289,7 @@ test('double-tapping the top strip snaps the view back behind you', async ({ pag
 });
 
 // ── getting around ──
-const SPAWN_Z = SPAWN.z;
+const SPAWN_Z = ROW_ENTRY.z;
 const mover = (page: Page) => page.evaluate(() => {
   const v = (window as any).__vora;
   return { mode: v.mover.mode as string, speed: v.mover.speed as number, riding: v.mover.riding as number | null, running: v.running as boolean, action: v.action as string };
@@ -291,7 +304,7 @@ test('keep the stick pushed and you break into a run', async ({ page }) => {
   await page.waitForFunction(() => !(window as any).__vora.running && (window as any).__vora.mover.speed === 0, null, { timeout: 20_000 });
 });
 
-test('a Ride button appears next to the rack by the start, and F gets you on a bike', async ({ page }) => {
+test('a Ride button appears next to the rack by the start, and F gets you on a bike @smoke', async ({ page }) => {
   await open(page, `x=-2.4&z=${SPAWN_Z + 5}`);
   const act = page.locator('#act');
   await expect(act).toHaveClass(/show/);
@@ -341,7 +354,7 @@ const house = (page: Page) => page.evaluate(() => {
   return { level: v.level as number, indoors: v.indoors as boolean, where: v.where as string, up: v.upstairsShown as boolean, sitting: v.sitting as string | null, action: v.action as string, hour: v.hour as number };
 });
 
-test('walk in the front door: you are taken into the house, its own world', async ({ page }) => {
+test('walk in the front door: you are taken into the house, its own world @smoke', async ({ page }) => {
   const errors = await open(page, `t=12&${hw(-2, 4)}&yaw=${-Math.PI / 2}`);
   expect((await house(page)).where).toBe('out');
   await page.keyboard.down('w');
@@ -454,7 +467,7 @@ const drv = (page: Page) => page.evaluate(() => {
   return { driving: v.driving as number | null, x: v.pos.x as number, z: v.pos.z as number, action: v.action as string, car: c ? { x: c.x, z: c.z, owner: c.owner, stolen: c.stolen } : null };
 });
 
-test('your car is in your driveway: Drive, go, get out', async ({ page }) => {
+test('your car is in your driveway: Drive, go, get out @smoke', async ({ page }) => {
   const errors = await open(page, `${hw(5, -12.8 + 2.4)}&yaw=${-Math.PI / 2}`); // beside it, driver's side
   await expect(page.locator('#act')).toContainText('Drive');
   await page.keyboard.press('f');
@@ -511,9 +524,10 @@ test("taking kofi's car is stealing it — and he notices when you get home", as
   await expect.poll(() => page.locator('.tag.say').allTextContents().then((t) => t.join(' ')), { timeout: 10_000 }).toMatch(/car/);
 });
 
-test('carjack: step out in front of a car, it stops, you pull the driver out and drive off in it', async ({ page }) => {
+test('carjack: step out in front of a car, it stops, you pull the driver out and drive off in it @smoke', async ({ page }) => {
+  test.setTimeout(150_000); // waits for traffic to come along and stop for you
   const errors = await open(page, `x=${LANES[0].x}&z=-200`); // standing in the near lane
-  await page.waitForFunction(() => (window as any).__vora.action.startsWith('jack-'), null, { timeout: 50_000 });
+  await page.waitForFunction(() => (window as any).__vora.action.startsWith('jack-'), null, { timeout: 100_000 });
   const before = await page.evaluate(() => {
     const v = (window as any).__vora;
     const car = v.traffic.vehicles.find((x: any) => `jack-${x.id}` === v.action);
@@ -543,7 +557,7 @@ test('carjack: step out in front of a car, it stops, you pull the driver out and
   expect(errors).toEqual([]);
 });
 
-test('drive into people on the walk: they go flying, yell, then pick themselves up', async ({ page }) => {
+test('drive into people on the walk: they go flying, yell, then pick themselves up @smoke', async ({ page }) => {
   const errors = await open(page, `yaw=${Math.PI}`);
   // your car, parked on the walk just ahead; get in and floor it down the row
   await page.evaluate(() => { const v = (window as any).__vora; const c = v.garage.cars[0]; Object.assign(c, { x: 0.6, z: v.pos.z + 4, heading: 0 }); v.pos.set(-1.3, 0, c.z); });
@@ -602,24 +616,35 @@ test('behind the row: walk through a walkway, across the back road, onto Andrus 
 });
 
 test('the burrito truck by Usdan: a line in the day that moves, gone at night', async ({ page }) => {
+  test.setTimeout(150_000); // an order takes 11s of game time; slow frames stretch that a lot
   const errors = await open(page, 't=12&x=-8&z=-169');
   await expect.poll(() => page.evaluate(() => (window as any).__vora.truckOpen)).toBe(true);
   expect(await page.evaluate(() => (window as any).__vora.inLine)).toBeGreaterThanOrEqual(4);
-  await page.waitForFunction(() => (window as any).__vora.served >= 1, null, { timeout: 40_000 }); // someone gets their burrito
+  await page.waitForFunction(() => (window as any).__vora.served >= 1, null, { timeout: 110_000 }); // someone gets their burrito
   await open(page, 't=22&x=-8&z=-169');
   await expect.poll(() => page.evaluate(() => (window as any).__vora.truckOpen)).toBe(false);
   expect(errors).toEqual([]);
 });
 
 test('Usdan sits behind Boger: "now passing" says so, and it is solid', async ({ page }) => {
-  await open(page, `t=12&x=-35.5&z=-200&yaw=${Math.PI / 2}`); // on the path between Boger and Usdan, looking toward Usdan (−x)
+  await open(page, `t=12&x=-54&z=-205&yaw=${Math.PI / 2}`); // on the plaza by Usdan's east face, looking at it (−x)
   await expect(page.locator('#passing .v')).toHaveText('Usdan University Center');
   const s = await hold(page, 'w', 10);
-  expect(s.x).toBeGreaterThan(-45); // stopped at its wall
+  expect(s.x).toBeGreaterThan(-61); // stopped at its wall
 });
 
 test("Physical Plant's golf cart drives the back path", async ({ page }) => {
   await open(page, 't=12&x=-40&z=-120');
   const z0 = await page.evaluate(() => (window as any).__vora.cart.z);
   await page.waitForFunction((z) => Math.abs((window as any).__vora.cart.z - z) > 4, z0, { timeout: 30_000 });
+});
+
+test('up the back path into the plaza between Usdan and Boger: people out at the tables @smoke', async ({ page }) => {
+  const errors = await open(page, `t=16&x=-56&z=-160&yaw=0`); // on the back path, looking north toward Usdan
+  const s = await hold(page, 'w', 40);
+  expect(s.z).toBeLessThan(-195); // well into the plaza
+  const sitting = await page.evaluate(() => (window as any).__vora.bodies.filter((b: any) => b.x < -32 && b.x > -60 && b.z < -163 && b.z > -240).length);
+  expect(sitting).toBeGreaterThanOrEqual(5);
+  expect(await page.evaluate(() => (window as any).__vora.sample())).toBeGreaterThan(20);
+  expect(errors).toEqual([]);
 });
