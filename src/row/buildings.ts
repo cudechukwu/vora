@@ -1,28 +1,29 @@
 import {
-  BoxGeometry, ConeGeometry, CylinderGeometry, Group, Material, Mesh, SphereGeometry,
+  BoxGeometry, ConeGeometry, CylinderGeometry, ExtrudeGeometry, Group, Material, Mesh, Path, Shape, SphereGeometry,
 } from 'three';
 import {
   BoxBank, Facing, PAL, WindowBank, WindowKind, block, brickMap, hipRoof, lambert, prism, stoneMap,
 } from './kit';
-import { BuildingId, FRONT_X, layoutRow } from './layout';
+import { BuildingId, FRONT_X, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
 
 // ─── College Row buildings ─────────────────────────────────────────────
 // Stylized, never literal (brief R/05): each building keeps the one or two
 // things a Wes student recognises it by — the chapel spire and striped
-// roof, the cupolas, Zelnick's glass, Usdan's curve — and drops the rest.
+// roof, the cupolas, Zelnick's glass, Usdan's big glass-banded triangle — and drops the rest.
 // Positions come from layout.ts; this file only draws.
 
 type Kit = { g: Group; win: WindowBank; box: BoxBank };
 type Builder = (k: Kit, zc: number) => void;
 
 const BUILDERS: Record<BuildingId, Builder> = {
-  allbritton, judd, chapel, zelnick, north: northCollege, south: southCollege, boger, usdan,
+  allbritton, judd, chapel, zelnick, north: northCollege, south: southCollege, boger,
 };
 
 export function buildRow(win: WindowBank, box: BoxBank) {
   const g = new Group();
   const { stops, crossings } = layoutRow();
   for (const s of stops) BUILDERS[s.id]({ g, win, box }, s.zc);
+  usdan({ g, win, box });
   g.traverse((o) => {
     if ((o as Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; }
   });
@@ -261,21 +262,46 @@ function boger(k: Kit, zc: number) {
 }
 
 /** Usdan: a curved front that bows out toward the field, brick below, glass above. */
-function usdan(k: Kit, zc: number) {
-  const { g, win } = k;
-  const R = 40, bulge = 6;
-  const ox = FRONT_X + bulge - R; // centre of the curve, far behind the facade
-  const half = Math.asin(24 / R);
-  const t0 = Math.PI / 2 - half, tl = half * 2;
+/** A slab in the shape of a polygon (x, z), from y0 up h, grown outward by `grow`. Optional hole. */
+function slab(poly: XZ[], y0: number, h: number, grow = 0, hole?: XZ[]) {
+  const c = poly.reduce((a, p) => ({ x: a.x + p.x / poly.length, z: a.z + p.z / poly.length }), { x: 0, z: 0 });
+  const out = (p: XZ) => {
+    const dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz) || 1;
+    return { x: p.x + (dx / d) * grow, z: p.z + (dz / d) * grow };
+  };
+  // shape lives in (x, −z); extruded up along its own z, then stood upright
+  const shape = new Shape(poly.map(out).map((p) => ({ x: p.x, y: -p.z }) as never));
+  if (hole) shape.holes.push(new Path(hole.map((p) => ({ x: p.x, y: -p.z }) as never)));
+  const geo = new ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, y0, 0);
+  return geo;
+}
+
+/** Usdan: a big low triangle behind Boger — brick ground floor, a band of glass above, pale green roof, courtyard in the middle. */
+function usdan(k: Kit) {
+  const { g, win, box } = k;
   const brick = lambert(PAL.brick, brickMap(), 'brick');
-  add(g, new CylinderGeometry(R, R, 4.6, 28, 1, false, t0, tl).translate(0, 2.3, 0), brick, ox, 0, zc);
-  add(g, new CylinderGeometry(R - 0.4, R - 0.4, 4.2, 28, 1, false, t0, tl).translate(0, 2.1, 0), lambert(0x34444e), ox, 4.6, zc);
-  add(g, new CylinderGeometry(R + 1.2, R + 1.2, 0.4, 28, 1, false, t0 - 0.02, tl + 0.04), lambert(0xa8bfa0), ox, 9.0, zc); // pale green roof
-  const n = 18;
-  for (let i = 0; i < n; i++) {
-    const th = t0 + ((i + 0.5) / n) * tl;
-    const sx = Math.sin(th), sz = Math.cos(th);
-    win.add('rect', ox + sx * (R - 0.37), 6.7, zc + sz * (R - 0.37), (tl * R) / n - 0.35, 3.4, th);
-    if (i % 2 === 0) win.add('rect', ox + sx * (R + 0.03), 2.4, zc + sz * (R + 0.03), 2.2, 2.6, th);
-  }
+  g.add(new Mesh(slab(USDAN, 0, 4.6, 0, USDAN_COURT), brick));
+  g.add(new Mesh(slab(USDAN, 4.6, 4.4, -0.4, USDAN_COURT), lambert(0x34444e)));
+  g.add(new Mesh(slab(USDAN, 9.0, 0.45, 1.2, USDAN_COURT), lambert(0xa8bfa0)));
+  // windows all the way round: tall glass above, a few big ones below
+  const area = USDAN.reduce((a, p, i) => { const q = USDAN[(i + 1) % USDAN.length]; return a + p.x * q.z - q.x * p.z; }, 0);
+  const sign = area > 0 ? -1 : 1; // which side of each edge is outside
+  USDAN.forEach((a, i) => {
+    const b = USDAN[(i + 1) % USDAN.length];
+    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+    const nx = (sign * dz) / len, nz = (-sign * dx) / len; // outward normal
+    const face = Math.atan2(nx, nz);
+    const n = Math.max(2, Math.floor(len / 3.2));
+    for (let j = 0; j < n; j++) {
+      const t = (j + 0.5) / n, x = a.x + dx * t, z = a.z + dz * t;
+      win.add('rect', x + nx * -0.37, 6.8, z + nz * -0.37, len / n - 0.35, 3.4, face);
+      if (j % 2 === 0) win.add('rect', x + nx * 0.03, 2.4, z + nz * 0.03, 2.2, 2.6, face);
+    }
+  });
+  // the entrance off the Boger–South walkway: a glass porch on the south side
+  const e = { x: (USDAN[1].x + USDAN[2].x) / 2 + 4, z: (USDAN[1].z + USDAN[2].z) / 2 };
+  box.add(e.x, 1.6, e.z + 1.4, 5, 3.2, 2.6, 0x3a4e5a);
+  box.add(e.x, 3.35, e.z + 1.6, 6, 0.3, 3.2, PAL.trim);
 }

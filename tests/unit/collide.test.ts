@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { resolveMove, XZ } from '../../src/row/collide';
-import { BOUNDS, byId, layoutRow } from '../../src/row/layout';
+import { BOUNDS, USDAN, byId, inPoly, layoutRow } from '../../src/row/layout';
 import { rng } from '../../src/noise';
 
 const { stops, crossings } = layoutRow();
 const boger = byId(stops, 'boger');
-const usdan = byId(stops, 'usdan');
 
 /** Walk from `from` toward `to` in small steps, like the game loop does. */
 function walk(from: XZ, to: XZ, stepLen = 0.2, maxSteps = 5000): XZ {
@@ -36,10 +35,20 @@ describe('walking around College Row', () => {
     expect(end.x).toBeCloseTo(boger.front + 0.8, 5);
   });
 
-  it("stops you at Usdan's curved front, which sticks out further", () => {
-    const end = walk({ x: 0, z: usdan.zc }, { x: -30, z: usdan.zc });
-    expect(end.x).toBeCloseTo(usdan.front + 0.8, 5);
-    expect(usdan.front).toBeGreaterThan(boger.front);
+  it('Usdan (behind Boger) is solid: walk at it from any side and you stop outside it', () => {
+    const c = USDAN.reduce((a, p) => ({ x: a.x + p.x / USDAN.length, z: a.z + p.z / USDAN.length }), { x: 0, z: 0 });
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      const from = { x: c.x + Math.sin(a) * 70, z: c.z + Math.cos(a) * 70 };
+      const end = walk(from, c);
+      expect(inPoly(end, USDAN)).toBe(false);
+    }
+  });
+
+  it('there is a way through between Boger and Usdan', () => {
+    const x = boger.back - 1.8;
+    const end = walk({ x, z: boger.z0 + 4 }, { x, z: boger.z1 - 4 });
+    expect(end.z).toBeCloseTo(boger.z1 - 4, 1);
   });
 
   it('lets you cut through each walkway onto Andrus Field', () => {
@@ -57,13 +66,15 @@ describe('walking around College Row', () => {
   });
 
   it('blocks you at the back wall when coming from the field', () => {
-    const end = walk({ x: -100, z: boger.zc }, { x: 0, z: boger.zc });
-    expect(end.x).toBeCloseTo(boger.back - 0.8, 5);
+    const south = byId(stops, 'south');
+    const end = walk({ x: -100, z: south.zc }, { x: 0, z: south.zc });
+    expect(end.x).toBeCloseTo(south.back - 0.8, 5);
   });
 
-  it('lets you roam the field behind the whole row', () => {
-    const end = walk({ x: -90, z: stops[0].z0 }, { x: -90, z: stops[stops.length - 1].z1 });
-    expect(end.z).toBeCloseTo(stops[stops.length - 1].z1, 5);
+  it('lets you roam the field behind the row, up to Usdan', () => {
+    const usdanSouth = Math.max(...USDAN.map((p) => p.z));
+    const end = walk({ x: -90, z: stops[0].z0 }, { x: -90, z: usdanSouth + 2 });
+    expect(end.z).toBeCloseTo(usdanSouth + 2, 5);
   });
 
   it('keeps you inside the world edges', () => {

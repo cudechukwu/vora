@@ -3,10 +3,10 @@ import {
   MOUNT_RADIUS, RACK_RADIUS, RUN_AFTER, SPEED, actionAt, carry, createMobility, dismount, freeSlot,
   isRunning, mount, newMover, slotPos, stepMover,
 } from '../../src/row/mobility';
-import { ROAD, byId, layoutRow } from '../../src/row/layout';
+import { ROAD, SPAWN, layoutRow } from '../../src/row/layout';
 
 const { stops, crossings } = layoutRow();
-const SPAWN = { x: -0.6, z: byId(stops, 'usdan').z1 - 8 };
+
 const fresh = () => createMobility(stops, crossings, SPAWN);
 
 /** Hold the stick at `mag` for `secs`, 60fps. */

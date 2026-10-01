@@ -1,5 +1,5 @@
 import { Box, Extra, XZ, blockedAt, inBox } from './collide';
-import { BACK_ROAD, ROAD, RowStop, byId, layoutRow } from './layout';
+import { ROAD, RowStop } from './layout';
 import { LANES, TrafficState, Vehicle, addVehicle, laneX, removeVehicle } from './traffic';
 import { DRIVEWAYS, RoommateId, toWorld } from './house/plan';
 
@@ -68,23 +68,10 @@ export function drivewaySpot(owner: 'you' | RoommateId) {
 const mkCar = (id: number, owner: Owner, color: number, at: { x: number; z: number; heading: number }): Car =>
   ({ id, kind: 'car', len: 4.4, color, ...at, speed: 0, owner, cruise: 10.5, stolen: false });
 
-/** Strangers' cars parked along the back road, at the curb on the row side. */
-export function backRoadParking(): { x: number; z: number; heading: number; color: number }[] {
-  const { stops } = layoutRow();
-  const x = BACK_ROAD.x1 - 1.25;
-  return [
-    { x, z: byId(stops, 'boger').zc + 6, heading: Math.PI, color: 0x8a9aa6 },
-    { x, z: byId(stops, 'north').zc - 4, heading: Math.PI, color: 0x6b2d2a },
-    { x, z: byId(stops, 'north').zc + 2, heading: Math.PI, color: 0xf1f1ee },
-    { x, z: byId(stops, 'judd').zc, heading: Math.PI, color: 0x3d6b4f },
-  ];
-}
-
-/** Your car + kofi's, each in its driveway (yours wherever you last left it, if saved), + a few strangers'. */
+/** Your car + kofi's, each in its driveway (yours wherever you last left it, if saved). */
 export function createGarage(saved: SavedCar | null = null): Garage {
-  const strangers = backRoadParking().map(({ color, ...at }, i) => mkCar(2 + i, null, color, at));
   return {
-    cars: [mkCar(0, 'you', YOUR_PAINT, saved ?? drivewaySpot('you')), mkCar(1, 'kofi', KOFI_PAINT, drivewaySpot('kofi')), ...strangers],
+    cars: [mkCar(0, 'you', YOUR_PAINT, saved ?? drivewaySpot('you')), mkCar(1, 'kofi', KOFI_PAINT, drivewaySpot('kofi'))],
     driving: null,
   };
 }

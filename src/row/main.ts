@@ -5,7 +5,7 @@ import {
 import { Sky, moodAt } from './sky';
 import { BoxBank, WindowBank, lambert } from './kit';
 import { buildRow } from './buildings';
-import { FRONT_X, PATH_HALF, WALK_MAX_Z, WALK_MIN_Z } from './layout';
+import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, SPAWN, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
 import { World } from './world';
 import { resolveMove } from './collide';
 import {
@@ -20,6 +20,9 @@ import { BED_SPOT, FRONT_DOOR, Level, SEATS, Seat, insideHouse, toLocal, toWorld
 import { ENTER_AT, EXIT_AT, Where, cameraClearance, nearDoor as byTheDoor, portalAt } from './house/portal';
 import { LANES, Obstacle, createTraffic, lightAt, stepTraffic } from './traffic';
 import { CarsView, Traffic } from './vehicles';
+import { cartBox, createCart, stepCart } from './cart';
+import { isOpen, newOrder, stepOrder } from './foodtruck';
+import { FoodTruckView, GolfCartView } from './campus';
 import {
   Car, asCar, carAt, carjack, distToCar, clearRoad, createGarage, driveMove, driven, footprint, getIn, getOut, jackable,
   SPEC, loadMine, missing, mph, onRoad, roadBlocks, saveMine, stepCar,
@@ -89,8 +92,7 @@ homeScene.add(homeHemi, homeDay, homeDay.target, house.interior);
 
 // ── people ──
 const me = new Person({ skin: 0x6b3e26, hair: 0x121212, hairStyle: 'short', top: 0xc8302a, legs: 0x2b2b30, pack: 0x2b3a66 });
-// spawn just short of Usdan, the row ahead on your right; ?x= / ?z= to start elsewhere
-const SPAWN = { x: -0.6, z: S('Usdan').z1 - 8 };
+// spawn just short of Boger, the row ahead on your right (Usdan behind it); ?x= / ?z= to start elsewhere
 const pos = new Vector3(parseFloat(params.get('x') ?? String(SPAWN.x)), 0, parseFloat(params.get('z') ?? String(SPAWN.z)));
 let level: Level = params.get('level') === '1' ? 1 : 0; // which floor you're on (only matters in your house)
 pos.y = floorY(level, pos.x, pos.z);
@@ -207,6 +209,34 @@ fa.face(Math.atan2(FB.x - FA.x, FB.z - FA.z)); fb.face(Math.atan2(FA.x - FB.x, F
 const disc = new Mesh(discGeometry, lambert(0xf2f2f2));
 disc.castShadow = true;
 scene.add(fa.root, fb.root, disc);
+
+// students walking the coal-tar path behind the row, back from class (keeping to its edges; the cart has the middle)
+const backZ = World.backPathZ(crossings);
+interface BackWalker { p: Person; x: number; z: number; dir: 1 | -1; speed: number; body: Body }
+const backWalkers: BackWalker[] = [];
+for (let i = 0; i < 12; i++) {
+  const dir = rng(i * 11 + 5) < 0.5 ? 1 : -1;
+  const edge = rng(i * 13 + 2) < 0.5 ? BACK_PATH.x0 + 0.9 + rng(i) * 0.7 : BACK_PATH.x1 - 0.9 - rng(i) * 0.7;
+  const bw: BackWalker = {
+    p: new Person(randomLook(600 + i)), x: edge, dir, speed: 1.1 + rng(i * 7 + 1) * 0.5,
+    z: backZ.z0 + 3 + rng(i * 17 + 3) * (backZ.z1 - backZ.z0 - 6), body: null!,
+  };
+  bw.body = hittable(bw.p, null, { land: (x, z) => { bw.x = Math.min(BACK_PATH.x1 - 0.8, Math.max(BACK_PATH.x0 + 0.8, x)); bw.z = z; } });
+  scene.add(bw.p.root);
+  backWalkers.push(bw);
+}
+
+// Physical Plant's golf cart, up and down the back path
+const cart = createCart(backZ.z0, backZ.z1);
+const cartView = new GolfCartView();
+scene.add(cartView.root);
+
+// the burrito truck by the Boger–South walkway, beside Usdan (daytime)
+const busyPeople = new Map<Person, Body>();
+const truck = new FoodTruckView(crossings[crossings.length - 1], (p) => { const b = busyPeople.get(p); return !!b && busy(b); });
+for (const p of truck.people) busyPeople.set(p, hittable(p));
+scene.add(truck.group);
+const order = newOrder();
 const faBody = hittable(fa, { x: FA.x, z: FA.z, heading: fa.heading, settle: () => fa.face(Math.atan2(FB.x - FA.x, FB.z - FA.z)) });
 const fbBody = hittable(fb, { x: FB.x, z: FB.z, heading: fb.heading, settle: () => fb.face(Math.atan2(FA.x - FB.x, FA.z - FB.z)) });
 
@@ -406,6 +436,11 @@ function collisions() {
     const b = footprint(c, 0.3);
     if (near(b)) solids.push(b);
   }
+  if (near(cartBox(cart))) solids.push(cartBox(cart, 0.3));
+  if (truck.group.visible) {
+    const t = truck.spot.box, c = truck.spot.cooler;
+    solids.push({ x0: t.x0 - 0.3, x1: t.x1 + 0.3, z0: t.z0 - 0.3, z1: t.z1 + 0.3 }, { x0: c.x - 0.7, x1: c.x + 0.7, z0: c.z - 0.55, z1: c.z + 0.55 });
+  }
   return { ...base, solids };
 }
 
@@ -546,6 +581,7 @@ function say(b: Body, text: string, secs = 3) {
 function updateBodies(dt: number) {
   const car = driven(garage);
   for (const b of bodies) {
+    if (!b.p.root.visible) continue; // (not out right now)
     const at = b.p.root.position;
     if (car && !(b.knock && b.knock.phase === 'air') && hits(car, at)) {
       b.knock = launch(car, at);
@@ -783,6 +819,22 @@ function frame(now: number) {
   if (playing) (aToB ? fa : fb).throwPose(u < 0.2 ? u / 0.2 : Math.max(0, 1 - (u - 0.2) * 5));
   updateBodies(dt);
 
+  // behind the row: students on the back path, the golf cart, the burrito truck
+  for (const w of backWalkers) {
+    if (busy(w.body)) continue;
+    w.z += w.dir * w.speed * dt;
+    if (w.z > backZ.z1 - 2 || w.z < backZ.z0 + 2) w.dir = w.dir > 0 ? -1 : 1; // turn back at the ends
+    w.p.root.position.set(w.x, 0, w.z);
+    w.p.face(w.dir > 0 ? 0 : Math.PI);
+    w.p.walk(dt, w.speed);
+  }
+  const drivenCar = driven(garage);
+  stepCart(cart, dt, drivenCar ? [drivenCar] : [pos]);
+  cartView.update(cart, dt);
+  const open = isOpen(hour);
+  if (stepOrder(order, dt, open)) truck.serve();
+  truck.update(dt, open);
+
   // camera: intro swoop, then follow
   const portrait = innerWidth < innerHeight;
   // sit a little out over the field (+x) and look back across the facades
@@ -826,9 +878,11 @@ function frame(now: number) {
   if (frames % 15 === 0 && where === 'out') world.lightNear(pos);
 
   // "now passing"
-  const stop = pos.x < 8 ? stops.find((s) => pos.z <= s.z0 + 2 && pos.z >= s.z1 - 2) : undefined;
+  const byUsdan = inPoly(pos, USDAN) || distToPoly(pos, USDAN) < 9;
+  const stop = pos.x < 8 && !byUsdan ? stops.find((s) => pos.z <= s.z0 + 2 && pos.z >= s.z1 - 2) : undefined;
   const atHome = local.u > -6 && local.u < 18 && Math.abs(local.v) < 12;
-  const here = indoors ? null : stop?.name ?? (atHome ? 'your house' : null); // (inside, the welcome card says it)
+  const onField = pos.x < FIELD_X && !byUsdan;
+  const here = indoors ? null : byUsdan ? USDAN_NAME : onField ? 'Andrus Field' : stop?.name ?? (atHome ? 'your house' : null); // (inside, the welcome card says it)
   if (here) { passingName.textContent = here; passing.classList.add('show'); }
   else passing.classList.remove('show');
 
@@ -847,6 +901,10 @@ Object.assign(window, {
     get driving() { return garage.driving; },
     get fleeing() { return fleers.length; },
     get knocked() { return bodies.filter((b) => b.knock !== null).length; },
+    cart,
+    get truckOpen() { return truck.group.visible; },
+    get inLine() { return truck.inLine; },
+    get served() { return order.served; },
     get bodies() { return bodies.map((b) => ({ x: b.p.root.position.x, z: b.p.root.position.z, busy: busy(b) })); },
     get level() { return level; },
     get indoors() { const l = toLocal(pos.x, pos.z); return insideHouse(l.u, l.v); },

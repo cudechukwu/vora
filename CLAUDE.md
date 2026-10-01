@@ -14,8 +14,8 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 
 ## How to run
 - `npm run dev` → http://localhost:5173/row.html. This is the game. `/` is the old Pixi Foss Hill greybox, which is still working but parked.
-- `npm test`: Vitest unit tests (172, about 8 s).
-- `npm run test:e2e`: Playwright browser tests (43, about 6 min). They use the installed Google Chrome with SwiftShader WebGL and their own Vite on port 5188.
+- `npm test`: Vitest unit tests (182, about 8 s).
+- `npm run test:e2e`: Playwright browser tests (46, about 10 min; run it in the background). They use the installed Google Chrome with SwiftShader WebGL and their own Vite on port 5188.
 - `npm run check`: tsc, then the unit tests, then the browser tests. **Keep it green.** The user asked for everything to be tested comprehensively.
 - URL debug params: `?t=17.3` freezes the game hour, `?x=&z=` sets the start position, `?yaw=` sets the camera direction, `?level=1` starts upstairs, `?intro=0` skips the camera swoop.
 - `window.__vora` is a read-only debug hook (pos, level, where, mover, traffic, roommates, `sample()` pixel check, and more). The e2e tests rely on it.
@@ -26,10 +26,11 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 - Screenshot/visual checks: launch Playwright with `channel: 'chrome'`, args `--use-angle=swiftshader --enable-unsafe-swiftshader`, viewport 390×844, and use the URL params above.
 
 ## The world (all in `src/row/`)
-You spawn at the south end by **Usdan** and walk **+z** along the High Street side of **College Row**:
-- The **buildings are on your right (−x)**, in this order: Usdan (curved front) → Boger → South College (belfry) → North College (green-domed cupola) → Zelnick Pavilion (glass link) → Memorial Chapel (red-striped roof, spire) → Judd → Allbritton.
+You spawn at the north end (−z is north) just short of **Boger** and walk **+z** along the High Street side of **College Row**:
+- The **buildings are on your right (−x)**, in this order: Boger → South College (belfry) → North College (green-domed cupola) → Zelnick Pavilion (glass link) → Memorial Chapel (red-striped roof, spire) → Judd → Allbritton.
+- **Usdan is not on the row.** Per the user's Google Maps screenshot, it's a big triangle *behind Boger*, north of the field, with a courtyard. It's `USDAN` (a polygon) in `layout.ts`, solid via `inUsdan`. A narrow path runs between Boger and Usdan. The Boger–South walkway passes Usdan's south side. The **burrito truck** (white, 10:30–15:30, with a line of students and a cooler) parks there: `foodtruck.ts` + `campus.ts`.
 - **High Street** (road, traffic, a far sidewalk, wood-frame houses) is on your left (+x).
-- Behind the row there's a **back road**: sidewalk, two-lane campus road (with strangers' cars parked at the row-side curb), another sidewalk, then **Andrus Field** (football field with stands, ball diamond). You reach it through two walkways: Allbritton–Judd and South–Boger. Each building has its own `depth` in `layout.ts`, matching what's drawn.
+- Behind the row there's a wide **coal-tar path** (`BACK_PATH`): no lines and no crosswalks (the user was specific). Students walk it, and **Physical Plant's golf cart** (`cart.ts`) drives up and down it. Then comes **Andrus Field** (football field with stands, ball diamond). You reach it through two walkways: Allbritton–Judd and South–Boger. Each building has its own `depth` in `layout.ts`, matching what's drawn.
 - The user confirmed this layout matches the real campus.
 - Planned next to the world: **Foss Hill** beyond Andrus Field.
 

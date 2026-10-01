@@ -1,24 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BACK_FAR_WALK, BACK_ROAD, BACK_WALK, FAR_WALK, FIELD_X, PATH_HALF, ROAD, ROW, ROW_END_Z, WALK_MAX_Z, WALK_MIN_Z,
-  byId, layoutRow,
+  BACK_PATH, FAR_WALK, FIELD_X, PATH_HALF, ROAD, ROW, ROW_END_Z, SPAWN, USDAN, USDAN_COURT, WALK_MAX_Z, WALK_MIN_Z,
+  byId, inPoly, layoutRow,
 } from '../../src/row/layout';
 import { resolveMove } from '../../src/row/collide';
-import { backRoadParking } from '../../src/row/cars';
 
 const { stops, crossings } = layoutRow();
 
 describe('College Row layout', () => {
   it('has every building once', () => {
     expect(stops.map((s) => s.id).sort()).toEqual(
-      ['allbritton', 'boger', 'chapel', 'judd', 'north', 'south', 'usdan', 'zelnick'],
+      ['allbritton', 'boger', 'chapel', 'judd', 'north', 'south', 'zelnick'],
     );
   });
 
-  it('meets the buildings in the agreed order when walking +z from Usdan', () => {
+  it('meets the buildings in the agreed order when walking +z from Boger', () => {
     const walking = [...stops].sort((a, b) => a.zc - b.zc).map((s) => s.name);
     expect(walking).toEqual([
-      'Usdan University Center', 'Boger Hall', 'South College', 'North College',
+      'Boger Hall', 'South College', 'North College',
       'Zelnick Pavilion', 'Memorial Chapel', 'Judd Hall', 'Allbritton Center',
     ]);
   });
@@ -56,8 +55,8 @@ describe('College Row layout', () => {
     }
   });
 
-  it('makes Usdan bulge out toward the walk, everything else flush', () => {
-    for (const s of stops) expect(s.front).toBe(s.id === 'usdan' ? stops[0].front + 6 : stops[0].front);
+  it('keeps every facade flush along the walk', () => {
+    for (const s of stops) expect(s.front).toBe(stops[0].front);
   });
 
   it('walk runs past both ends of the row', () => {
@@ -73,34 +72,42 @@ describe('College Row layout', () => {
   });
 });
 
-describe('behind the row: sidewalk, road, sidewalk, then Andrus Field', () => {
-  it('runs in that order, edge to edge, going back from the buildings', () => {
-    expect(BACK_WALK.x0).toBe(BACK_ROAD.x1);
-    expect(BACK_ROAD.x0).toBe(BACK_FAR_WALK.x1);
-    expect(BACK_FAR_WALK.x0).toBeGreaterThan(FIELD_X);
-    expect(BACK_ROAD.x1 - BACK_ROAD.x0).toBeGreaterThanOrEqual(6.5); // two lanes
+describe('behind the row', () => {
+  const boger = byId(stops, 'boger'), south = byId(stops, 'south');
+  const byUsdan = crossings[crossings.length - 1];
+
+  it('Boger is the first building on the row; you start just short of it', () => {
+    expect(stops[stops.length - 1].id).toBe('boger');
+    expect(SPAWN.z).toBeLessThan(boger.z1);
+    expect(boger.z1 - SPAWN.z).toBeLessThan(15);
   });
 
-  it('every building ends before the back sidewalk (with room to walk behind it)', () => {
-    for (const s of stops) expect(s.back).toBeGreaterThan(BACK_WALK.x1 + 0.8);
+  it('Usdan is behind Boger — not on the row — between it and the field, its south side on the Boger–South walkway', () => {
+    for (const p of USDAN) expect(p.x).toBeLessThan(boger.back - 2); // a path's width behind Boger
+    const south = Math.max(...USDAN.map((p) => p.z));
+    expect(south).toBeLessThan(byUsdan.z - byUsdan.w / 2); // north of the walkway…
+    expect(byUsdan.z - byUsdan.w / 2 - south).toBeLessThan(5); // …right beside it
+    expect(Math.min(...USDAN.map((p) => p.x))).toBeLessThan(FIELD_X); // out past the back path
+    expect(inPoly(USDAN_COURT[0], USDAN)).toBe(true); // the courtyard's inside it
   });
 
-  it('you can walk the whole length of the back sidewalk, and come out of a walkway onto it', () => {
-    const x = (BACK_WALK.x0 + BACK_WALK.x1) / 2;
-    let p = { x, z: stops[0].z0 + 5 };
-    for (let i = 0; i < 2000 && p.z > stops[stops.length - 1].z1 - 5; i++) p = resolveMove(p, { x, z: p.z - 0.3 }, stops);
-    expect(p.z).toBeLessThan(stops[stops.length - 1].z1 - 4);
-    const c = crossings[0];
-    p = { x: -20, z: c.z };
-    for (let i = 0; i < 300; i++) p = resolveMove(p, { x: p.x - 0.2, z: c.z }, stops);
-    expect(p.x).toBeLessThan(BACK_FAR_WALK.x0); // straight across the road and onto the field
+  it('a coal-tar path runs behind the buildings, in front of the field', () => {
+    for (const s of stops) expect(s.back).toBeGreaterThan(BACK_PATH.x1 + 0.8);
+    expect(BACK_PATH.x0).toBeGreaterThan(FIELD_X);
+    expect(BACK_PATH.x1 - BACK_PATH.x0).toBeGreaterThan(5);
   });
 
-  it('the cars parked on the back road sit in it, by the row-side curb, clear of the walkways', () => {
-    for (const c of backRoadParking()) {
-      expect(c.x).toBeGreaterThan(BACK_ROAD.x0 + 1);
-      expect(c.x).toBeLessThan(BACK_ROAD.x1 - 0.9);
-      for (const k of crossings) expect(Math.abs(c.z - k.z)).toBeGreaterThan(k.w / 2 + 3);
-    }
+  it('you can walk the back path from the Boger–South walkway to the end of the row', () => {
+    const x = (BACK_PATH.x0 + BACK_PATH.x1) / 2;
+    let p = { x, z: byUsdan.z };
+    for (let i = 0; i < 2000 && p.z < 40; i++) p = resolveMove(p, { x, z: p.z + 0.3 }, stops);
+    expect(p.z).toBeGreaterThanOrEqual(40);
+    expect(south.back).toBeGreaterThan(x);
+  });
+
+  it('…and from the walkway by Usdan out onto Andrus Field', () => {
+    let p = { x: -20, z: byUsdan.z };
+    for (let i = 0; i < 300; i++) p = resolveMove(p, { x: p.x - 0.2, z: byUsdan.z }, stops);
+    expect(p.x).toBeLessThan(FIELD_X - 5);
   });
 });

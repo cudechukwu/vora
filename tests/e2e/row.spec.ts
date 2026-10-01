@@ -1,5 +1,5 @@
 import { Page, expect, test } from '@playwright/test';
-import { byId, layoutRow } from '../../src/row/layout';
+import { SPAWN, byId, layoutRow } from '../../src/row/layout';
 import { LANES, PED_GAP } from '../../src/row/traffic';
 import { EXIT_AT } from '../../src/row/house/portal';
 import { DRIVEWAYS } from '../../src/row/house/plan';
@@ -50,7 +50,7 @@ test('boots cleanly and draws a real scene', async ({ page }) => {
   await expect(page.locator('#presence')).toContainText('on the row');
   // nobody touched anything: you're exactly where you spawned (regression: a negative first frame once slid you backwards)
   const s = await state(page);
-  expect(s.z).toBe(byId(stops, 'usdan').z1 - 8);
+  expect(s.z).toBe(SPAWN.z);
   expect(s.x).toBe(-0.6);
   expect(errors).toEqual([]);
 });
@@ -276,7 +276,7 @@ test('double-tapping the top strip snaps the view back behind you', async ({ pag
 });
 
 // ── getting around ──
-const SPAWN_Z = byId(stops, 'usdan').z1 - 8;
+const SPAWN_Z = SPAWN.z;
 const mover = (page: Page) => page.evaluate(() => {
   const v = (window as any).__vora;
   return { mode: v.mover.mode as string, speed: v.mover.speed as number, riding: v.mover.riding as number | null, running: v.running as boolean, action: v.action as string };
@@ -599,4 +599,27 @@ test('behind the row: walk through a walkway, across the back road, onto Andrus 
   await open(page, `x=-20&z=${c.z}&yaw=${Math.PI / 2}`); // looking −x, toward the field
   const s = await hold(page, 'w', 46);
   expect(s.x).toBeLessThan(-63);
+});
+
+test('the burrito truck by Usdan: a line in the day that moves, gone at night', async ({ page }) => {
+  const errors = await open(page, 't=12&x=-8&z=-169');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.truckOpen)).toBe(true);
+  expect(await page.evaluate(() => (window as any).__vora.inLine)).toBeGreaterThanOrEqual(4);
+  await page.waitForFunction(() => (window as any).__vora.served >= 1, null, { timeout: 40_000 }); // someone gets their burrito
+  await open(page, 't=22&x=-8&z=-169');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.truckOpen)).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('Usdan sits behind Boger: "now passing" says so, and it is solid', async ({ page }) => {
+  await open(page, `t=12&x=-35.5&z=-200&yaw=${Math.PI / 2}`); // on the path between Boger and Usdan, looking toward Usdan (−x)
+  await expect(page.locator('#passing .v')).toHaveText('Usdan University Center');
+  const s = await hold(page, 'w', 10);
+  expect(s.x).toBeGreaterThan(-45); // stopped at its wall
+});
+
+test("Physical Plant's golf cart drives the back path", async ({ page }) => {
+  await open(page, 't=12&x=-40&z=-120');
+  const z0 = await page.evaluate(() => (window as any).__vora.cart.z);
+  await page.waitForFunction((z) => Math.abs((window as any).__vora.cart.z - z) > 4, z0, { timeout: 30_000 });
 });

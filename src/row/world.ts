@@ -6,8 +6,8 @@ import {
 import { BoxBank, PAL, lambert, prism } from './kit';
 import type { Box } from './collide';
 import {
-  BACK_FAR_WALK, BACK_ROAD, BACK_WALK, CROSSWALK_W, Crossing, FAR_WALK, FIELD_X, PATH_HALF, ROAD, RowStop,
-  WALK_MAX_Z, WALK_MIN_Z,
+  BACK_PATH, CROSSWALK_W, Crossing, FAR_WALK, FIELD_X, PATH_HALF, ROAD, RowStop, USDAN, WALK_MAX_Z, WALK_MIN_Z,
+  inUsdan,
 } from './layout';
 import { noise2, rng } from '../noise';
 import { DRIVEWAYS, HOUSE } from './house/plan';
@@ -42,7 +42,7 @@ export class World {
     this.field(chapel ? chapel.doorZ : -60, box);
     this.walks(stops);
     this.street(box);
-    this.backRoad(box);
+    this.backPath(stops);
     this.trees(stops);
     this.lamps();
     this.benchesAlongLawn(box);
@@ -76,11 +76,12 @@ export class World {
     const tex = new CanvasTexture(cv);
     tex.wrapS = tex.wrapT = RepeatWrapping;
     tex.colorSpace = SRGBColorSpace;
-    const len = WALK_MIN_Z - WALK_MAX_Z + 40, wid = 150;
+    const zN = USDAN.reduce((m, p) => Math.max(m, p.z), -Infinity) + 3; // the field starts just south of Usdan
+    const len = WALK_MIN_Z + 20 - zN, wid = 150;
     tex.repeat.set(1, len / 10);
     const f = new Mesh(new PlaneGeometry(wid, len), new MeshLambertMaterial({ map: tex }));
     f.rotation.x = -Math.PI / 2;
-    f.position.set(FIELD_X - wid / 2, 0.01, (WALK_MIN_Z + WALK_MAX_Z) / 2);
+    f.position.set(FIELD_X - wid / 2, 0.01, zN + len / 2);
     f.receiveShadow = true;
     this.group.add(f);
 
@@ -191,27 +192,36 @@ export class World {
     }
   }
 
-  /** Behind the row: sidewalk, a two-lane campus road, sidewalk, then the field. */
-  private backRoad(box: BoxBank) {
-    const len = WALK_MIN_Z - WALK_MAX_Z + 160, midZ = (WALK_MIN_Z + WALK_MAX_Z) / 2;
-    const strip = (x0: number, x1: number, y: number, color: number) => {
-      const m = new Mesh(new PlaneGeometry(x1 - x0, len), lambert(color));
+  /** Where the coal-tar path behind the row starts (by Usdan, at the Boger–South walkway) and ends. */
+  static backPathZ(crossings: Crossing[]) {
+    const byUsdan = crossings[crossings.length - 1]; // the Boger–South walkway
+    return { z0: byUsdan.z - byUsdan.w / 2, z1: WALK_MIN_Z + 40 };
+  }
+
+  /** Behind the row: a wide coal-tar path — no lines, no curbs, just students walking back from class. */
+  private backPath(stops: RowStop[]) {
+    const { z0, z1 } = World.backPathZ(this.crossings);
+    const tar = lambert(0x3b3e41);
+    const strip = (x0: number, x1: number, za: number, zb: number, mat = tar) => {
+      const m = new Mesh(new PlaneGeometry(x1 - x0, zb - za), mat);
       m.rotation.x = -Math.PI / 2;
-      m.position.set((x0 + x1) / 2, y, midZ);
+      m.position.set((x0 + x1) / 2, 0.027, (za + zb) / 2);
       m.receiveShadow = true;
       this.group.add(m);
     };
-    strip(BACK_ROAD.x0, BACK_ROAD.x1, 0.025, 0x44484c);
-    strip(BACK_WALK.x0, BACK_WALK.x1, 0.03, PAL.path);
-    strip(BACK_FAR_WALK.x0, BACK_FAR_WALK.x1, 0.03, PAL.path);
-    for (const x of [BACK_ROAD.x0, BACK_ROAD.x1]) box.add(x, 0.08, midZ, 0.25, 0.16, len, PAL.curb);
-    const cx = (BACK_ROAD.x0 + BACK_ROAD.x1) / 2;
-    const onCrosswalk = (z: number) => this.crossings.some((c) => Math.abs(c.z - z) < CROSSWALK_W / 2 + 1.5);
-    for (let z = WALK_MIN_Z + 70; z > WALK_MAX_Z - 70; z -= 6) if (!onCrosswalk(z)) box.add(cx, 0.035, z, 0.14, 0.02, 3, 0xe8c14a);
-    // a zebra where each walkway between buildings crosses it, on its way to the field
-    for (const c of this.crossings) {
-      for (let x = BACK_ROAD.x0 + 0.5; x < BACK_ROAD.x1 - 0.3; x += 1.1) box.add(x, 0.036, c.z, 0.55, 0.02, CROSSWALK_W, 0xf2f0ea);
+    strip(BACK_PATH.x0, BACK_PATH.x1, z0, z1);
+    // worn, patched tar: a few lighter and darker patches
+    for (let i = 0; i < 18; i++) {
+      const z = z0 + rng(i * 3 + 400) * (z1 - z0), x = BACK_PATH.x0 + 0.8 + rng(i * 3 + 401) * (BACK_PATH.x1 - BACK_PATH.x0 - 1.6);
+      const w = 0.8 + rng(i * 3 + 402) * 1.6;
+      const m = new Mesh(new PlaneGeometry(w, w * 1.6), lambert(i % 2 ? 0x46494c : 0x333638));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x, 0.029, z);
+      this.group.add(m);
     }
+    // and a narrow one between Boger and Usdan, up toward Wyllys Ave
+    const boger = stops.find((s) => s.id === 'boger');
+    if (boger) strip(boger.back - 3.2, boger.back - 0.6, boger.z1 - 12, boger.z0 + 2, lambert(PAL.path));
   }
 
   private walks(stops: RowStop[]) {
@@ -231,7 +241,7 @@ export class World {
     }
     // walkways that cut across the row, from between the buildings to the back sidewalk
     for (const c of this.crossings) {
-      const x0 = BACK_WALK.x0, x1 = ROAD.x0; // from the back road to the High Street curb
+      const x0 = BACK_PATH.x0 - 6, x1 = ROAD.x0; // from the field, across the back path, to the High Street curb
       const cr = new Mesh(new PlaneGeometry(x1 - x0, c.w), lambert(PAL.path));
       cr.rotation.x = -Math.PI / 2;
       cr.position.set((x0 + x1) / 2, 0.031, c.z);
@@ -270,7 +280,7 @@ export class World {
     // lining the field side of the back road, peeking over the rooftops from the walk
     for (let z = WALK_MIN_Z; z > WALK_MAX_Z - 40; z -= 9) {
       if (nearDoor(z)) continue;
-      list.push({ x: BACK_FAR_WALK.x0 - 2.2 - rng(id) * 3, z: z - rng(id + 1) * 6, s: 1.6 + rng(id + 2) * 0.8, id: id++ });
+      list.push({ x: BACK_PATH.x0 - 2.6 - rng(id) * 3, z: z - rng(id + 1) * 6, s: 1.6 + rng(id + 2) * 0.8, id: id++ });
     }
     // far side of Andrus Field, across High Street, and the two ends
     for (let z = WALK_MIN_Z + 30; z > WALK_MAX_Z - 60; z -= 7) {
@@ -287,6 +297,8 @@ export class World {
       list.push({ x: x + rng(id) * 4, z: WALK_MAX_Z - 50 - rng(id + 1) * 20, s: 1.6 + rng(id + 2), id: id++ });
       list.push({ x: x + rng(id + 3) * 4, z: WALK_MIN_Z + 45 + rng(id + 4) * 20, s: 1.6 + rng(id + 5), id: id++ });
     }
+
+    for (let i = list.length - 1; i >= 0; i--) if (inUsdan(list[i], 3)) list.splice(i, 1); // not inside Usdan
 
     // early-fall Connecticut: mostly green, some already turning
     const leaves = [0x5a9a38, 0x4a8a30, 0x6aa840, 0x5a9a38, 0x4a8a30, 0xd9a032, 0xd9782b, 0xb8452a, 0xe6c147];
@@ -323,9 +335,9 @@ export class World {
     for (let z = WALK_MIN_Z - 6; z > WALK_MAX_Z; z -= 24) {
       spots.push({ x: -PATH_HALF - 0.7, z, h: 4, arm: 0 }, { x: PATH_HALF + 0.7, z: z - 12, h: 4, arm: 0 });
     }
-    // the back road: tall lamps on the row side, arms out over it
-    for (let z = WALK_MIN_Z + 20; z > WALK_MAX_Z - 20; z -= 28) {
-      spots.push({ x: BACK_ROAD.x1 + 0.4, z, h: 7, arm: -2.4 });
+    // the back path: heritage lamps along both edges
+    for (let z = WALK_MIN_Z + 20; z > WALK_MAX_Z - 20; z -= 22) {
+      spots.push({ x: BACK_PATH.x1 + 0.5, z, h: 4, arm: 0 }, { x: BACK_PATH.x0 - 0.5, z: z - 11, h: 4, arm: 0 });
     }
     for (let z = WALK_MIN_Z + 40; z > WALK_MAX_Z - 40; z -= 30) {
       // never in the mouth of a driveway: slide it along to just beside one
@@ -334,7 +346,7 @@ export class World {
       if (drive) fz = HOUSE.zc + (fz > HOUSE.zc + (drive.v0 + drive.v1) / 2 ? drive.v1 + 1.6 : drive.v0 - 1.6);
       spots.push({ x: ROAD.x0 - 0.5, z, h: 7.5, arm: 2.6 }, { x: ROAD.x1 + 0.5, z: fz, h: 7.5, arm: -2.6 });
     }
-    return spots;
+    return spots.filter((l) => !inUsdan(l, 2)); // nothing inside Usdan
   }
 
   private lamps() {
