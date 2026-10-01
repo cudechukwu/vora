@@ -21,11 +21,12 @@ import { ENTER_AT, EXIT_AT, Where, cameraClearance, nearDoor as byTheDoor, porta
 import { LANES, Obstacle, createTraffic, lightAt, stepTraffic } from './traffic';
 import { CarsView, Traffic } from './vehicles';
 import {
-  Car, carAt, carExtra, carjack, clearRoad, createGarage, driveMove, driven, footprint, getIn, getOut, jackable,
-  loadMine, missing, roadBlocks, saveMine, stepCar,
+  Car, carAt, carjack, clearRoad, createGarage, driveMove, driven, footprint, getIn, getOut, jackable,
+  loadMine, missing, onRoad, roadBlocks, saveMine, stepCar,
 } from './cars';
 import { START_HOUR, advance, formatHour, nextPreset, periodOf, wrapHour } from './clock';
 import { Person, discGeometry, randomLook } from './people';
+import { Knock, OUCH, hits, launch, stepKnock } from './knock';
 import { Labels, Note, Trail, buildTrails } from './traces';
 import { Input } from './controls';
 import { CameraRig, wrap } from './camera';
@@ -117,7 +118,7 @@ const saveCar = () => { try { localStorage.setItem(CAR_KEY, saveMine(garage)); }
 addEventListener('pagehide', saveCar);
 
 /** Drivers you've pulled out of their cars: knocked down, up again, then off down the sidewalk, yelling. */
-interface Fleer { p: Person; x: number; z: number; out: { x: number; z: number }; t: number; bubble: HTMLElement }
+interface Fleer { p: Person; x: number; z: number; out: { x: number; z: number }; t: number; bubble: HTMLElement; body: Body }
 const fleers: Fleer[] = [];
 const YELLS = ['hey!! that\'s my car!', 'are you serious?!', 'somebody stop them!', 'my groceries are in there!', 'i just got that washed!'];
 let jacks = 0;
@@ -126,7 +127,30 @@ const actBtn = document.getElementById('act')!;
 let actKey = '';
 const lastDir = new Vector3(0, 0, 1);
 
-interface Walker { p: Person; x: number; z: number; dir: number; speed: number }
+/**
+ * Anyone outside a car can hit. While they're flying / lying there / walking back to where they were,
+ * their usual animation is paused. `land` says what they do once they're back on their feet
+ * (default: walk back to `back` and pick up where they left off).
+ */
+interface Body {
+  p: Person;
+  knock: Knock | null;
+  returning: boolean;
+  back: { x: number; z: number; heading: number; settle: () => void } | null;
+  land?: (x: number, z: number) => void;
+  idle?: (dt: number) => void; // what they do each frame when nothing's happened to them
+  bubble?: HTMLElement;
+  sayUntil: number;
+}
+const bodies: Body[] = [];
+const hittable = (p: Person, back: Body['back'] = null, extra: Partial<Body> = {}): Body => {
+  const b: Body = { p, knock: null, returning: false, back, sayUntil: 0, ...extra };
+  bodies.push(b);
+  return b;
+};
+const busy = (b: Body) => b.knock !== null || b.returning;
+
+interface Walker { p: Person; x: number; z: number; dir: number; speed: number; off: number; body: Body }
 const walkers: Walker[] = [];
 for (let i = 0; i < 26; i++) {
   const p = new Person(randomLook(i + 3));
@@ -135,7 +159,7 @@ for (let i = 0; i < 26; i++) {
     p, dir,
     x: dir > 0 ? 0.4 + rng(i + 9) * 1.6 : -0.4 - rng(i + 9) * 1.6, // keep right, mostly
     z: WALK_MAX_Z + rng(i * 5 + 2) * (WALK_MIN_Z - WALK_MAX_Z),
-    speed: 1.05 + rng(i * 7) * 0.5,
+    speed: 1.05 + rng(i * 7) * 0.5, off: 0, body: null!,
   };
   // every fourth walker brings a friend
   walkers.push(w);
@@ -146,6 +170,8 @@ for (let i = 0; i < 26; i++) {
     scene.add(q.root);
   }
 }
+// knocked off the walk: get up, and carry on from where you landed, drifting back to your side of the walk
+for (const w of walkers) w.body = hittable(w.p, null, { land: (x, z) => { w.z = z; w.off = x - w.x; } });
 
 let seated = 0;
 const sitAt = (p: Person, x: number, z: number, heading: number, seatY: number) => {
@@ -154,6 +180,7 @@ const sitAt = (p: Person, x: number, z: number, heading: number, seatY: number) 
   p.sit(seatY);
   scene.add(p.root);
   seated++;
+  hittable(p, { x, z, heading, settle: () => p.sit(seatY) }, { idle: (dt) => p.sitIdle(dt) });
 };
 // benches: a few taken
 world.benches.slice(0, 6).forEach((b, i) => {
@@ -180,6 +207,8 @@ fa.face(Math.atan2(FB.x - FA.x, FB.z - FA.z)); fb.face(Math.atan2(FA.x - FB.x, F
 const disc = new Mesh(discGeometry, lambert(0xf2f2f2));
 disc.castShadow = true;
 scene.add(fa.root, fb.root, disc);
+const faBody = hittable(fa, { x: FA.x, z: FA.z, heading: fa.heading, settle: () => fa.face(Math.atan2(FB.x - FA.x, FB.z - FA.z)) });
+const fbBody = hittable(fb, { x: FB.x, z: FB.z, heading: fb.heading, settle: () => fb.face(Math.atan2(FA.x - FB.x, FA.z - FB.z)) });
 
 // a friend who is actually here right now
 const devon = new Person({ skin: 0xc68642, hair: 0x2b1d14, hairStyle: 'puff', top: 0xe8b33a, legs: 0x3b4a6b, pack: null });
@@ -440,7 +469,9 @@ function jack(vehicleId: number) {
   p.root.rotation.order = 'YXZ';
   p.face(r.driver.heading + Math.PI); // looking back at their car as they land
   const out = { x: Math.sin(r.driver.heading), z: Math.cos(r.driver.heading) };
-  const f: Fleer = { p, x: r.driver.x - out.x * 0.8, z: r.driver.z - out.z * 0.8, out, t: 0, bubble: null! };
+  const f: Fleer = { p, x: r.driver.x - out.x * 0.8, z: r.driver.z - out.z * 0.8, out, t: 0, bubble: null!, body: null! };
+  // hit them as well, and they get up and keep running
+  f.body = hittable(p, null, { land: (x, z) => { f.x = x; f.z = z; f.t = Math.max(f.t, 1.7); } });
   f.bubble = labels.add(pick(YELLS), new Vector3(), 22, undefined,
     () => p.root.position.clone().setY(2.5), () => f.t > 0.5 && f.t < 4.5);
   f.bubble.classList.add('say');
@@ -453,18 +484,16 @@ function updateFleers(dt: number) {
   for (const f of [...fleers]) {
     f.t += dt;
     const p = f.p;
-    if (f.t < 0.35) { // thrown: flies out and tips over backwards
+    if (busy(f.body)) { /* you hit them (again) */ } else if (f.t < 0.35) { // thrown: flies out and tips over backwards
       const k = f.t / 0.35;
       f.x += f.out.x * dt * 4.5; f.z += f.out.z * dt * 4.5;
-      p.root.rotation.x = -1.45 * k;
+      p.flail(dt, -Math.PI / 2 * k);
       p.root.position.set(f.x, Math.sin(k * Math.PI) * 0.5, f.z);
-      p.walk(dt, 0);
     } else if (f.t < 1.7) { // down… then back up
       const k = f.t < 1.2 ? 1 : 1 - (f.t - 1.2) / 0.5;
-      p.root.rotation.x = -1.45 * k;
-      p.root.position.set(f.x, 0.12 * k, f.z);
+      p.limp(-Math.PI / 2 * k);
+      p.root.position.set(f.x, 0, f.z);
     } else { // run: off the road to the nearest sidewalk, then away down it
-      p.root.rotation.x = 0;
       const curb = f.x > (ROAD.x0 + ROAD.x1) / 2 ? 21.9 : 3;
       const away = Math.sign(f.z - pos.z) || 1;
       const dx = curb - f.x, dirX = Math.abs(dx) > 0.3 ? Math.sign(dx) : 0;
@@ -475,11 +504,69 @@ function updateFleers(dt: number) {
       p.root.position.set(f.x, 0, f.z);
       p.walk(dt, 6);
     }
-    if (f.t > 16) {
+    if (f.t > 16 && !busy(f.body)) {
       scene.remove(p.root);
       labels.remove(f.bubble);
+      if (f.body.bubble) labels.remove(f.body.bubble);
+      bodies.splice(bodies.indexOf(f.body), 1);
       fleers.splice(fleers.indexOf(f), 1);
     }
+  }
+}
+
+let shake = 0; // camera shake after a hit
+
+function say(b: Body, text: string, secs = 3) {
+  if (!b.bubble) {
+    b.bubble = labels.add('', new Vector3(), 24, undefined,
+      () => b.p.root.position.clone().setY(b.knock && b.knock.phase !== 'air' ? 1.1 : b.p.root.position.y + 2.5),
+      () => performance.now() < b.sayUntil);
+    b.bubble.classList.add('say');
+  }
+  b.bubble.querySelector('.b')!.textContent = text;
+  b.sayUntil = performance.now() + secs * 1000;
+}
+
+/** Your car vs everyone out on the row: knock them flying, then let them pick themselves up. */
+function updateBodies(dt: number) {
+  const car = driven(garage);
+  for (const b of bodies) {
+    const at = b.p.root.position;
+    if (car && !(b.knock && b.knock.phase === 'air') && hits(car, at)) {
+      b.knock = launch(car, at);
+      b.returning = false;
+      car.speed *= 0.8; // you feel it
+      shake = Math.min(0.6, shake + 0.12 + Math.abs(car.speed) * 0.02);
+      say(b, pick(OUCH), 3.2);
+    }
+    if (b.knock) {
+      const k = b.knock;
+      stepKnock(k, dt);
+      b.p.root.position.set(k.x, k.y, k.z);
+      b.p.face(k.heading);
+      if (k.phase === 'air') b.p.flail(dt, k.tilt);
+      else b.p.limp(k.tilt);
+      if (k.phase === 'done') {
+        b.knock = null;
+        b.p.walk(dt, 0);
+        if (b.land) b.land(k.x, k.z);
+        else if (b.back) b.returning = true;
+      }
+    } else if (b.returning && b.back) {
+      // walk back to where you were (a bench, the grass, your frisbee spot) and settle in again
+      const dx = b.back.x - at.x, dz = b.back.z - at.z, d = Math.hypot(dx, dz);
+      if (d < 0.08) {
+        b.returning = false;
+        b.p.root.position.set(b.back.x, 0, b.back.z);
+        b.p.face(b.back.heading);
+        b.back.settle();
+      } else {
+        const step = Math.min(d, 1.5 * dt);
+        b.p.root.position.set(at.x + (dx / d) * step, 0, at.z + (dz / d) * step);
+        b.p.face(Math.atan2(dx, dz));
+        b.p.walk(dt, 1.5);
+      }
+    } else b.idle?.(dt);
   }
 }
 
@@ -571,8 +658,10 @@ function frame(now: number) {
   let speed: number;
   if (car) {
     // driving: the car steers toward where you push, reverses if you push behind it
-    const r = driveMove(car, stepCar(car, dt, { x: move.x, z: move.z }), stops, carExtra(collisions(), car.kind));
+    const was = car.heading;
+    const r = driveMove(car, stepCar(car, dt, { x: move.x, z: move.z }), stops, collisions(), was);
     if (r.hit) car.speed = 0;
+    else if (r.scrape) car.speed *= Math.pow(0.4, dt); // scraping along a wall drags you down
     car.x = r.x; car.z = r.z;
     pos.set(car.x, 0, car.z);
     me.face(car.heading);
@@ -597,7 +686,8 @@ function frame(now: number) {
   right.set(Math.cos(rig.yaw), 0, -Math.sin(rig.yaw));
   pos.y = floorY(level, pos.x, pos.z);
   me.root.position.copy(pos);
-  if (sittingOn || car) { /* pose set when you sat down; hidden in a car */ }
+  if (sittingOn) me.sitIdle(dt);
+  else if (car) { /* hidden in the car */ }
   else if (mover.mode === 'bike') me.ride(dt, speed);
   else if (mover.mode === 'scooter') me.scoot(dt, speed);
   else me.walk(dt, speed);
@@ -632,14 +722,16 @@ function frame(now: number) {
 
   // passers-by
   for (const w of walkers) {
+    if (busy(w.body)) continue;
+    w.off -= Math.sign(w.off) * Math.min(Math.abs(w.off), 0.8 * dt); // drift back to your side of the walk
     w.z += w.dir * -w.speed * dt;
     if (w.z < WALK_MAX_Z - 30) w.z = WALK_MIN_Z + 30;
     if (w.z > WALK_MIN_Z + 30) w.z = WALK_MAX_Z - 30;
     // step aside for you
-    const dx = w.x - pos.x, dz = w.z - pos.z;
-    const room = garage.driving !== null ? 2.4 : 1.1; // jump well clear of a car
-    const near = Math.abs(dz) < room * 2 && Math.abs(dx) < room && Math.abs(pos.x) < PATH_HALF + room;
-    const x = near ? w.x + Math.sign(dx || 1) * (room - Math.abs(dx)) : w.x;
+    // step aside for you on foot (a car, they don't see coming)
+    const wx = w.x + w.off, dx = wx - pos.x, dz = w.z - pos.z;
+    const near = garage.driving === null && Math.abs(dz) < 2.2 && Math.abs(dx) < 1.1 && Math.abs(pos.x) < PATH_HALF + 1;
+    const x = near ? wx + Math.sign(dx || 1) * (1.1 - Math.abs(dx)) : wx;
     w.p.root.position.set(x, 0, w.z);
     w.p.face(w.dir > 0 ? Math.PI : 0);
     w.p.walk(dt, w.speed);
@@ -647,6 +739,7 @@ function frame(now: number) {
 
   // High Street
   const inRoad: Obstacle[] = [...roadBlocks(garage), ...fleers.map((f) => ({ x: f.x, z: f.z }))];
+  for (const b of bodies) if (busy(b) && onRoad(b.p.root.position)) inRoad.push(b.p.root.position); // someone lying in the road
   if (garage.driving === null) inRoad.push(pos);
   stepTraffic(traffic, dt, inRoad);
   trafficView.update(dt);
@@ -667,8 +760,12 @@ function frame(now: number) {
   const from = aToB ? FA : FB, to = aToB ? FB : FA;
   disc.position.lerpVectors(from, to, flight).setY(1.4 + Math.sin(flight * Math.PI) * 2.2);
   disc.rotation.y += dt * 14;
-  (aToB ? fa : fb).throwPose(u < 0.2 ? u / 0.2 : Math.max(0, 1 - (u - 0.2) * 5));
-  fa.walk(dt, 0); fb.walk(dt, 0);
+  const playing = !busy(faBody) && !busy(fbBody);
+  disc.visible = playing;
+  if (!busy(faBody)) fa.walk(dt, 0);
+  if (!busy(fbBody)) fb.walk(dt, 0);
+  if (playing) (aToB ? fa : fb).throwPose(u < 0.2 ? u / 0.2 : Math.max(0, 1 - (u - 0.2) * 5));
+  updateBodies(dt);
 
   // camera: intro swoop, then follow
   const portrait = innerWidth < innerHeight;
@@ -693,6 +790,11 @@ function frame(now: number) {
   camPos.lerp(want, snapCamera ? 1 : introT < 1 ? k * 0.12 + 0.02 : 1 - Math.exp(-dt * 7));
   snapCamera = false;
   camera.position.copy(camPos);
+  if (shake > 0.002) {
+    camera.position.x += (Math.random() - 0.5) * shake;
+    camera.position.y += (Math.random() - 0.5) * shake;
+    shake *= Math.exp(-dt * 7);
+  }
   // look ahead of you — less so when the camera's had to tuck in close, so you stay on screen
   const ahead = indoors ? 2.5 : 9 * Math.max(0.15, clear);
   lookAt.copy(pos).addScaledVector(fwd, ahead).addScaledVector(right, -1.8 * side * clear).setY(pos.y + 1.1 - rig.pitch * 1.5);
@@ -726,6 +828,8 @@ Object.assign(window, {
     mob, mover, roommates, garage, obstacles: world.obstacles,
     get driving() { return garage.driving; },
     get fleeing() { return fleers.length; },
+    get knocked() { return bodies.filter((b) => b.knock !== null).length; },
+    get bodies() { return bodies.map((b) => ({ x: b.p.root.position.x, z: b.p.root.position.z, busy: busy(b) })); },
     get level() { return level; },
     get indoors() { const l = toLocal(pos.x, pos.z); return insideHouse(l.u, l.v); },
     get sitting() { return sittingOn?.id ?? null; },

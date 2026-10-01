@@ -1,4 +1,4 @@
-import { Box, Extra, XZ, inBox, resolveMove } from './collide';
+import { Box, Extra, XZ, blockedAt, inBox } from './collide';
 import { ROAD, RowStop } from './layout';
 import { LANES, TrafficState, Vehicle, addVehicle, laneX, removeVehicle } from './traffic';
 import { DRIVEWAYS, RoommateId, toWorld } from './house/plan';
@@ -51,6 +51,8 @@ export const LEAVE_AFTER = 40; // metres you must be from a car left in the road
 export const YOUR_PAINT = 0x2b3a66;
 export const KOFI_PAINT = 0xd8c9a0;
 
+/** Centre to back axle. */
+const axle = (c: { len: number }) => c.len / 2 - 0.9;
 const fwd = (h: number) => ({ x: Math.sin(h), z: Math.cos(h) });
 /** The driver's side (left, in a US car). */
 const left = (h: number) => ({ x: Math.cos(h), z: -Math.sin(h) });
@@ -174,39 +176,71 @@ export function stepCar(c: Car, dt: number, stick: XZ): XZ {
   const slowing = Math.abs(target) < Math.abs(c.speed);
   const rate = braking ? BRAKE : slowing ? COAST : spec.accel;
   c.speed += Math.sign(d) * Math.min(Math.abs(d), rate * dt);
-  // a car only turns while it rolls
+  // a car only turns while it rolls, and it turns about its back axle: the nose swings, the tail follows
   const turn = spec.turn * Math.min(1, Math.abs(c.speed) / 3) * dt;
+  const ax = axle(c), f0 = fwd(c.heading);
+  const rear = { x: c.x - f0.x * ax, z: c.z - f0.z * ax };
   c.heading = wrap(c.heading + Math.max(-turn, Math.min(turn, wrap(aim - c.heading))));
   const f = fwd(c.heading);
-  return { x: c.x + f.x * c.speed * dt, z: c.z + f.z * c.speed * dt };
+  return { x: rear.x + f.x * (ax + c.speed * dt), z: rear.z + f.z * (ax + c.speed * dt) };
 }
 
-const grow = (b: Box, pad: number): Box => ({ x0: b.x0 - pad, x1: b.x1 + pad, z0: b.z0 - pad, z1: b.z1 + pad });
+/** Points around a car's outline (corners, middle of each end, centre) that must stay clear. */
+export function outline(c: { len: number; kind: CarKind }, x: number, z: number, h: number): XZ[] {
+  const f = fwd(h), l = left(h), hl = c.len / 2 - 0.1, hw = SPEC[c.kind].halfW - 0.1;
+  const at = (a: number, s: number) => ({ x: x + f.x * a + l.x * s, z: z + f.z * a + l.z * s });
+  return [at(0, 0), at(hl, 0), at(-hl, 0), at(hl, hw), at(hl, -hw), at(-hl, hw), at(-hl, -hw), at(0, hw), at(0, -hw)];
+}
 
-/** Collisions for a car: everything you'd bump into, fattened by the car's width. */
-export function carExtra(extra: Extra, kind: CarKind): Extra {
-  const pad = SPEC[kind].halfW - 0.3; // solids are already padded by a walker's radius
-  return { ...extra, solids: (extra.solids ?? []).map((b) => grow(b, pad)) };
+/** How far a blocked point is from the nearest free spot (0 if it's free). */
+export function depthIn(p: XZ, blocked: (p: XZ) => boolean): number {
+  if (!blocked(p)) return 0;
+  const free = (a: number, d: number) => !blocked({ x: p.x + Math.sin(a) * d, z: p.z + Math.cos(a) * d });
+  let best = 6;
+  for (let k = 0; k < 16; k++) {
+    const a = (k / 16) * Math.PI * 2;
+    let d = 0.25;
+    while (d < best + 0.25 && !free(a, d)) d += 0.25;
+    if (!free(a, d)) continue;
+    // home in on the edge, so tiny moves out of a wall count
+    let lo = d - 0.25, hi = d;
+    for (let i = 0; i < 12; i++) { const m = (lo + hi) / 2; if (free(a, m)) hi = m; else lo = m; }
+    best = Math.min(best, hi);
+  }
+  return best;
 }
 
 /**
- * Move a car toward `want`, checking its nose, middle and tail. Slides along walls where it can;
- * stops dead (hit = true) where it can't.
+ * Move (and turn) a car toward `want` / its new heading, from where it was (`from`, at heading `was`).
+ * The rule: no part of the car may end up somewhere it wasn't already blocked. So it can never be pushed
+ * into a wall — and if it's somehow in one, any move that doesn't make things worse gets it out.
+ * Slides along walls where it can; if the turn itself is what hits, it keeps its old heading.
  */
-export function driveMove(c: Car, want: XZ, stops: RowStop[], extra: Extra): { x: number; z: number; hit: boolean } {
-  const f = fwd(c.heading), reach = c.len / 2 - 0.3;
-  const pts = [0, reach, -reach];
-  const fits = (to: XZ) => pts.every((k) => {
-    const from = { x: c.x + f.x * k, z: c.z + f.z * k }, at = { x: to.x + f.x * k, z: to.z + f.z * k };
-    const r = resolveMove(from, at, stops, extra);
-    return Math.abs(r.x - at.x) < 1e-6 && Math.abs(r.z - at.z) < 1e-6;
-  });
-  if (fits(want)) return { ...want, hit: false };
-  const sx = { x: want.x, z: c.z }, sz = { x: c.x, z: want.z };
-  // a glancing bump: keep the axis that still works
-  if (Math.abs(want.x - c.x) > 1e-6 && fits(sx)) return { ...sx, hit: true };
-  if (Math.abs(want.z - c.z) > 1e-6 && fits(sz)) return { ...sz, hit: true };
-  return { x: c.x, z: c.z, hit: true };
+export function driveMove(c: Car, want: XZ, stops: RowStop[], extra: Extra, was = c.heading): { x: number; z: number; hit: boolean; scrape: boolean } {
+  const blocked = (p: XZ) => blockedAt(p, stops, extra);
+  const start = outline(c, c.x, c.z, was);
+  const before = start.map(blocked);
+  // already (somehow) in something: only moves that leave it less far in are allowed
+  const stuck = before.some(Boolean);
+  const depthBefore = stuck ? start.reduce((s, p) => s + depthIn(p, blocked), 0) : 0;
+  const ok = (x: number, z: number, h: number) => {
+    const pts = outline(c, x, z, h);
+    if (!pts.every((p, i) => before[i] || !blocked(p))) return false;
+    return !stuck || pts.reduce((s, p) => s + depthIn(p, blocked), 0) < depthBefore - 1e-9 || pts.every((p) => !blocked(p));
+  };
+  const h = c.heading;
+  if (ok(want.x, want.z, h)) return { ...want, hit: false, scrape: false };
+  const tries: [number, number, number][] = [
+    [want.x, c.z, h], [c.x, want.z, h], // glancing bump: keep the axis that still works
+    [want.x, want.z, was], [want.x, c.z, was], [c.x, want.z, was], // it was the turn that hit
+    [c.x, c.z, h],
+  ];
+  for (const [x, z, hh] of tries) {
+    const moved = Math.abs(x - c.x) > 1e-6 || Math.abs(z - c.z) > 1e-6;
+    if ((moved || hh !== was) && ok(x, z, hh)) { c.heading = hh; return { x, z, hit: !moved, scrape: moved }; }
+  }
+  c.heading = was;
+  return { x: c.x, z: c.z, hit: true, scrape: false };
 }
 
 /** A parked car's footprint (axis-aligned, close enough for collisions), padded by `pad`. */

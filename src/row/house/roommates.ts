@@ -121,6 +121,8 @@ export class Roommates {
         else m.p.walk(dt, SPEED);
       } else if (m.target.pose === 'stand') {
         m.p.walk(dt, 0);
+      } else if (m.target.pose === 'sit') {
+        m.p.sitIdle(dt);
       }
       this.place(m);
     }

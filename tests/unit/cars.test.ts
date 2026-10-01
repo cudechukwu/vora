@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  Car, JACK_SPEED, LEAVE_AFTER, REACH, SPEC, carAt, carExtra, carjack, clearRoad, createGarage, distToCar,
+  Car, JACK_SPEED, LEAVE_AFTER, REACH, SPEC, carAt, carjack, clearRoad, createGarage, distToCar,
   driveMove, driven, drivewaySpot, footprint, getIn, getOut, inDriveway, jackable, laneFor, loadMine, missing,
   onRoad, roadBlocks, saveMine, stepCar,
 } from '../../src/row/cars';
-import { resolveMove } from '../../src/row/collide';
+import { Extra, blockedAt, resolveMove } from '../../src/row/collide';
 import { FAR_WALK, ROAD, byId, layoutRow } from '../../src/row/layout';
 import { LANES, TrafficState, addVehicle, createTraffic, removeVehicle, stepTraffic } from '../../src/row/traffic';
 import { houseExtra } from '../../src/row/house/collide';
@@ -21,12 +21,13 @@ const { stops, crossings } = layoutRow();
 const STEP = 1 / 60;
 
 /** Drive with the stick held in a fixed world direction for `secs`, colliding with the world. */
-function drive(c: Car, stick: { x: number; z: number }, secs: number, extra = carExtra(houseExtra(0, true), c.kind)) {
+function drive(c: Car, stick: { x: number; z: number }, secs: number, extra: Extra = houseExtra(0, true)) {
   let hits = 0;
   for (let t = 0; t < secs; t += STEP) {
+    const was = c.heading;
     const want = stepCar(c, STEP, stick);
-    const r = driveMove(c, want, stops, extra);
-    if (r.hit) { hits++; c.speed = 0; }
+    const r = driveMove(c, want, stops, extra, was);
+    if (r.hit) { hits++; c.speed = 0; } else if (r.scrape) { hits++; c.speed *= Math.pow(0.4, STEP); }
     c.x = r.x; c.z = r.z;
   }
   return hits;
@@ -175,7 +176,7 @@ describe('driving', () => {
     const c = getIn(g, id)!;
     const base = houseExtra(0, true);
     const world = { ...base, solids: [...base.solids!, ...worldObstacles()] };
-    const hits = drive(c, { x: -1, z: 0 }, 2.2, carExtra(world, 'car'));
+    const hits = drive(c, { x: -1, z: 0 }, 2.2, world);
     expect(hits).toBe(0);
     expect(onRoad(c)).toBe(true);
   });
@@ -186,6 +187,47 @@ describe('driving', () => {
     const hits = drive(c, { x: -1, z: 0 }, 4, {});
     expect(hits).toBeGreaterThan(0);
     expect(c.x - c.len / 2).toBeGreaterThan(north.front);
+  });
+
+  it('turning hard alongside a building never swings the car into it, and never gets it stuck (regression)', () => {
+    const north = byId(stops, 'north');
+    // parked nose-down the row, right against the facade, then steer hard into the wall
+    const c: Car = { ...fresh(), x: north.front + 0.8 + SPEC.car.halfW + 0.05, z: north.z1 + 5, heading: 0 };
+    drive(c, { x: -1, z: 0.3 }, 6, {});
+    const corners = [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, s]) => ({
+      x: c.x + Math.sin(c.heading) * a * (c.len / 2 - 0.1) + Math.cos(c.heading) * s * (SPEC.car.halfW - 0.1),
+      z: c.z + Math.cos(c.heading) * a * (c.len / 2 - 0.1) - Math.sin(c.heading) * s * (SPEC.car.halfW - 0.1),
+    }));
+    expect(corners.some((p) => blockedAt(p, stops))).toBe(false);
+    // and you can always drive away
+    const before = { x: c.x, z: c.z };
+    drive(c, { x: 1, z: 0 }, 3, {});
+    expect(Math.hypot(c.x - before.x, c.z - before.z)).toBeGreaterThan(3);
+  });
+
+  it('a car that is somehow already in a wall can always get out', () => {
+    const north = byId(stops, 'north');
+    const c: Car = { ...fresh(), x: north.front + 0.5, z: north.zc, heading: -Math.PI / 2 }; // nose deep in the facade
+    expect(blockedAt({ x: c.x - 2, z: c.z }, stops)).toBe(true);
+    drive(c, { x: -1, z: 0 }, 1, {}); // pushing further in does nothing
+    expect(c.x).toBeCloseTo(north.front + 0.5, 1);
+    drive(c, { x: 1, z: 0 }, 3, {}); // pull back: reverses out
+    expect(c.x).toBeGreaterThan(north.front + 3);
+  });
+
+  it('fuzz: a minute of random driving along the row never ends with the car in a building or stuck', () => {
+    let seed = 7;
+    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const c: Car = { ...fresh(), x: 0, z: byId(stops, 'south').zc, heading: 0 };
+    for (let k = 0; k < 30; k++) {
+      const a = rand() * Math.PI * 2;
+      drive(c, { x: Math.sin(a), z: Math.cos(a) }, 2, {});
+      expect(blockedAt(c, stops)).toBe(false);
+    }
+    // whichever way it ended up, it can still move one way or another
+    const at = { x: c.x, z: c.z };
+    for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) drive(c, { x: Math.sin(a), z: Math.cos(a) }, 1.5, {});
+    expect(Math.hypot(c.x - at.x, c.z - at.z)).toBeGreaterThan(1);
   });
 
   it('can\'t drive into your house', () => {

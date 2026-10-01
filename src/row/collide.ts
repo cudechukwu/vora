@@ -53,3 +53,13 @@ export function resolveMove(prev: XZ, want: XZ, stops: RowStop[], extra?: Extra)
   if (ok(sz)) return sz;
   return { x: prev.x, z: prev.z };
 }
+
+/** Would standing at p be against the rules (in a building, out of bounds, in a solid, off the floor)? */
+export function blockedAt(p: XZ, stops: RowStop[], extra?: Extra): boolean {
+  const lots = extra?.lots ?? [];
+  if (p.x < BOUNDS.xMin || p.z < BOUNDS.zMin || p.z > BOUNDS.zMax) return true;
+  if (p.x > BOUNDS.xMax && !lots.some((l) => inBox(p, l))) return true;
+  if (inside(stops, p.x, p.z)) return true;
+  if (!extra) return false;
+  return (extra.solids ?? []).some((b) => inBox(p, b)) || (!!extra.walkable && !extra.walkable.some((b) => inBox(p, b)));
+}

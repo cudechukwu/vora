@@ -533,3 +533,39 @@ test('carjack: step out in front of a car, it stops, you pull the driver out and
   await page.keyboard.up('w');
   expect(errors).toEqual([]);
 });
+
+test('drive into people on the walk: they go flying, yell, then pick themselves up', async ({ page }) => {
+  const errors = await open(page, `yaw=${Math.PI}`);
+  // your car, parked on the walk just ahead; get in and floor it down the row
+  await page.evaluate(() => { const v = (window as any).__vora; const c = v.garage.cars[0]; Object.assign(c, { x: 0.6, z: v.pos.z + 4, heading: 0 }); v.pos.set(-1.3, 0, c.z); });
+  await expect(page.locator('#act')).toContainText('Drive');
+  await page.keyboard.press('f');
+  await page.keyboard.down('w');
+  await page.waitForFunction(() => (window as any).__vora.knocked > 0, null, { timeout: 50_000 });
+  await page.keyboard.up('w');
+  await expect.poll(() => page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.tag.say')]
+    .some((el) => parseFloat(el.style.opacity) > 0)), { timeout: 5000 }).toBe(true);
+  // nobody stays down
+  await page.waitForFunction(() => (window as any).__vora.knocked === 0, null, { timeout: 30_000 });
+  expect(errors).toEqual([]);
+});
+
+test('a car steered into a building never gets stuck in it (regression)', async ({ page }) => {
+  await open(page, `yaw=${Math.PI}`);
+  const north = byId(stops, 'north');
+  await page.evaluate(([x, z]) => { const v = (window as any).__vora; const c = v.garage.cars[0]; Object.assign(c, { x, z, heading: 0 }); v.pos.set(x + 2, 0, z); }, [north.front + 2.2, north.z1 + 6]);
+  await page.keyboard.press('f');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.driving)).toBe(0);
+  // hard right, into the facade (the row's on your right), for a while
+  await page.keyboard.down('d');
+  await page.keyboard.down('w');
+  await page.waitForTimeout(4000);
+  await page.keyboard.up('w');
+  await page.keyboard.up('d');
+  const stuckAt = await page.evaluate(() => ({ x: (window as any).__vora.pos.x, z: (window as any).__vora.pos.z }));
+  expect(stuckAt.x).toBeGreaterThan(north.front + 0.8);
+  // and it drives away: left, toward High Street
+  await page.keyboard.down('a');
+  await page.waitForFunction((x) => (window as any).__vora.pos.x > x, stuckAt.x + 3, { timeout: 40_000 });
+  await page.keyboard.up('a');
+});
