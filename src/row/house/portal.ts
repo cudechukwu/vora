@@ -7,7 +7,8 @@ import { FRONT_DOOR, HOUSE } from './plan';
 // the bottom of the porch steps, facing High Street, so leaving is never
 // confusing.
 
-export type Where = 'out' | 'in';
+/** Which world you're in: outside, inside your house, or inside Usdan. */
+export type Where = 'out' | 'in' | 'usdan';
 
 /** Where you appear (house-local u, v) and which way you face (radians, 0 = +v). */
 export const ENTER_AT = { u: 1.7, v: (FRONT_DOOR.v0 + FRONT_DOOR.v1) / 2, heading: Math.PI / 2 }; // in the hall, facing in

@@ -31,6 +31,11 @@ import { START_HOUR, advance, formatHour, nextPreset, periodOf, wakeFrom, wrapHo
 import { Person, discGeometry, randomLook } from './people';
 import { Knock, OUCH, hits, launch, stepKnock } from './knock';
 import { ITEMS, SITTERS, chairs } from './plaza';
+import { UsdanView } from './usdan/view';
+import {
+  AT_DESK, Door, ITEMS as U_ITEMS, SITTERS as U_SITTERS, SOFA_SITTERS, STAFF, WALK_LANES, arriveAt, chairsAt as uChairs,
+  insideUsdan, nearUsdanDoor, usdanExtra, usdanPortalAt,
+} from './usdan/plan';
 import { Labels, Note, Trail, buildTrails } from './traces';
 import { Input } from './controls';
 import { CameraRig, wrap } from './camera';
@@ -91,6 +96,41 @@ homeDay.position.set(hd.x, 14, hd.z);
 homeDay.target.position.set(hc.x, 0, hc.z);
 homeScene.add(homeHemi, homeDay, homeDay.target, house.interior);
 
+// inside Usdan: its own world too — warm light, the atrium's pendants, people about
+const usdanScene = new Scene();
+usdanScene.background = new Color(0x1a1714);
+const usdan = new UsdanView();
+const usdanHemi = new HemisphereLight(0xfff3e0, 0x8a7a66, 1.6);
+const usdanSun = new DirectionalLight(0xfff0dc, 0.9);
+usdanSun.position.set(-70, 30, -170);
+usdanSun.target.position.set(-80, 0, -205);
+const pendants = [new PointLight(0xffe9c8, 30, 22, 1.3), new PointLight(0xffe9c8, 30, 22, 1.3)];
+pendants[0].position.set(-86, 6.4, -202); pendants[1].position.set(-76, 6.4, -202);
+usdanScene.add(usdanHemi, usdanSun, usdanSun.target, ...pendants, usdan.group);
+interface Inside { p: Person; lane?: [number, number, number]; z?: number; dir?: 1 | -1; speed?: number; sit?: boolean }
+const insiders: Inside[] = [];
+{
+  let seed = 950;
+  const add = (x: number, z: number, heading: number, extra: Partial<Inside> = {}, look = randomLook(seed++)) => {
+    const p = new Person(look);
+    p.root.position.set(x, 0, z);
+    p.face(heading);
+    usdanScene.add(p.root);
+    insiders.push({ p, ...extra });
+    return p;
+  };
+  for (const [t, c] of U_SITTERS) { const at = uChairs(U_ITEMS[t])[c]; add(at.x, at.z, at.heading, { sit: true }).sit(0.46); }
+  for (const s of SOFA_SITTERS) add(s.x, s.z, s.heading, { sit: true }).sit(0.42);
+  for (const s of STAFF) add(s.x, s.z, s.heading, {}, { ...randomLook(seed++), top: s.role === 'cafe' ? 0x1e1e22 : 0xc8302a });
+  for (const s of AT_DESK) add(s.x, s.z, s.heading);
+  WALK_LANES.forEach((lane, i) => {
+    for (let k = 0; k < 2; k++) {
+      const z = lane[1] + ((k + 0.3 + i * 0.2) / 2) * (lane[2] - lane[1]);
+      add(lane[0], z, 0, { lane, z, dir: k ? 1 : -1, speed: 1.1 + k * 0.3 });
+    }
+  });
+}
+
 // ── people ──
 const me = new Person({ skin: 0x6b3e26, hair: 0x121212, hairStyle: 'short', top: 0xc8302a, legs: 0x2b2b30, pack: 0x2b3a66 });
 // you start the day outside your house, on the sidewalk; ?x= / ?z= to start elsewhere
@@ -103,7 +143,8 @@ me.face(HOME_SPAWN.heading); // facing +z, up High Street
 scene.add(me.root);
 let sittingOn: Seat | null = null;
 // which world you're in: the street, or inside your house (?x/?z can start you inside)
-let where: Where = insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v) ? 'in' : 'out';
+let where: Where = insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v) ? 'in' : insideUsdan(pos) ? 'usdan' : 'out';
+const sceneFor = (w: Where) => (w === 'in' ? homeScene : w === 'usdan' ? usdanScene : scene);
 
 // ── getting around: walk → run, bikes + scooters in racks and loose on the walk ──
 const mob = createMobility(stops, crossings, ROW_ENTRY);
@@ -365,6 +406,9 @@ function applyMood(h: number) {
   hemi.groundColor.copy(m.hemiGround);
   hemi.intensity = m.hemiI;
   homeHemi.intensity = 1.7 - m.night * 1.0;
+  usdan.setDaylight(m.horizon, m.night);
+  usdanSun.intensity = (1 - m.night) * 0.9;
+  usdanHemi.intensity = 1.7 - m.night * 0.5; // Usdan stays lit at night
   homeDay.intensity = (1 - m.night) * 1.3;
   sun.color.copy(m.sun);
   sun.intensity = m.sunI;
@@ -430,6 +474,7 @@ function sleep() {
 /** Everything you can bump into right now: the house (by floor), and outside, nearby trunks, posts, benches and traffic. */
 const VEHICLE_HALF_W = { car: 0.95, truck: 1.2, bike: 0.35 } as const;
 function collisions() {
+  if (where === 'usdan') return usdanExtra();
   const base = houseExtra(level, mover.riding !== null || garage.driving !== null);
   if (where === 'in') return base;
   const near = (b: { x0: number; x1: number; z0: number; z1: number }) =>
@@ -460,7 +505,7 @@ function goThrough(kind: 'enter' | 'exit') {
   pos.set(w.x, 0, w.z);
   level = 0;
   where = kind === 'enter' ? 'in' : 'out';
-  (where === 'in' ? homeScene : scene).add(me.root, fill);
+  sceneFor(where).add(me.root, fill);
   me.face(at.heading);
   lastDir.set(Math.sin(at.heading), 0, Math.cos(at.heading));
   mover.speed = 0;
@@ -469,6 +514,23 @@ function goThrough(kind: 'enter' | 'exit') {
   fade.classList.add('blink');
   setTimeout(() => fade.classList.remove('blink'), 260);
   if (where === 'in') welcomeHome();
+}
+
+/** Through one of Usdan's doors: a blink, and you're inside (or back out, facing away from the building). */
+function goUsdan(door: Door, kind: 'enter' | 'exit') {
+  const at = arriveAt(door, kind);
+  pos.set(at.x, 0, at.z);
+  level = 0;
+  where = kind === 'enter' ? 'usdan' : 'out';
+  sceneFor(where).add(me.root, fill);
+  me.face(at.heading);
+  lastDir.set(Math.sin(at.heading), 0, Math.cos(at.heading));
+  mover.speed = 0;
+  rig.snapBehind(at.heading);
+  snapCamera = true;
+  fade.classList.add('blink');
+  setTimeout(() => fade.classList.remove('blink'), 260);
+  if (kind === 'enter') toast('Usdan University Center');
 }
 
 /** Walking in: who's home, who's out, and a hello from whoever you'd see first. */
@@ -647,6 +709,13 @@ function currentAction(): Act | null {
   }
   const options: Act[] = [];
   const lp = toLocal(pos.x, pos.z);
+  const ud = mover.riding === null && garage.driving === null ? nearUsdanDoor(where, pos) : null;
+  if (ud) {
+    const d = Math.hypot(pos.x - ud.x, pos.z - ud.z);
+    options.push(where === 'out'
+      ? { key: `usdan-in-${ud.id}`, label: '🚪  Go into Usdan', dist: d, run: () => goUsdan(ud, 'enter') }
+      : { key: `usdan-out-${ud.id}`, label: '🚪  Go outside', dist: d, run: () => goUsdan(ud, 'exit') });
+  }
   if (byTheDoor(where, lp.u, lp.v)) {
     const d = Math.abs(lp.u);
     options.push(where === 'out'
@@ -775,10 +844,25 @@ function frame(now: number) {
   let local = toLocal(pos.x, pos.z);
   const through = mover.riding === null && garage.driving === null ? portalAt(where, local.u, local.v) : null;
   if (through) { goThrough(through); local = toLocal(pos.x, pos.z); }
-  const indoors = where === 'in';
+  const ut = mover.riding === null && garage.driving === null && !through ? usdanPortalAt(where, pos) : null;
+  if (ut) goUsdan(ut.door, ut.kind);
+  const indoors = where !== 'out';
+  if (where === 'usdan') {
+    usdan.update(camera.position, pos);
+    for (const s of insiders) {
+      if (s.lane) { // up and down the corridor
+        s.z! += s.dir! * s.speed! * dt;
+        if (s.z! > s.lane[2] || s.z! < s.lane[1]) s.dir = s.dir! > 0 ? -1 : 1;
+        s.p.root.position.set(s.lane[0], 0, s.z!);
+        s.p.face(s.dir! > 0 ? 0 : Math.PI);
+        s.p.walk(dt, s.speed!);
+      } else if (s.sit) s.p.sitIdle(dt);
+      else s.p.walk(dt, 0);
+    }
+  }
   const door = toWorld(0, (FRONT_DOOR.v0 + FRONT_DOOR.v1) / 2);
   const doorOpens = Math.hypot(pos.x - door.x, pos.z - door.z) < 2.4 || roommates.near(door.x, door.z, 2.2);
-  house.update(dt, camera.position, { x: pos.x, z: pos.z, level, inside: indoors }, doorOpens);
+  house.update(dt, camera.position, { x: pos.x, z: pos.z, level, inside: where === 'in' }, doorOpens);
   roommates.update(dt, hour, house.upstairs.visible);
 
   // passers-by
@@ -849,8 +933,9 @@ function frame(now: number) {
   // sit a little out over the field (+x) and look back across the facades
   const fast = (1 + Math.min(0.55, Math.max(0, mover.speed - 3) / 26)) * (car ? 1.3 : 1); // pull back a little when you're moving fast
   // indoors: closer and higher, looking down into the room (walls in the way are cut away)
-  const dist = indoors ? 5.2 : (portrait ? 9 : 8.6) * fast;
-  const up = (indoors ? 7.4 : (portrait ? 6 : 4.4) * fast) * (1 + rig.pitch);
+  const dist = where === 'usdan' ? 6.8 : indoors ? 5.2 : (portrait ? 9 : 8.6) * fast;
+  const up = where === 'usdan' ? Math.min(4.0, 3.3 * (1 + rig.pitch)) // stay under Usdan's ceiling
+    : (indoors ? 7.4 : (portrait ? 6 : 4.4) * fast) * (1 + rig.pitch);
   const side = indoors ? 0 : right.x; // +1 when +x is screen-right, −1 when it's screen-left
   want.copy(pos).addScaledVector(fwd, -dist).addScaledVector(right, 2.2 * side).setY(pos.y + up);
   let clear = 1;
@@ -873,7 +958,7 @@ function frame(now: number) {
     shake *= Math.exp(-dt * 7);
   }
   // look ahead of you — less so when the camera's had to tuck in close, so you stay on screen
-  const ahead = indoors ? 2.5 : 9 * Math.max(0.15, clear);
+  const ahead = where === 'usdan' ? 5 : indoors ? 2.5 : 9 * Math.max(0.15, clear);
   lookAt.copy(pos).addScaledVector(fwd, ahead).addScaledVector(right, -1.8 * side * clear).setY(pos.y + 1.1 - rig.pitch * 1.5);
   // the opening shot at home: start on your house, then turn to the street as the camera comes round behind you
   if (atHomeStart && introT < 1) lookAt.lerpVectors(HOUSE_LOOK, lookAt, k);
@@ -897,9 +982,9 @@ function frame(now: number) {
   if (here) { passingName.textContent = here; passing.classList.add('show'); }
   else passing.classList.remove('show');
 
-  labels.where = where;
+  labels.where = where === 'out' ? 'out' : 'in';
   labels.update(camera, pos, innerWidth, innerHeight);
-  renderer.render(where === 'in' ? homeScene : scene, camera);
+  renderer.render(sceneFor(where), camera);
   requestAnimationFrame(frame);
 }
 
@@ -921,6 +1006,7 @@ Object.assign(window, {
     get indoors() { const l = toLocal(pos.x, pos.z); return insideHouse(l.u, l.v); },
     get sitting() { return sittingOn?.id ?? null; },
     get where() { return where; },
+    get insiders() { return insiders.length; },
     get upstairsShown() { return house.upstairs.visible; },
     get running() { return isRunning(mover); },
     get action() { return actKey; },
@@ -947,7 +1033,7 @@ Object.assign(window, {
 
 applyMood(hour);
 lastHour = hour;
-if (where === 'in') homeScene.add(me.root, fill);
+if (where !== 'out') sceneFor(where).add(me.root, fill);
 if (introT === 1) camPos.set(pos.x + Math.sin(rig.yaw) * 9, 6, pos.z + Math.cos(rig.yaw) * 9); // already behind you
 requestAnimationFrame(frame);
 const boot = document.getElementById('boot')!;

@@ -648,3 +648,24 @@ test('up the back path into the plaza between Usdan and Boger: people out at the
   expect(await page.evaluate(() => (window as any).__vora.sample())).toBeGreaterThan(20);
   expect(errors).toEqual([]);
 });
+
+test('into Usdan from the plaza, across to the atrium, and back out @smoke', async ({ page }) => {
+  // on the plaza, facing Usdan's east doors (−x)
+  const errors = await open(page, `t=13&x=-58.6&z=-197&yaw=${Math.PI / 2}`);
+  await expect(page.locator('#act')).toContainText('Go into Usdan');
+  await page.keyboard.press('f');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.where)).toBe('usdan');
+  expect(await page.evaluate(() => (window as any).__vora.insiders)).toBeGreaterThan(15);
+  expect(await page.evaluate(() => (window as any).__vora.sample())).toBeGreaterThan(20);
+  // walk in (−x), past the lounge, into the atrium
+  const s = await hold(page, 'w', 8);
+  expect(s.x).toBeLessThan(-66);
+  expect(await page.evaluate(() => (window as any).__vora.where)).toBe('usdan');
+  // and back out the way you came: turn round, walk into the doorway
+  await page.keyboard.down('s');
+  await page.waitForFunction(() => (window as any).__vora.where === 'out', null, { timeout: 60_000 });
+  await page.keyboard.up('s');
+  const out = await state(page);
+  expect(out.x).toBeGreaterThan(-60); // on the plaza
+  expect(errors).toEqual([]);
+});

@@ -14,9 +14,9 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 
 ## How to run
 - `npm run dev` → http://localhost:5173/row.html. This is the game. `/` is the old Pixi Foss Hill greybox, which is still working but parked.
-- `npm test`: Vitest unit tests (193, about 8 s).
-- Browser tests (Playwright, 47) run against a **built copy** (`vite build` into `dist-e2e/`, served by `vite preview` on port 5189), snapshotted when the run starts. So you **can keep editing source while they run**. They use the installed Google Chrome with SwiftShader WebGL, 2 workers (`-- --workers=1` when the machine is busy).
-  - `npm run test:smoke`: 8 key tests tagged `@smoke`, about 3 min. Run after each feature.
+- `npm test`: Vitest unit tests (206, about 8 s).
+- Browser tests (Playwright, 48) run against a **built copy** (`vite build` into `dist-e2e/`, served by `vite preview` on port 5189), snapshotted when the run starts. So you **can keep editing source while they run**. They use the installed Google Chrome with SwiftShader WebGL, 2 workers (`-- --workers=1` when the machine is busy).
+  - `npm run test:smoke`: 9 key tests tagged `@smoke`, about 3 min. Run after each feature.
   - `npm run test:e2e -- -g carjack`: just the tests whose names match.
   - `npm run test:e2e`: everything, 10+ min. Run it in the background.
 - `npm run check:quick`: tsc + unit tests + smoke. `npm run check`: tsc + unit + all browser tests, before commits. **Keep it green.** The user asked for everything to be tested comprehensively. The agreed workflow (2026-10-01) is unit tests on every change, smoke after each feature, the full suite in the background before commits.
@@ -54,6 +54,13 @@ You **start the game outside your house**, on the sidewalk at the end of your fr
 | `people.ts` / `traces.ts` | Blocky people with knees, elbows, hands and eyes. Each body segment is one merged vertex-coloured mesh (≤12 meshes per person). `gait(phase, speed)` is a pure walk↔run blend: knees fold and arms pump when running. Also sit/ride/scoot, idle breathing, blinking and glances, plus `flail`/`limp` for being hit. Traces: demo social traces (friend footstep trails, notes, labels). All social data is **demo/fake** for now. |
 | `knock.ts` | Being hit by your car (pure): `hits`, `launch`, `stepKnock` (air → down → up → done). main.ts keeps a `bodies` registry of everyone hittable (walkers, sitters, frisbee players, carjacked drivers), each with how it recovers. |
 | `main.ts` | Wiring, game loop, actions, the two scenes. |
+
+### Inside Usdan (`src/row/usdan/`)
+The ground floor, built from the user's photos (2026-10-01). Like the house, it's its **own scene** (`usdanScene`; `where === 'usdan'`). You enter through the **south doors** (off the Boger–South walkway) or the **east doors** (from the plaza), by walking into the doorway or with "Go into Usdan".
+- **`plan.ts`** (pure, tested): doors and portals (`usdanPortalAt`, `arriveAt`), rooms, internal walls, furniture, seated students, staff and walking lanes. `usdanExtra()` gives collision via the new `Extra.interior` predicate, so you stay inside the outline.
+- **Rooms:** the lobby (Information booth with an orange column, a TV niche with wood chairs on a rug, an iPad Pro banner); the lounge (black box sofas round a red column); the sage corridor north (hanging OSI/Meeting Room signs, the Navaratri 50-years display case, blue bins, the elevator); the double-height atrium (globe pendants, the curved red-walled stair, the W, round café tables, balcony boxes with plants, a pumpkin-carving screen); Flex Dining (yellow walls, tall windows, square tables on striped carpet); and the café (counter, coolers, chip rack, menu).
+- **`view.ts`:** a terrazzo floor, a low ceiling with downlights, and the atrium's high ceiling. Walls between the camera and you hide (`crosses`), and so do the hanging signs. The indoor camera stays under the 4.4 m ceiling.
+- Not built yet: the upstairs (balconies are just openings), the west wing, actually ordering at the café, and the mail room downstairs.
 
 ### Your house (`src/row/house/`)
 A two-storey wood frame across High Street (local coordinates: `u` from the front, `v` across; `plan.ts` has an ASCII map).

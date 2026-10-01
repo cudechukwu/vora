@@ -11,7 +11,13 @@ import { BOUNDS, RowStop, inUsdan } from './layout';
 
 export interface XZ { x: number; z: number }
 export interface Box { x0: number; x1: number; z0: number; z1: number }
-export interface Extra { solids?: Box[]; walkable?: Box[]; lots?: Box[] }
+export interface Extra {
+  solids?: Box[];
+  walkable?: Box[];
+  lots?: Box[];
+  /** Inside a building on the map (e.g. Usdan): ignore its outside walls, but stay where this says you can stand. */
+  interior?: (p: XZ) => boolean;
+}
 
 const PAD = 0.8; // keep this far off a wall
 
@@ -43,12 +49,15 @@ function rowMove(prev: XZ, want: XZ, stops: RowStop[], xMax: number): XZ {
 export function resolveMove(prev: XZ, want: XZ, stops: RowStop[], extra?: Extra): XZ {
   const lots = extra?.lots ?? [];
   const xMax = Math.max(BOUNDS.xMax, ...lots.map((l) => l.x1));
-  const p = rowMove(prev, want, stops, xMax);
+  const p = extra?.interior
+    ? { x: Math.min(xMax, Math.max(BOUNDS.xMin, want.x)), z: Math.min(BOUNDS.zMax, Math.max(BOUNDS.zMin, want.z)) }
+    : rowMove(prev, want, stops, xMax);
   if (!extra) return p;
   const ok = (q: XZ) =>
     (q.x <= BOUNDS.xMax || lots.some((l) => inBox(q, l)))
     && !(extra.solids ?? []).some((b) => inBox(q, b))
-    && (!extra.walkable || extra.walkable.some((b) => inBox(q, b)));
+    && (!extra.walkable || extra.walkable.some((b) => inBox(q, b)))
+    && (!extra.interior || extra.interior(q));
   if (ok(p)) return p;
   // safety net: if you're somehow already inside something (a car pulled up, a floor change), never freeze —
   // let any move that gets you out (or at least doesn't trap you) through
