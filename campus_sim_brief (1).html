@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAMPUS / SIM — Strategic Brief v0.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg: #d8e6d4;
+  --bg-deep: #c9dbc4;
+  --bg-haze: #e4efde;
+  --ink: #0f1a14;
+  --ink-soft: #2a3a30;
+  --ink-mute: #5a6b5e;
+  --line: #0f1a14;
+  --line-soft: rgba(15,26,20,0.15);
+  --accent: #00ff88;
+  --accent-deep: #00b865;
+  --warn: #ff5e3a;
+  --cream: #f4f6ec;
+}
+
+*{box-sizing:border-box; margin:0; padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.55;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Grain overlay for texture */
+body::before{
+  content:"";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0.4;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.06 0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Scanline subtle */
+body::after{
+  content:"";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 3px,
+    rgba(15,26,20,0.018) 3px,
+    rgba(15,26,20,0.018) 4px
+  );
+}
+
+.mono{ font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;}
+.sans{ font-family: 'Space Grotesk', sans-serif; }
+.serif{ font-family: 'Fraunces', serif; }
+
+/* ============ NAV BAR ============ */
+.topbar{
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 50;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 32px;
+  background: rgba(216, 230, 212, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line-soft);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.topbar .left{display:flex; gap:24px; align-items:center;}
+.topbar .right{display:flex; gap:18px; color: var(--ink-mute);}
+.topbar .dot{
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%, 100%{opacity:1; transform:scale(1);}
+  50%{opacity:0.5; transform:scale(0.85);}
+}
+
+/* ============ HERO ============ */
+.hero{
+  min-height: 100vh;
+  padding: 120px 32px 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  border-bottom: 1px solid var(--line);
+}
+
+.hero-meta{
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 60px;
+}
+
+.hero-title{
+  font-family: 'Fraunces', serif;
+  font-weight: 300;
+  font-size: clamp(64px, 11vw, 184px);
+  line-height: 0.88;
+  letter-spacing: -0.04em;
+  margin-bottom: 40px;
+}
+.hero-title em{
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+.hero-title .slash{
+  display: inline-block;
+  color: var(--accent-deep);
+  transform: translateY(-0.08em);
+  margin: 0 0.04em;
+}
+
+.hero-bottom{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 40px;
+  align-items: end;
+}
+.hero-bottom .lede{
+  font-size: 22px;
+  line-height: 1.35;
+  font-weight: 300;
+  color: var(--ink-soft);
+  max-width: 480px;
+}
+.hero-bottom .lede em{ font-style: italic; color: var(--ink);}
+.hero-stat{
+  border-left: 1px solid var(--line);
+  padding-left: 18px;
+}
+.hero-stat .label{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-mute);
+  margin-bottom: 6px;
+}
+.hero-stat .value{
+  font-family: 'Fraunces', serif;
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.hero-stat .sub{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-mute);
+  margin-top: 4px;
+}
+
+/* Floating coordinate marks */
+.coord{
+  position: absolute;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-mute);
+  letter-spacing: 0.1em;
+}
+.coord-1{ top: 90px; right: 32px; }
+.coord-2{ bottom: 30px; left: 32px; }
+
+/* ============ SECTION SHELL ============ */
+section.body{
+  padding: 100px 32px;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+
+.sec-head{
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 60px;
+  margin-bottom: 60px;
+  align-items: start;
+}
+.sec-num{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.sec-num strong{
+  color: var(--accent-deep);
+  font-weight: 500;
+}
+.sec-title{
+  font-family: 'Fraunces', serif;
+  font-weight: 300;
+  font-size: clamp(40px, 5vw, 72px);
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+.sec-title em{ font-style: italic; color: var(--ink-soft);}
+
+.sec-body{
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 60px;
+}
+.sec-aside{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  line-height: 1.8;
+}
+.sec-aside div{
+  padding: 6px 0;
+  border-bottom: 1px dotted var(--line-soft);
+}
+
+.prose{
+  max-width: 760px;
+  font-size: 17px;
+  line-height: 1.65;
+}
+.prose p{ margin-bottom: 1.1em; color: var(--ink-soft);}
+.prose p strong{ color: var(--ink); font-weight: 500;}
+.prose p em{ font-style: italic; color: var(--ink);}
+
+.pull{
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.25;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  padding: 28px 0;
+  margin: 28px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  max-width: 760px;
+}
+.pull .accent{ color: var(--accent-deep); font-style: normal;}
+
+/* ============ THESIS BLOCK ============ */
+.thesis-grid{
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
+  border: 1px solid var(--line);
+  margin-top: 20px;
+}
+.thesis-cell{
+  padding: 28px 28px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-haze);
+  transition: background 0.4s ease;
+}
+.thesis-cell:hover{ background: var(--cream);}
+.thesis-cell:nth-child(2n){ border-right: none;}
+.thesis-cell:nth-last-child(-n+2){ border-bottom: none;}
+.thesis-cell .lbl{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--ink-mute);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.thesis-cell h4{
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.2;
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+}
+.thesis-cell p{ font-size: 14px; color: var(--ink-soft); line-height: 1.55;}
+
+/* ============ TIMELINE ============ */
+.timeline{
+  position: relative;
+  margin-top: 40px;
+}
+.phase{
+  display: grid;
+  grid-template-columns: 220px 1fr 240px;
+  gap: 40px;
+  padding: 36px 0;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.phase:first-child{ border-top: 1px solid var(--line);}
+.phase-marker{
+  position: relative;
+}
+.phase-marker .when{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 8px;
+}
+.phase-marker .num{
+  font-family: 'Fraunces', serif;
+  font-size: 56px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.phase-marker .num .pre{
+  font-size: 18px;
+  color: var(--ink-mute);
+  vertical-align: top;
+  margin-right: 6px;
+}
+.phase-body h3{
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.15;
+  margin-bottom: 10px;
+  letter-spacing: -0.015em;
+}
+.phase-body h3 em{ font-style: italic; color: var(--ink-soft);}
+.phase-body p{
+  font-size: 15px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  margin-bottom: 14px;
+  max-width: 540px;
+}
+.phase-body ul{
+  list-style: none;
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+.phase-body ul li{
+  padding-left: 18px;
+  position: relative;
+}
+.phase-body ul li::before{
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: var(--accent-deep);
+  font-family: 'JetBrains Mono', monospace;
+}
+.phase-meta{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  line-height: 1.9;
+}
+.phase-meta .row{
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px dotted var(--line-soft);
+}
+.phase-meta .row span:last-child{ color: var(--ink);}
+
+/* ============ CAMPUS ROLLOUT ============ */
+.campus-map{
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.wave{
+  background: var(--bg-haze);
+  padding: 32px;
+}
+.wave-head{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.wave-head .name{
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+.wave-head .name em{ font-style: italic; color: var(--ink-soft);}
+.wave-head .when{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.wave .thesis{
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+.wave .schools{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.school-tag{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+}
+.school-tag.featured{
+  background: var(--ink);
+  color: var(--bg-haze);
+}
+.wave .why{
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  padding-top: 14px;
+  border-top: 1px dotted var(--line-soft);
+}
+.wave .why strong{ color: var(--ink); font-weight: 500;}
+
+/* ============ METRIC GRID ============ */
+.metric-grid{
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 30px;
+}
+.metric{
+  border: 1px solid var(--line);
+  padding: 22px;
+  background: var(--bg-haze);
+  position: relative;
+}
+.metric .key{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 14px;
+}
+.metric .val{
+  font-family: 'Fraunces', serif;
+  font-size: 42px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+.metric .val .unit{ font-size: 16px; color: var(--ink-mute); margin-left: 4px;}
+.metric .desc{
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dotted var(--line-soft);
+}
+
+/* ============ COMPARISON ============ */
+.compare{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--line);
+  margin-top: 30px;
+}
+.compare-col{
+  padding: 28px;
+  border-right: 1px solid var(--line);
+}
+.compare-col:last-child{ border-right: none;}
+.compare-col.featured{
+  background: var(--ink);
+  color: var(--bg-haze);
+}
+.compare-col.featured .compare-head .name{ color: var(--accent);}
+.compare-head{
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid currentColor;
+  opacity: 1;
+}
+.compare-head .lbl{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+.compare-head .name{
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 400;
+}
+.compare-row{
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px dotted rgba(127,127,127,0.25);
+}
+.compare-row:last-child{ border-bottom: none;}
+.compare-row .k{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+
+/* ============ RISK GRID ============ */
+.risk-list{
+  margin-top: 30px;
+}
+.risk{
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr;
+  gap: 24px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+.risk:first-child{ border-top: 1px solid var(--line);}
+.risk-num{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-mute);
+  padding-top: 4px;
+}
+.risk-name{
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+.risk-name .severity{
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  margin-left: 8px;
+  vertical-align: middle;
+  border: 1px solid currentColor;
+}
+.risk-name .severity.high{ color: var(--warn); border-color: var(--warn);}
+.risk-name .severity.med{ color: var(--ink-mute);}
+.risk-name p{
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink-soft);
+  margin-top: 6px;
+  font-weight: 300;
+}
+.risk-mit{
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.risk-mit strong{
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+/* ============ HORIZON ============ */
+.horizon{
+  position: relative;
+  margin-top: 30px;
+  padding: 60px 40px;
+  background: var(--ink);
+  color: var(--bg-haze);
+  overflow: hidden;
+}
+.horizon::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 80% 20%, rgba(0,255,136,0.18) 0%, transparent 50%),
+    radial-gradient(circle at 20% 80%, rgba(0,255,136,0.08) 0%, transparent 50%);
+  pointer-events: none;
+}
+.horizon-content{ position: relative; z-index: 2;}
+.horizon h3{
+  font-family: 'Fraunces', serif;
+  font-weight: 300;
+  font-size: clamp(36px, 4.5vw, 60px);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  margin-bottom: 28px;
+  max-width: 900px;
+}
+.horizon h3 em{ font-style: italic; color: var(--accent);}
+.horizon-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 36px;
+  margin-top: 30px;
+}
+.horizon-card .num{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.horizon-card h4{
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 400;
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+}
+.horizon-card p{
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(244,246,236,0.7);
+}
+
+/* ============ FOOTER ============ */
+footer{
+  padding: 80px 32px 40px;
+  background: var(--bg-deep);
+  border-top: 1px solid var(--line);
+}
+.footer-top{
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 40px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid var(--line);
+}
+.footer-tagline{
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(28px, 3.6vw, 52px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  max-width: 700px;
+}
+.footer-tagline .accent{ color: var(--accent-deep); font-style: normal;}
+.footer-meta{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  line-height: 1.9;
+}
+.footer-meta strong{ color: var(--ink); font-weight: 500;}
+.footer-bottom{
+  padding-top: 30px;
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 900px){
+  .hero-bottom{ grid-template-columns: 1fr; gap: 24px;}
+  .sec-head, .sec-body{ grid-template-columns: 1fr; gap: 20px;}
+  .phase{ grid-template-columns: 1fr; gap: 16px;}
+  .thesis-grid{ grid-template-columns: 1fr;}
+  .thesis-cell{ border-right: none !important;}
+  .campus-map{ grid-template-columns: 1fr;}
+  .metric-grid{ grid-template-columns: 1fr 1fr;}
+  .compare{ grid-template-columns: 1fr;}
+  .compare-col{ border-right: none; border-bottom: 1px solid var(--line);}
+  .horizon-grid{ grid-template-columns: 1fr;}
+  .footer-top{ grid-template-columns: 1fr;}
+  .risk{ grid-template-columns: 40px 1fr; }
+  .risk-mit{ grid-column: 1 / -1; padding-left: 64px;}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topbar">
+  <div class="left">
+    <span class="dot"></span>
+    <span>CAMPUS / SIM</span>
+    <span>BRIEF v0.1</span>
+  </div>
+  <div class="right">
+    <span>14.05.26</span>
+    <span>INTERNAL</span>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-meta">
+    <span>Strategic Brief — Confidential Draft</span>
+    <span>Prepared for: Founding Team</span>
+  </div>
+
+  <div>
+    <div class="hero-title">
+      A campus<br>
+      <em>that lives</em> <span class="slash">/</span><br>
+      between sessions.
+    </div>
+  </div>
+
+  <div class="hero-bottom">
+    <div class="lede">
+      A live multiplayer social simulation that begins as <em>your university, digitized</em> — and grows, over time, into a simulator for every situation worth being in.
+    </div>
+    <div class="hero-stat">
+      <div class="label">Beachhead</div>
+      <div class="value">Wesleyan</div>
+      <div class="sub">Fall '26 Pilot</div>
+    </div>
+    <div class="hero-stat">
+      <div class="label">Horizon</div>
+      <div class="value">≈10 yrs</div>
+      <div class="sub">Sim → Situation Sim</div>
+    </div>
+  </div>
+
+  <div class="coord coord-1">41.5560°N / 72.6566°W</div>
+  <div class="coord coord-2">// SIM.LAYER.01 — INSTANCE: WES_PILOT_α</div>
+</section>
+
+<!-- 01 THESIS -->
+<section class="body">
+  <div class="sec-head">
+    <div class="sec-num"><strong>01</strong> / Thesis</div>
+    <div class="sec-title">What we're <em>actually</em> building.</div>
+  </div>
+
+  <div class="sec-body">
+    <div class="sec-aside">
+      <div>Read: 4 min</div>
+      <div>Status: Live draft</div>
+      <div>Audience: Internal</div>
+      <div>Author: Team</div>
+    </div>
+    <div>
+      <div class="prose">
+        <p>Modern apps killed ambient social life. Feeds replaced rooms. Notifications replaced footsteps. The result: a generation that's hyper-connected and chronically lonely, especially on college campuses where physical proximity should have made this impossible.</p>
+        <p><strong>CAMPUS</strong> is a live multiplayer social simulation of a real university. Students enter as avatars, spawn in their dorms, walk to real-feeling locations, encounter friends, attend events, and exist socially — even when nothing important is happening. The gameplay is <em>life rhythm</em>.</p>
+        <p>It is not a dating app. It is not social media. It is not a game in the traditional sense. It is <strong>a digital social layer for real life</strong>, and the only metric that matters is whether students log in when they have nothing to do.</p>
+      </div>
+
+      <div class="pull">
+        The world must support <span class="accent">passive social existence.</span> Players should enjoy being there even when doing nothing important.
+      </div>
+
+      <div class="thesis-grid">
+        <div class="thesis-cell">
+          <div class="lbl">// First Principle 01</div>
+          <h4>Presence over content.</h4>
+          <p>Other people existing nearby is the product. Posts, content, and feeds are secondary at best, hostile at worst.</p>
+        </div>
+        <div class="thesis-cell">
+          <div class="lbl">// First Principle 02</div>
+          <h4>Place is identity.</h4>
+          <p>Foss, Beckham, Usdan, Olin — campus geography becomes shorthand for who you are, what you're doing, who you'll see.</p>
+        </div>
+        <div class="thesis-cell">
+          <div class="lbl">// First Principle 03</div>
+          <h4>Soft reputation, not metrics.</h4>
+          <p>No followers, no likes, no scores. People become known for fashion, music taste, parties, presence — emergently, not algorithmically.</p>
+        </div>
+        <div class="thesis-cell">
+          <div class="lbl">// First Principle 04</div>
+          <h4>Never feel optimized.</h4>
+          <p>No XP grinding, no daily rewards, no streaks. The moment players sense the casino, the spell breaks. Engagement comes from emotion, not from skinner boxes.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 MARKET -->
+<section class="body">
+  <div class="sec-head">
+    <div class="sec-num"><strong>02</strong> / Market</div>
+    <div class="sec-title">Who else is in <em>this room.</em></div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-aside">
+      <div>Adjacent: YikYak</div>
+      <div>Adjacent: Fizz</div>
+      <div>Adjacent: Sidechat</div>
+      <div>Distant: Roblox</div>
+      <div>Distant: Zepeto</div>
+      <div>Distant: VRChat</div>
+    </div>
+    <div>
+      <div class="prose">
+        <p>The campus-social space is dominated by anonymous text apps (Fizz, Sidechat, Yik Yak revival) — feeds for gossip, missed connections, and shitposts. They solve <em>signaling</em>; they do not solve <em>presence</em>. They are read alone, in bed, late at night.</p>
+        <p>The metaverse/virtual world space (Roblox, Zepeto, VRChat) solves presence but at a cost: the world is fantasy, the friends are strangers, and the social capital you build there does not transfer to your real life. The lobby is global and meaningless.</p>
+        <p>CAMPUS sits in the gap: <strong>real social graph, virtual ambient presence.</strong> The people are people you'll see tomorrow in class. The buildings are buildings you walked through this afternoon.</p>
+      </div>
+
+      <div class="compare">
+        <div class="compare-col">
+          <div class="compare-head">
+            <div class="lbl">// Anonymous Feeds</div>
+            <div class="name">Fizz / Sidechat</div>
+          </div>
+          <div class="compare-row"><span class="k">Mode</span><span>Text feed</span></div>
+          <div class="compare-row"><span class="k">Identity</span><span>Anonymous</span></div>
+          <div class="compare-row"><span class="k">Presence</span><span>None</span></div>
+          <div class="compare-row"><span class="k">Graph</span><span>Local</span></div>
+          <div class="compare-row"><span class="k">Output</span><span>Gossip</span></div>
+        </div>
+        <div class="compare-col featured">
+          <div class="compare-head">
+            <div class="lbl">// Us</div>
+            <div class="name">CAMPUS</div>
+          </div>
+          <div class="compare-row"><span class="k">Mode</span><span>Live sim</span></div>
+          <div class="compare-row"><span class="k">Identity</span><span>Avatar / Real</span></div>
+          <div class="compare-row"><span class="k">Presence</span><span>Ambient</span></div>
+          <div class="compare-row"><span class="k">Graph</span><span>Local</span></div>
+          <div class="compare-row"><span class="k">Output</span><span>Relationships</span></div>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head">
+            <div class="lbl">// Virtual Worlds</div>
+            <div class="name">Roblox / VRChat</div>
+          </div>
+          <div class="compare-row"><span class="k">Mode</span><span>3D sim</span></div>
+          <div class="compare-row"><span class="k">Identity</span><span>Fantasy</span></div>
+          <div class="compare-row"><span class="k">Presence</span><span>Ambient</span></div>
+          <div class="compare-row"><span class="k">Graph</span><span>Global</span></div>
+          <div class="compare-row"><span class="k">Output</span><span>Strangers</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 BUILD TIMELINE -->
+<section class="body">
+  <div class="sec-head">
+    <div class="sec-num"><strong>03</strong> / Build Timeline</div>
+    <div class="sec-title">Eighteen months <em>to a real product.</em></div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-aside">
+      <div>Stack: Unity → Unreal</div>
+      <div>Net: Photon / Mirror</div>
+      <div>Backend: Firebase</div>
+      <div>Audio: Wwise / FMOD</div>
+      <div>Avatar: ReadyPlayer/RPM</div>
+      <div>Voice: LiveKit</div>
+    </div>
+    <div>
+      <div class="prose">
+        <p>The full vision is a ten-year project. The first product is not. The plan below assumes a 4–6 person core team, shipping a playable single-campus build in 12 months and reaching meaningful daily-life retention by month 18.</p>
+      </div>
+
+      <div class="timeline">
+
+        <div class="phase">
+          <div class="phase-marker">
+            <div class="when">Now → Month 3</div>
+            <div class="num"><span class="pre">P</span>01</div>
+          </div>
+          <div class="phase-body">
+            <h3>Greybox the <em>vibe</em>, not the campus.</h3>
+            <p>Before modeling a single dorm: prove the emotional thesis in a flat, ugly box. Two rooms, four avatars, walk, sit, message, change outfit. Does it <em>feel alive</em> with 6 friends in it on a Tuesday night?</p>
+            <ul>
+              <li>Tech spike: client/server presence + ambient proximity chat</li>
+              <li>Greybox of Foss + a single dorm</li>
+              <li>Avatar prototype: outfit slot system, sit/walk/idle</li>
+              <li>Closed playtest: 8 internal users for 2 weeks</li>
+            </ul>
+          </div>
+          <div class="phase-meta">
+            <div class="row"><span>Team</span><span>3–4</span></div>
+            <div class="row"><span>Burn</span><span>Low</span></div>
+            <div class="row"><span>Gate</span><span>Vibe ≥ 7/10</span></div>
+            <div class="row"><span>Risk</span><span>Conceptual</span></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-marker">
+            <div class="when">Month 3 → 6</div>
+            <div class="num"><span class="pre">P</span>02</div>
+          </div>
+          <div class="phase-body">
+            <h3>The Wesleyan <em>shell.</em></h3>
+            <p>Build a stylized version of Wesleyan — not photorealistic, not literal — that any current student would recognize within ten seconds. Five core buildings, the campus walk, dorms. Phone UI v1. Outfit closet. Friend system via in-world contact exchange.</p>
+            <ul>
+              <li>Map: Foss, Beckham, Usdan, Olin, Allbritton + outdoor paths</li>
+              <li>Phone OS v1: contacts, messages, photo, events</li>
+              <li>Dorm customization: lighting, posters, music</li>
+              <li>Hygiene/sleep system — lightweight, visual only</li>
+            </ul>
+          </div>
+          <div class="phase-meta">
+            <div class="row"><span>Team</span><span>5–6</span></div>
+            <div class="row"><span>Burn</span><span>Med</span></div>
+            <div class="row"><span>Gate</span><span>Internal alpha</span></div>
+            <div class="row"><span>Risk</span><span>Scope</span></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-marker">
+            <div class="when">Month 6 → 9</div>
+            <div class="num"><span class="pre">P</span>03</div>
+          </div>
+          <div class="phase-body">
+            <h3>Closed alpha: <em>fifty students.</em></h3>
+            <p>Invite-only, hand-picked across friend groups. The goal is to seed a real social graph — not test mechanics. Measure: how often do they open it when nothing is planned? That is the only metric that matters.</p>
+            <ul>
+              <li>First parties: 3 in-world events tied to real Wes events</li>
+              <li>Memory system v1: "you walked together 17 times"</li>
+              <li>Crush / mutual notification system</li>
+              <li>Soft launch of social energy: time-of-day mood shifts</li>
+            </ul>
+          </div>
+          <div class="phase-meta">
+            <div class="row"><span>Team</span><span>6</span></div>
+            <div class="row"><span>Burn</span><span>Med</span></div>
+            <div class="row"><span>Gate</span><span>D7 ≥ 40%</span></div>
+            <div class="row"><span>Risk</span><span>Retention</span></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-marker">
+            <div class="when">Month 9 → 12</div>
+            <div class="num"><span class="pre">P</span>04</div>
+          </div>
+          <div class="phase-body">
+            <h3>Open at Wesleyan. <em>One campus, all of it.</em></h3>
+            <p>Public launch to the full Wesleyan student body. .edu-gated. Marketing is poster-based, in-person, busker-coded — never paid digital ads. The whole campus needs to feel like it's quietly happening, the way real subcultures spread.</p>
+            <ul>
+              <li>Edu-domain gating + photo verification for safety</li>
+              <li>Event calendar integrated with real Wes student orgs</li>
+              <li>Moderation team + Trust & Safety v1</li>
+              <li>Press: campus paper first, then student-press networks</li>
+            </ul>
+          </div>
+          <div class="phase-meta">
+            <div class="row"><span>Team</span><span>8–10</span></div>
+            <div class="row"><span>Burn</span><span>High</span></div>
+            <div class="row"><span>Gate</span><span>30% of campus</span></div>
+            <div class="row"><span>Risk</span><span>Moderation</span></div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div class="phase-marker">
+            <div class="when">Month 12 → 18</div>
+            <div class="num"><span class="pre">P</span>05</div>
+          </div>
+          <div class="phase-body">
+            <h3>Second and third <em>campuses.</em></h3>
+            <p>Templatize the engine. New campuses ship with a custom-modeled map but shared systems. Each campus is a separate instance — no cross-campus play in v1. Scarcity and locality are the brand.</p>
+            <ul>
+              <li>Build pipeline: 1 campus per 8–10 weeks at steady state</li>
+              <li>Local launch teams: student ambassadors, paid stipend</li>
+              <li>Hardware optimization: must run on a 4-year-old phone</li>
+              <li>Series A close mid-window</li>
+            </ul>
+          </div>
+          <div class="phase-meta">
+            <div class="row"><span>Team</span><span>15–20</span></div>
+            <div class="row"><span>Burn</span><span>High</span></div>
+            <div class="row"><span>Gate</span><span>3 campuses live</span></div>
+            <div class="row"><span>Risk</span><span>Scaling</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 GTM CAMPUS WAVES -->
+<section class="body">
+  <div class="sec-head">
+    <div class="sec-num"><strong>04</strong> / Go-To-Market</div>
+    <div class="sec-title">Campus by campus, <em>in waves.</em></div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-aside">
+      <div>Method: Dense → Spread</div>
+      <div>Order: Small NESCAC →</div>
+      <div>→ Mid Privates →</div>
+      <div>→ State flagship pilot →</div>
+      <div>→ HBCU partner →</div>
+      <div>→ Coastal megas</div>
+    </div>
+    <div>
+      <div class="prose">
+        <p>The mistake everyone makes with campus social is launching everywhere at once. The product needs density to feel alive, and density only comes from <em>one campus at a time</em>, deeply, before moving on. Each wave is selected for a reason.</p>
+      </div>
+
+      <div class="campus-map">
+
+        <div class="wave">
+          <div class="wave-head">
+            <div class="name">Wave 0 <em>— Anchor</em></div>
+            <div class="when">Fall '26</div>
+          </div>
+          <div class="thesis">A small, weird, walkable campus where the founders are known and the social fabric is already dense.</div>
+          <div class="schools">
+            <span class="school-tag featured">Wesleyan</span>
+          </div>
+          <div class="why"><strong>Why first:</strong> ~3,000 undergrads. Walkable. Strong arts/music culture aligned with founder narrative. Existing relationships across friend groups. Failure mode is contained; success is visible.</div>
+        </div>
+
+        <div class="wave">
+          <div class="wave-head">
+            <div class="name">Wave 1 <em>— NESCAC twins</em></div>
+            <div class="when">Spring → Fall '27</div>
+          </div>
+          <div class="thesis">Schools that share Wesleyan's scale, culture, and student archetype. Word-of-mouth carries naturally between them.</div>
+          <div class="schools">
+            <span class="school-tag">Amherst</span>
+            <span class="school-tag">Williams</span>
+            <span class="school-tag">Bowdoin</span>
+            <span class="school-tag">Middlebury</span>
+            <span class="school-tag">Hamilton</span>
+          </div>
+          <div class="why"><strong>Why next:</strong> Identical population profile to anchor. Inter-campus dating, friendships, and rivalries already exist offline. Cross-campus FOMO accelerates organic spread without us paying for it.</div>
+        </div>
+
+        <div class="wave">
+          <div class="wave-head">
+            <div class="name">Wave 2 <em>— Mid privates</em></div>
+            <div class="when">Spring '28</div>
+          </div>
+          <div class="thesis">Stress-test the engine on bigger student bodies (4–8k) while staying in cultural range. First real density test.</div>
+          <div class="schools">
+            <span class="school-tag">Brown</span>
+            <span class="school-tag">Vassar</span>
+            <span class="school-tag">Tufts</span>
+            <span class="school-tag">Oberlin</span>
+            <span class="school-tag">Bard</span>
+          </div>
+          <div class="why"><strong>Why now:</strong> Larger graphs reveal moderation, server, and matchmaking issues that won't appear at NESCAC scale. Brown is the lever — if it works there, Ivy-adjacent spread is unlocked.</div>
+        </div>
+
+        <div class="wave">
+          <div class="wave-head">
+            <div class="name">Wave 3 <em>— Cultural anchors</em></div>
+            <div class="when">Fall '28</div>
+          </div>
+          <div class="thesis">Specific schools whose culture exports nationally. Get in, and the brand becomes legible to every other campus.</div>
+          <div class="schools">
+            <span class="school-tag">Howard</span>
+            <span class="school-tag">Spelman</span>
+            <span class="school-tag">NYU Tisch</span>
+            <span class="school-tag">USC</span>
+            <span class="school-tag">Morehouse</span>
+          </div>
+          <div class="why"><strong>Why now:</strong> Brand legitimacy upgrade. These campuses set the aesthetic ceiling for the rest of the country. HBCU partnership is non-negotiable — and earned, not extracted. Local partnerships, local ambassadors, local concerts.</div>
+        </div>
+
+        <div class="wave">
+          <div class="wave-head">
+            <div class="name">Wave 4 <em>— State flagships</em></div>
+            <div class="when">Spring '29</div>
+          </div>
+          <div class="thesis">Test what happens when "campus" is 40,000 people. Either we shard by college / dorm cluster, or the proximity model needs to evolve.</div>
+          <div class="schools">
+            <span class="school-tag">Michigan</span>
+            <span class="school-tag">UT Austin</span>
+            <span class="school-tag">UNC</span>
+            <span class="school-tag">UW Madison</span>
+          </div>
+          <div class="why"><strong>Why now:</strong> Truly different product problem. Greek life, megaclasses, sprawl. Likely requires "neighborhood" model — sub-campuses inside campuses. Treat as R&D wave, not pure growth wave.</div>
+        </div>
+
+        <div class="wave">
+          <div class="wave-head">
+            <div class="name">Wave 5 <em>— Global</em></div>
+            <div class="when">'29 → '30</div>
+          </div>
+          <div class="thesis">Once the U.S. template is tight, port it. Universities abroad have the same need with even less existing infrastructure.</div>
+          <div class="schools">
+            <span class="school-tag">McGill</span>
+            <span class="school-tag">Oxford</span>
+            <span class="school-tag">Edinburgh</span>
+            <span class="school-tag">Trinity Dublin</span>
+            <span class="school-tag">UCT</span>
+          </div>
+          <div class="why"><strong>Why now:</strong> International student diasporas already pull friendships across borders. Cross-instance social features (visiting a friend's campus) become the global-network play. International rights, payments, and content law become real work.</div>
+        </div>
+
+      </div>
+
+      <div class="prose" style="margin-top: 40px;">
+        <p><strong>Tactics, on every campus:</strong> No paid digital ads, ever. Launch loop is poster-based, busker-coded, in-person. Student ambassadors get a real stipend (not equity-as-payment). Launch event is a free in-person concert at a local venue tied to the campus, where the only way to RSVP is to be on the app.</p>
+        <p><strong>What we will not do:</strong> growth hacks that compromise the feel of the world. No "invite 5 friends to unlock a hat." No referral leaderboards. The product is its own marketing — if it isn't, more posters won't fix it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 METRICS -->
+<section class="body">
+  <div class="sec-head">
+    <div class="sec-num"><strong>05</strong> / Metrics</div>
+    <div class="sec-title">What we <em>actually</em> measure.</div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-aside">
+      <div>Anti-metric: Time spent</div>
+      <div>Anti-metric: Streaks</div>
+      <div>Anti-metric: DAU vanity</div>
+      <div>—</div>
+      <div>Real metric: Ambient open</div>
+      <div>Real metric: Co-presence</div>
+      <div>Real metric: Memory depth</div>
+    </div>
+    <div>
+      <div class="prose">
+        <p>Standard engagement metrics will lie to us about whether this works. A user opening the app to scroll for 40 minutes is not the win — a user opening it for 90 seconds because they had nothing to do, said hi to two people, and closed it, <em>is</em>. We measure for the kind of behavior we want to cause, not the kind that's easy to count.</p>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="key">// Ambient Open Rate</div>
+          <div class="val">≥4<span class="unit">x/day</span></div>
+          <div class="desc">Sessions opened without a notification or plan. The "what's everyone doing" check-in.</div>
+        </div>
+        <div class="metric">
+          <div class="key">// Co-Presence Minutes</div>
+          <div class="val">12<span class="unit">min</span></div>
+          <div class="desc">Median minutes spent in the same space as ≥1 friend per session, not necessarily messaging.</div>
+        </div>
+        <div class="metric">
+          <div class="key">// D30 Retention</div>
+          <div class="val">55<span class="unit">%</span></div>
+          <div class="desc">Target at full-campus launch. Below 40% means the world doesn't feel alive enough yet.</div>
+        </div>
+        <div class="metric">
+          <div class="key">// Campus Penetration</div>
+          <div class="val">30<span class="unit">%</span></div>
+          <div class="desc">% of enrolled students active weekly. Below this, density collapses and the app feels empty.</div>
+        </div>
+        <div class="metric">
+          <div class="key">// Outfit Changes / Week</div>
+          <div class="val">5+</div>
+          <div class="desc">Proxy for identity investment. People who change outfits stay; people who don't, churn.</div>
+        </div>
+        <div class="metric">
+          <div class="key">// IRL Spillover</div>
+          <div class="val">42<span class="unit">%</span></div>
+          <div class="desc">% of users who, monthly, met someone in-app and then in real life. This is the actual product.</div>
+        </div>
+        <div class="metric">
+          <div class="key">// Memory Recalls</div>
+          <div class="val">3<span class="unit">/wk</span></div>
+          <div class="desc">Times per week a user views/shares a "memory" — a recorded moment, walk, or photo.</div>
+        </div>
+        <div class="metric">
+          <div class="key">// NPS</div>
+          <div class="val">60+</div>
+          <div class="desc">Standard, but real on a closed campus with no incentive to lie. Below 40 means we've built the wrong thing.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 RISKS -->
+<section class="body">
+  <div class="sec-head">
+    <div class="sec-num"><strong>06</strong> / Risk Register</div>
+    <div class="sec-title">What <em>actually</em> kills this.</div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-aside">
+      <div>Reviewed: 14.05.26</div>
+      <div>Owner: Founding team</div>
+      <div>Cadence: Quarterly</div>
+    </div>
+    <div>
+      <div class="risk-list">
+
+        <div class="risk">
+          <div class="risk-num">R/01</div>
+          <div>
+            <div class="risk-name">Density collapse <span class="severity high">High</span></div>
+            <p>If too few students are online, the world feels empty and the magic evaporates. Cold-start kills social products faster than anything.</p>
+          </div>
+          <div class="risk-mit">
+            <strong>Mitigation</strong>
+            Launch one campus at a time with engineered concentration: invite-clusters by friend group, scheduled in-world events, and physical posters that pull people on at the same time. Never open before D7 retention hits target at closed alpha.
+          </div>
+        </div>
+
+        <div class="risk">
+          <div class="risk-num">R/02</div>
+          <div>
+            <div class="risk-name">Moderation / safety <span class="severity high">High</span></div>
+            <p>Real-name campus social is a harassment, stalking, and doxxing surface. Romance + minors-adjacent + proximity = serious obligations.</p>
+          </div>
+          <div class="risk-mit">
+            <strong>Mitigation</strong>
+            Edu-gating + photo verification at signup. Block/report flows are first-class UI, not buried. Dedicated T&S lead by P03. Crush system is private-by-default. No location sharing outside the in-world map. External legal review pre-launch.
+          </div>
+        </div>
+
+        <div class="risk">
+          <div class="risk-num">R/03</div>
+          <div>
+            <div class="risk-name">Optimization-creep <span class="severity high">High</span></div>
+            <p>Pressure to add streaks, XP, daily rewards, and "engagement features" will be intense. Adding them will quietly kill the soul of the product, slowly, before anyone admits it.</p>
+          </div>
+          <div class="risk-mit">
+            <strong>Mitigation</strong>
+            Founders document a written "no-list" at the start. Investor decks state explicitly that we are not chasing screen time. Anti-metrics tracked publicly inside the team. Quarterly review for drift.
+          </div>
+        </div>
+
+        <div class="risk">
+          <div class="risk-num">R/04</div>
+          <div>
+            <div class="risk-name">Build complexity <span class="severity high">High</span></div>
+            <p>Multiplayer + real-time + avatars + voice + physics-feeling movement is genuinely hard. Studios spend $50M+ on less. Founder concern was correctly "10 years" — that's the maximal version.</p>
+          </div>
+          <div class="risk-mit">
+            <strong>Mitigation</strong>
+            Aggressive scope cuts at P01–P02. 2D-isometric or low-poly 3D, never photorealistic. ReadyPlayerMe-style avatar pipeline. Photon / managed multiplayer stack. Treat the engine choice as the most important hire-or-buy decision in the company.
+          </div>
+        </div>
+
+        <div class="risk">
+          <div class="risk-num">R/05</div>
+          <div>
+            <div class="risk-name">University legal pushback <span class="severity med">Med</span></div>
+            <p>Universities may object to virtual replicas of their buildings, mascots, or trademarks. Especially if anything embarrassing happens on the platform that traces back to the brand.</p>
+          </div>
+          <div class="risk-mit">
+            <strong>Mitigation</strong>
+            Stylized — never literal — building names and architecture. Friendly student-org partnerships before launch. Pre-emptive outreach to student affairs. Optional university partnership tier later, opt-in.
+          </div>
+        </div>
+
+        <div class="risk">
+          <div class="risk-num">R/06</div>
+          <div>
+            <div class="risk-name">Semester seasonality <span class="severity med">Med</span></div>
+            <p>Summer and breaks empty the campus. A campus-only product has a brutal 3-month annual hibernation, repeated forever.</p>
+          </div>
+          <div class="risk-mit">
+            <strong>Mitigation</strong>
+            Multi-campus rollout staggers seasons. International campuses on different calendars. Long-arc product (situation simulator, see §07) is the off-season hedge — the platform isn't only campus forever.
+          </div>
+        </div>
+
+        <div class="risk">
+          <div class="risk-num">R/07</div>
+          <div>
+            <div class="risk-name">Copycat from a major <span class="severity med">Med</span></div>
+            <p>Snap, Meta, Discord, or Roblox could clone the core loop in six months once it works.</p>
+          </div>
+          <div class="risk-mit">
+            <strong>Mitigation</strong>
+            Speed and brand. The defensibility is not the tech; it's that we are the team that *belongs there.* Busker-coded, student-coded, real. Bigcos can't fake that, and trying to looks worse than not trying.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 HORIZON -->
+<section class="body" style="padding-bottom: 60px;">
+  <div class="sec-head">
+    <div class="sec-num"><strong>07</strong> / Horizon</div>
+    <div class="sec-title">Where <em>this all leads.</em></div>
+  </div>
+  <div class="sec-body">
+    <div class="sec-aside">
+      <div>Frame: Long arc</div>
+      <div>Term: 5–10 years</div>
+      <div>Status: Direction, not plan</div>
+    </div>
+    <div>
+      <div class="prose">
+        <p>The original idea — phrased in the team's earlier conversation as <em>"the coolest video game that needs to be created"</em> — was a <strong>situation simulator</strong>: a place where anyone could simulate any situation, real or imagined. A club in Berlin. NFL GM on draft night. Wall Street on a Monday morning after a war breaks out. The reaction at the time was: incredible idea, ten years to build.</p>
+        <p>That estimate is right. But the path to that horizon runs <em>through</em> the campus product, not around it. A working campus sim is, structurally, a working situation sim with one specific situation pre-built. Every system we ship at Wesleyan — proximity, avatars, ambient density, event spawning, memory, social energy — is a brick in the larger thing.</p>
+      </div>
+
+      <div class="horizon">
+        <div class="horizon-content">
+          <h3>The campus is just the <em>first situation</em>. Every situation worth being in is on the same engine.</h3>
+
+          <div class="horizon-grid">
+            <div class="horizon-card">
+              <div class="num">// HZN.01</div>
+              <h4>Years 1–3 — The Campus Engine</h4>
+              <p>Prove the model on one university type. Build the systems — presence, ambient, memory — that make any social simulation feel real. Ship 10–20 campuses.</p>
+            </div>
+            <div class="horizon-card">
+              <div class="num">// HZN.02</div>
+              <h4>Years 3–6 — Adjacent Worlds</h4>
+              <p>Adapt the engine to non-campus situations with similar shape: cities, music scenes, conferences, festivals, summer programs. Same loop, different geography.</p>
+            </div>
+            <div class="horizon-card">
+              <div class="num">// HZN.03</div>
+              <h4>Years 6–10 — The Situation Sim</h4>
+              <p>Open the engine. Let users — or operators — spawn arbitrary scenarios: trading desks, club nights in Berlin, draft rooms, kitchens at dinner rush. Practice. Rehearse. Live in.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="prose" style="margin-top: 40px;">
+        <p>The team was right that a situation simulator built from a cold start would take a decade and probably never ship. But that is not the bet on the table. The bet is: <strong>build one small, real, beloved situation first. Earn the right to build the next. Let the engine become general by the time anyone notices.</strong></p>
+        <p>That's not a video game project. That's a company.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-tagline">
+      <em>Existing socially</em> <span class="accent">/</span> is the gameplay. Everything else is just where it happens.
+    </div>
+    <div class="footer-meta">
+      <div><strong>Doc</strong></div>
+      <div>Brief v0.1</div>
+      <div>14 May 2026</div>
+      <div>Internal — Draft</div>
+    </div>
+    <div class="footer-meta">
+      <div><strong>Next</strong></div>
+      <div>Greybox spec → P01</div>
+      <div>Founders sync</div>
+      <div>Engine selection memo</div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© CAMPUS / SIM — Internal</span>
+    <span>Pale green / Futuristic / Minimal</span>
+    <span>End of document</span>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,55 @@
+import { BOUNDS, BUILDING_DEPTH, RowStop } from './layout';
+
+// ─── Where you can walk ────────────────────────────────────────────────
+// Buildings on the row are solid slabs from their facade back BUILDING_DEPTH
+// metres. The gaps between them (walkways) are open, so you can cut through
+// to Andrus Field. Pure function: old position + wanted position → allowed.
+//
+// `extra` adds finer rules (used for your house): solid boxes, an optional
+// set of walkable boxes you must stay inside (upstairs floors), and "lots"
+// that extend the world past the far sidewalk (your front yard).
+
+export interface XZ { x: number; z: number }
+export interface Box { x0: number; x1: number; z0: number; z1: number }
+export interface Extra { solids?: Box[]; walkable?: Box[]; lots?: Box[] }
+
+const PAD = 0.8; // keep this far off a wall
+
+export const inBox = (p: XZ, b: Box) => p.x > b.x0 && p.x < b.x1 && p.z > b.z0 && p.z < b.z1;
+
+function inside(stops: RowStop[], x: number, z: number): RowStop | undefined {
+  return stops.find((s) => z <= s.z0 + 0.5 && z >= s.z1 - 0.5 && x < s.front + PAD && x > s.front - BUILDING_DEPTH);
+}
+
+function rowMove(prev: XZ, want: XZ, stops: RowStop[], xMax: number): XZ {
+  let x = Math.min(xMax, Math.max(BOUNDS.xMin, want.x));
+  let z = Math.min(BOUNDS.zMax, Math.max(BOUNDS.zMin, want.z));
+  const hit = inside(stops, x, z);
+  if (!hit) return { x, z };
+  // slide along whichever wall you ran into
+  if (prev.x >= hit.front + PAD) x = hit.front + PAD; // facade, from the walk
+  else if (prev.x <= hit.front - BUILDING_DEPTH) x = hit.front - BUILDING_DEPTH; // back wall, from the field
+  else z = prev.z; // side wall, from a walkway
+  // still stuck (e.g. a corner)? stay put
+  return inside(stops, x, z) ? { x: prev.x, z: prev.z } : { x, z };
+}
+
+export function resolveMove(prev: XZ, want: XZ, stops: RowStop[], extra?: Extra): XZ {
+  const lots = extra?.lots ?? [];
+  const xMax = Math.max(BOUNDS.xMax, ...lots.map((l) => l.x1));
+  const p = rowMove(prev, want, stops, xMax);
+  if (!extra) return p;
+  const ok = (q: XZ) =>
+    (q.x <= BOUNDS.xMax || lots.some((l) => inBox(q, l)))
+    && !(extra.solids ?? []).some((b) => inBox(q, b))
+    && (!extra.walkable || extra.walkable.some((b) => inBox(q, b)));
+  if (ok(p)) return p;
+  // safety net: if you're somehow already inside something (a car pulled up, a floor change), never freeze —
+  // let any move that gets you out (or at least doesn't trap you) through
+  if (!ok(prev)) return p;
+  // slide: keep whichever axis still works
+  const sx = { x: p.x, z: prev.z }, sz = { x: prev.x, z: p.z };
+  if (ok(sx)) return sx;
+  if (ok(sz)) return sz;
+  return { x: prev.x, z: prev.z };
+}
