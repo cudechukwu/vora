@@ -1,12 +1,13 @@
 import {
   AdditiveBlending, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DynamicDrawUsage, Group,
-  IcosahedronGeometry, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, PlaneGeometry,
+  IcosahedronGeometry, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, PlaneGeometry, PointLight,
   Quaternion, RepeatWrapping, SRGBColorSpace, Sprite, SpriteMaterial, Vector3, BoxGeometry, Float32BufferAttribute,
 } from 'three';
 import { BoxBank, PAL, lambert, prism } from './kit';
 import type { Box } from './collide';
 import {
-  CROSSWALK_W, Crossing, FAR_WALK, FRONT_X, PATH_HALF, ROAD, RowStop, WALK_MAX_Z, WALK_MIN_Z,
+  BACK_FAR_WALK, BACK_ROAD, BACK_WALK, CROSSWALK_W, Crossing, FAR_WALK, FIELD_X, PATH_HALF, ROAD, RowStop,
+  WALK_MAX_Z, WALK_MIN_Z,
 } from './layout';
 import { noise2, rng } from '../noise';
 import { DRIVEWAYS, HOUSE } from './house/plan';
@@ -30,6 +31,10 @@ export class World {
   private glows: Sprite[] = [];
   private glowMat!: SpriteMaterial;
   private poolMat!: MeshBasicMaterial;
+  private spots: Lamp[] = [];
+  private lampOn = 0;
+  /** Real lights, moved to whichever street lamps are nearest you (so people + walls light up, not just the ground). */
+  readonly lampLights: PointLight[] = [0, 1, 2, 3].map(() => new PointLight(0xffd59a, 0, 18, 1.4));
 
   constructor(stops: RowStop[], private crossings: Crossing[], box: BoxBank) {
     const chapel = stops.find((s) => s.name === 'Memorial Chapel');
@@ -37,6 +42,7 @@ export class World {
     this.field(chapel ? chapel.doorZ : -60, box);
     this.walks(stops);
     this.street(box);
+    this.backRoad(box);
     this.trees(stops);
     this.lamps();
     this.benchesAlongLawn(box);
@@ -74,14 +80,14 @@ export class World {
     tex.repeat.set(1, len / 10);
     const f = new Mesh(new PlaneGeometry(wid, len), new MeshLambertMaterial({ map: tex }));
     f.rotation.x = -Math.PI / 2;
-    f.position.set(-(55 + wid / 2), 0.01, (WALK_MIN_Z + WALK_MAX_Z) / 2);
+    f.position.set(FIELD_X - wid / 2, 0.01, (WALK_MIN_Z + WALK_MAX_Z) / 2);
     f.receiveShadow = true;
     this.group.add(f);
 
     this.football(fz, box);
 
     // ball diamond, beyond the stands
-    const dz = fz - 20, dx = -172;
+    const dz = fz - 20, dx = FIELD_X - 117;
     const dirt = new Mesh(new PlaneGeometry(30, 30), lambert(PAL.dirt));
     dirt.rotation.set(-Math.PI / 2, 0, Math.PI / 4);
     dirt.position.set(dx, 0.02, dz);
@@ -100,7 +106,7 @@ export class World {
 
   /** Football field behind the chapel, with goalposts and the red-trimmed stands on the far side. */
   private football(fz: number, box: BoxBank) {
-    const W = 49, L = 110, cx = -(62 + W / 2);
+    const W = 49, L = 110, cx = FIELD_X - 7 - W / 2;
     const cv = document.createElement('canvas');
     cv.width = 128; cv.height = 288;
     const g = cv.getContext('2d')!;
@@ -185,6 +191,29 @@ export class World {
     }
   }
 
+  /** Behind the row: sidewalk, a two-lane campus road, sidewalk, then the field. */
+  private backRoad(box: BoxBank) {
+    const len = WALK_MIN_Z - WALK_MAX_Z + 160, midZ = (WALK_MIN_Z + WALK_MAX_Z) / 2;
+    const strip = (x0: number, x1: number, y: number, color: number) => {
+      const m = new Mesh(new PlaneGeometry(x1 - x0, len), lambert(color));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set((x0 + x1) / 2, y, midZ);
+      m.receiveShadow = true;
+      this.group.add(m);
+    };
+    strip(BACK_ROAD.x0, BACK_ROAD.x1, 0.025, 0x44484c);
+    strip(BACK_WALK.x0, BACK_WALK.x1, 0.03, PAL.path);
+    strip(BACK_FAR_WALK.x0, BACK_FAR_WALK.x1, 0.03, PAL.path);
+    for (const x of [BACK_ROAD.x0, BACK_ROAD.x1]) box.add(x, 0.08, midZ, 0.25, 0.16, len, PAL.curb);
+    const cx = (BACK_ROAD.x0 + BACK_ROAD.x1) / 2;
+    const onCrosswalk = (z: number) => this.crossings.some((c) => Math.abs(c.z - z) < CROSSWALK_W / 2 + 1.5);
+    for (let z = WALK_MIN_Z + 70; z > WALK_MAX_Z - 70; z -= 6) if (!onCrosswalk(z)) box.add(cx, 0.035, z, 0.14, 0.02, 3, 0xe8c14a);
+    // a zebra where each walkway between buildings crosses it, on its way to the field
+    for (const c of this.crossings) {
+      for (let x = BACK_ROAD.x0 + 0.5; x < BACK_ROAD.x1 - 0.3; x += 1.1) box.add(x, 0.036, c.z, 0.55, 0.02, CROSSWALK_W, 0xf2f0ea);
+    }
+  }
+
   private walks(stops: RowStop[]) {
     const len = WALK_MIN_Z - WALK_MAX_Z + 60;
     const midZ = (WALK_MIN_Z + WALK_MAX_Z) / 2;
@@ -200,9 +229,9 @@ export class World {
       curb.receiveShadow = true;
       this.group.add(curb);
     }
-    // walkways that cut across the row, from between the buildings out to the field
+    // walkways that cut across the row, from between the buildings to the back sidewalk
     for (const c of this.crossings) {
-      const x0 = FRONT_X - 45, x1 = ROAD.x0; // from Andrus Field to the High Street curb
+      const x0 = BACK_WALK.x0, x1 = ROAD.x0; // from the back road to the High Street curb
       const cr = new Mesh(new PlaneGeometry(x1 - x0, c.w), lambert(PAL.path));
       cr.rotation.x = -Math.PI / 2;
       cr.position.set((x0 + x1) / 2, 0.031, c.z);
@@ -238,14 +267,14 @@ export class World {
       if (nearDoor(z)) continue;
       list.push({ x: 6.8 + rng(id) * 1.5, z: z - rng(id + 1) * 4, s: 1.2 + rng(id + 2) * 0.4, id: id++ });
     }
-    // behind the buildings, peeking over rooftops
+    // lining the field side of the back road, peeking over the rooftops from the walk
     for (let z = WALK_MIN_Z; z > WALK_MAX_Z - 40; z -= 9) {
       if (nearDoor(z)) continue;
-      list.push({ x: FRONT_X - 36 - rng(id) * 6, z: z - rng(id + 1) * 6, s: 1.6 + rng(id + 2) * 0.8, id: id++ });
+      list.push({ x: BACK_FAR_WALK.x0 - 2.2 - rng(id) * 3, z: z - rng(id + 1) * 6, s: 1.6 + rng(id + 2) * 0.8, id: id++ });
     }
     // far side of Andrus Field, across High Street, and the two ends
     for (let z = WALK_MIN_Z + 30; z > WALK_MAX_Z - 60; z -= 7) {
-      list.push({ x: -215 - rng(id) * 30, z: z - rng(id + 1) * 5, s: 1.6 + rng(id + 2) * 0.9, id: id++ });
+      list.push({ x: FIELD_X - 160 - rng(id) * 30, z: z - rng(id + 1) * 5, s: 1.6 + rng(id + 2) * 0.9, id: id++ });
     }
     for (let z = WALK_MIN_Z + 20; z > WALK_MAX_Z - 40; z -= 13) {
       const tz = z - rng(id + 1) * 6;
@@ -294,6 +323,10 @@ export class World {
     for (let z = WALK_MIN_Z - 6; z > WALK_MAX_Z; z -= 24) {
       spots.push({ x: -PATH_HALF - 0.7, z, h: 4, arm: 0 }, { x: PATH_HALF + 0.7, z: z - 12, h: 4, arm: 0 });
     }
+    // the back road: tall lamps on the row side, arms out over it
+    for (let z = WALK_MIN_Z + 20; z > WALK_MAX_Z - 20; z -= 28) {
+      spots.push({ x: BACK_ROAD.x1 + 0.4, z, h: 7, arm: -2.4 });
+    }
     for (let z = WALK_MIN_Z + 40; z > WALK_MAX_Z - 40; z -= 30) {
       // never in the mouth of a driveway: slide it along to just beside one
       let fz = z - 15;
@@ -305,7 +338,8 @@ export class World {
   }
 
   private lamps() {
-    const spots = World.lampSpots();
+    const spots = (this.spots = World.lampSpots());
+    for (const l of this.lampLights) this.group.add(l);
     const unitPost = new CylinderGeometry(0.07, 0.1, 1, 6).translate(0, 0.5, 0);
     const posts = new InstancedMesh(unitPost, lambert(PAL.iron), spots.length);
     const arms = new InstancedMesh(new BoxGeometry(1, 0.1, 0.1), lambert(PAL.iron), spots.length);
@@ -346,7 +380,7 @@ export class World {
       s.scale.setScalar(l.h > 5 ? 3.4 : 2.6);
       this.glows.push(s);
       this.group.add(s);
-      const pr = l.h > 5 ? 6.5 : 4.2;
+      const pr = l.h > 5 ? 8 : 5.2;
       pools.setMatrixAt(i, m4.compose(v.set(hx, 0.05, l.z), q, sc.set(pr, 1, pr)));
     });
     pools.renderOrder = 2;
@@ -371,7 +405,20 @@ export class World {
     const c = new Color(0x9aa0a0).lerp(new Color(0xffe2a8), on);
     for (let i = 0; i < this.lampHeads.count; i++) this.lampHeads.setColorAt(i, c);
     this.lampHeads.instanceColor!.needsUpdate = true;
-    this.glowMat.opacity = on * 0.95;
-    this.poolMat.opacity = on * 0.55;
+    this.glowMat.opacity = on;
+    this.poolMat.opacity = on * 0.7;
+    this.lampOn = on;
+  }
+
+  /** Put the real lamp lights on the lamps nearest `p`. Cheap enough to call every few frames. */
+  lightNear(p: { x: number; z: number }) {
+    const near = [...this.spots]
+      .sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))
+      .slice(0, this.lampLights.length);
+    near.forEach((l, i) => {
+      const light = this.lampLights[i];
+      light.position.set(l.x + l.arm, l.h - 0.6, l.z);
+      light.intensity = this.lampOn * (l.h > 5 ? 30 : 14);
+    });
   }
 }

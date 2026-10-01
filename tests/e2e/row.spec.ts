@@ -401,7 +401,16 @@ test('sleep in your bed and wake up in the morning', async ({ page }) => {
   await open(page, `t=23&${hw(2.5, -7.0)}&yaw=0&level=1`);
   await expect.poll(async () => (await house(page)).action).toBe('sleep');
   await page.keyboard.press('f');
+  await expect(page.locator('#fade')).toContainText('morning');
   await expect.poll(async () => (await house(page)).hour, { timeout: 10_000 }).toBeCloseTo(7.5, 1);
+});
+
+test('a nap in the afternoon: you wake up at night', async ({ page }) => {
+  await open(page, `t=13&${hw(2.5, -7.0)}&yaw=0&level=1`);
+  await expect.poll(async () => (await house(page)).action).toBe('sleep');
+  await page.keyboard.press('f');
+  await expect(page.locator('#fade')).toContainText('night');
+  await expect.poll(async () => (await house(page)).hour, { timeout: 10_000 }).toBeCloseTo(21, 1);
 });
 
 test('roommates are on the couch at night, and their name tags only show on your floor', async ({ page }) => {
@@ -568,4 +577,26 @@ test('a car steered into a building never gets stuck in it (regression)', async 
   await page.keyboard.down('a');
   await page.waitForFunction((x) => (window as any).__vora.pos.x > x, stuckAt.x + 3, { timeout: 40_000 });
   await page.keyboard.up('a');
+});
+
+test('on a bike: the speedometer shows, and your speed builds the longer you pedal', async ({ page }) => {
+  await open(page, `x=-2.4&z=${SPAWN_Z + 5}`); // by the rack at the start
+  await expect(page.locator('#speedo')).not.toHaveClass(/show/);
+  await expect.poll(async () => (await page.evaluate(() => (window as any).__vora.action)) as string).toMatch(/^ride-/);
+  await page.keyboard.press('f');
+  await expect(page.locator('#speedo')).toHaveClass(/show/);
+  await page.keyboard.down('w');
+  await page.waitForFunction(() => (window as any).__vora.mover.speed > 3, null, { timeout: 30_000 });
+  const early = await page.evaluate(() => (window as any).__vora.mover.speed);
+  await page.waitForFunction((s) => (window as any).__vora.mover.speed > s + 3, early, { timeout: 30_000 });
+  await page.keyboard.up('w');
+  const shown = parseInt(await page.locator('#speedo .n').textContent() ?? '0', 10);
+  expect(shown).toBeGreaterThan(10); // mph
+});
+
+test('behind the row: walk through a walkway, across the back road, onto Andrus Field', async ({ page }) => {
+  const c = crossings[0];
+  await open(page, `x=-20&z=${c.z}&yaw=${Math.PI / 2}`); // looking −x, toward the field
+  const s = await hold(page, 'w', 46);
+  expect(s.x).toBeLessThan(-63);
 });

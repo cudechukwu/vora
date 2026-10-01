@@ -14,8 +14,8 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 
 ## How to run
 - `npm run dev` → http://localhost:5173/row.html. This is the game. `/` is the old Pixi Foss Hill greybox, which is still working but parked.
-- `npm test`: Vitest unit tests (165, about 8 s).
-- `npm run test:e2e`: Playwright browser tests (40, about 5 min). They use the installed Google Chrome with SwiftShader WebGL and their own Vite on port 5188.
+- `npm test`: Vitest unit tests (172, about 8 s).
+- `npm run test:e2e`: Playwright browser tests (43, about 6 min). They use the installed Google Chrome with SwiftShader WebGL and their own Vite on port 5188.
 - `npm run check`: tsc, then the unit tests, then the browser tests. **Keep it green.** The user asked for everything to be tested comprehensively.
 - URL debug params: `?t=17.3` freezes the game hour, `?x=&z=` sets the start position, `?yaw=` sets the camera direction, `?level=1` starts upstairs, `?intro=0` skips the camera swoop.
 - `window.__vora` is a read-only debug hook (pos, level, where, mover, traffic, roommates, `sample()` pixel check, and more). The e2e tests rely on it.
@@ -29,7 +29,7 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 You spawn at the south end by **Usdan** and walk **+z** along the High Street side of **College Row**:
 - The **buildings are on your right (−x)**, in this order: Usdan (curved front) → Boger → South College (belfry) → North College (green-domed cupola) → Zelnick Pavilion (glass link) → Memorial Chapel (red-striped roof, spire) → Judd → Allbritton.
 - **High Street** (road, traffic, a far sidewalk, wood-frame houses) is on your left (+x).
-- **Andrus Field** (football field with stands, ball diamond) is *behind* the row. You reach it through two walkways: Allbritton–Judd and South–Boger.
+- Behind the row there's a **back road**: sidewalk, two-lane campus road (with strangers' cars parked at the row-side curb), another sidewalk, then **Andrus Field** (football field with stands, ball diamond). You reach it through two walkways: Allbritton–Judd and South–Boger. Each building has its own `depth` in `layout.ts`, matching what's drawn.
 - The user confirmed this layout matches the real campus.
 - Planned next to the world: **Foss Hill** beyond Andrus Field.
 
@@ -43,7 +43,7 @@ You spawn at the south end by **Usdan** and walk **+z** along the High Street si
 | `mobility.ts` / `rideables.ts` | Walk, then run after holding the stick 2 s (`RUN_AFTER`); bikes and scooters in racks or loose; ride, park in a rack, or leave anywhere. |
 | `cars.ts` | Cars you own, drive, steal and carjack (pure). `owner` is `'you'`, a roommate id, or null (a stranger's). One-thumb driving: the car steers toward the stick, and pointing behind it reverses. `jackable` lets you take a car in traffic going under 3 m/s within 3 m (step in front of one and it stops). A stranger's car left in the road rejoins traffic once you're 40 m away; owned cars get towed home. Your car's spot is saved in localStorage (`vora.row.car`). Meshes: `CarsView` in `vehicles.ts`, which reuses the jacked car's own mesh. `driveMove` checks 9 points round the car's outline: a move may never block a new point, and a car already in something may only move in ways that reduce its depth (so it can't get stuck in a building). Steering pivots on the back axle. |
 | `camera.ts` / `controls.ts` | Camera rig: follows you, direction locks while your thumb is down, look via the eye button or top strip, ←/→ or Q/E, double-tap snaps behind you. Input: walk by dragging anywhere; action button (F/Space). |
-| `clock.ts` / `sky.ts` | Game time runs about 60× real (1 real second = 1 game minute), nights 2× faster, starts at 15:30, saved in localStorage, tapping the clock skips to the next preset. Sky, lighting and colour mood by hour. |
+| `clock.ts` / `sky.ts` | Game time runs about 60× real (1 real second = 1 game minute), nights 2× faster, starts at 15:30, saved in localStorage, tapping the clock skips to the next preset. `wakeFrom`: sleeping between 05:00 and 15:00 wakes you at 21:00, otherwise at 07:30. Sky, lighting and colour mood by hour. Nights are kept readable (the user asked): bright moon and hemisphere light, exposure lifted, and 4 real point lights that follow the nearest street lamps (`world.lightNear`). |
 | `world.ts` / `buildings.ts` / `kit.ts` | Ground, field, walks, trees, lamps, benches, street and houses; building kits; instanced window and box banks. |
 | `people.ts` / `traces.ts` | Blocky people with knees, elbows, hands and eyes. Each body segment is one merged vertex-coloured mesh (≤12 meshes per person). `gait(phase, speed)` is a pure walk↔run blend: knees fold and arms pump when running. Also sit/ride/scoot, idle breathing, blinking and glances, plus `flail`/`limp` for being hit. Traces: demo social traces (friend footstep trails, notes, labels). All social data is **demo/fake** for now. |
 | `knock.ts` | Being hit by your car (pure): `hits`, `launch`, `stepKnock` (air → down → up → done). main.ts keeps a `bodies` registry of everyone hittable (walkers, sitters, frisbee players, carjacked drivers), each with how it recovers. |
@@ -60,9 +60,11 @@ A two-storey wood frame across High Street (local coordinates: `u` from the fron
 
 ## Open items / next ideas
 - Git repo initialised 2026-10-01 (branch `main`). The remote is https://github.com/cudechukwu/vora. The user said nothing here is private, so the brief and photos are committed. Still ask before pushing.
+- **Roadmap after the world (user, 2026-10-01):** interactive life. Showering, designing your room, money and buying things (including buying a car), making friends (real and NPC), conversations (NPC too), inviting people over, a phone with contacts, throwing a party that your contacts come to, a "Miami nights" real-world feel. Also a bigger map, so driving makes sense. Driving and biking already build speed with a mph speedometer; a fuel gauge isn't built yet.
+- The user shared a Google Maps view: **Olin Memorial Library** and the **Public Affairs Center** are south of Judd (which confirms Olin), Fayerweather and Admissions are by Usdan on Wyllys Ave, and **Foss Hill** is west of Andrus Field. Use these when the map grows.
 - Real presence is the strategic next step: a server, logins, real friends as roommates, real traces and notes. I recommended stopping world-building at some point to test with 15–20 Wes friends.
 - Foss Hill beyond Andrus Field; the other bedrooms; personalising your room; Wes-specific details (ask the user for these).
-- Olin Library and Fisk Hall were dropped from the row. They're unconfirmed, so ask before adding them back.
+- Fisk Hall is still unconfirmed, so ask before adding it.
 
 ## Working style the user likes
 - Build first, show screenshots, explain plainly, and be honest about what's untested or fake.

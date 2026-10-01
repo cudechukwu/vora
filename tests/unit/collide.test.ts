@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveMove, XZ } from '../../src/row/collide';
-import { BOUNDS, BUILDING_DEPTH, byId, layoutRow } from '../../src/row/layout';
+import { BOUNDS, byId, layoutRow } from '../../src/row/layout';
 import { rng } from '../../src/noise';
 
 const { stops, crossings } = layoutRow();
@@ -22,7 +22,7 @@ function walk(from: XZ, to: XZ, stepLen = 0.2, maxSteps = 5000): XZ {
 }
 
 function insideBuilding(p: XZ) {
-  return stops.some((s) => p.z < s.z0 && p.z > s.z1 && p.x < s.front && p.x > s.front - BUILDING_DEPTH);
+  return stops.some((s) => p.z < s.z0 && p.z > s.z1 && p.x < s.front && p.x > s.back);
 }
 
 describe('walking around College Row', () => {
@@ -58,7 +58,7 @@ describe('walking around College Row', () => {
 
   it('blocks you at the back wall when coming from the field', () => {
     const end = walk({ x: -100, z: boger.zc }, { x: 0, z: boger.zc });
-    expect(end.x).toBeCloseTo(boger.front - BUILDING_DEPTH, 5);
+    expect(end.x).toBeCloseTo(boger.back - 0.8, 5);
   });
 
   it('lets you roam the field behind the whole row', () => {

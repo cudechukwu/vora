@@ -9,11 +9,20 @@
 // Order from a student's walk-through + the wesleyan.edu/about aerial.
 
 export const FRONT_X = -15; // x of most facades
-export const BUILDING_DEPTH = 45; // how far behind its facade a building is solid
+export const BUILDING_DEPTH = 45; // deepest a building may be (behind its facade); each has its own `depth`
 export const ROW_START_Z = 40;
 
 /** Walk (sidewalk in front of the row). */
 export const PATH_HALF = 2.6;
+
+/**
+ * Behind the row: a campus road with a sidewalk each side, between the backs of the buildings
+ * and Andrus Field. (x decreases going back toward the field.)
+ */
+export const BACK_WALK = { x0: -52.8, x1: -50 } as const; // row side
+export const BACK_ROAD = { x0: -59.8, x1: -52.8 } as const;
+export const BACK_FAR_WALK = { x0: -62.4, x1: -59.8 } as const; // field side
+export const FIELD_X = -64; // Andrus Field starts here and runs back (−x)
 
 /** High Street. */
 export const ROAD = { x0: 11, x1: 20 } as const;
@@ -31,17 +40,18 @@ export interface Spec {
   crossing?: number; // a walkway through that gap, this wide
   door?: number; // door z offset from the building's centre
   bulge?: number; // how far the facade sticks out past FRONT_X
+  depth: number; // how far back from its facade it's solid (matches what's drawn)
 }
 
 export const ROW: Spec[] = [
-  { id: 'allbritton', name: 'Allbritton Center', w: 34, gap: 22, crossing: 7 },
-  { id: 'judd', name: 'Judd Hall', w: 30, gap: 10 },
-  { id: 'chapel', name: 'Memorial Chapel', w: 22, gap: 0, door: 3.2 },
-  { id: 'zelnick', name: 'Zelnick Pavilion', w: 14, gap: 0 },
-  { id: 'north', name: 'North College', w: 36, gap: 8 },
-  { id: 'south', name: 'South College', w: 24, gap: 20, crossing: 5 },
-  { id: 'boger', name: 'Boger Hall', w: 44, gap: 10, door: -5 },
-  { id: 'usdan', name: 'Usdan University Center', w: 50, gap: 0, bulge: 6 },
+  { id: 'allbritton', name: 'Allbritton Center', w: 34, gap: 22, crossing: 7, depth: 18.4 },
+  { id: 'judd', name: 'Judd Hall', w: 30, gap: 10, depth: 18.4 },
+  { id: 'chapel', name: 'Memorial Chapel', w: 22, gap: 0, door: 3.2, depth: 32.4 },
+  { id: 'zelnick', name: 'Zelnick Pavilion', w: 14, gap: 0, depth: 32.4 }, // the glass link: solid back to the chapel's depth
+  { id: 'north', name: 'North College', w: 36, gap: 8, depth: 18.4 },
+  { id: 'south', name: 'South College', w: 24, gap: 20, crossing: 5, depth: 16.4 },
+  { id: 'boger', name: 'Boger Hall', w: 44, gap: 10, door: -5, depth: 18.4 },
+  { id: 'usdan', name: 'Usdan University Center', w: 50, gap: 0, bulge: 6, depth: 40 },
 ];
 
 export interface RowStop {
@@ -52,6 +62,7 @@ export interface RowStop {
   zc: number; // centre
   doorZ: number;
   front: number; // x of the facade
+  back: number; // x of the back wall
 }
 
 /** A walkway crossing the row (and High Street) between two buildings. */
@@ -65,7 +76,7 @@ export function layoutRow(row: Spec[] = ROW): { stops: RowStop[]; crossings: Cro
     const zc = z - s.w / 2;
     stops.push({
       id: s.id, name: s.name, z0: z, z1: z - s.w, zc,
-      doorZ: zc + (s.door ?? 0), front: FRONT_X + (s.bulge ?? 0),
+      doorZ: zc + (s.door ?? 0), front: FRONT_X + (s.bulge ?? 0), back: FRONT_X + (s.bulge ?? 0) - s.depth,
     });
     if (s.crossing) crossings.push({ z: z - s.w - s.gap / 2, w: s.crossing });
     z -= s.w + s.gap;

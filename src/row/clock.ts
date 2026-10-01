@@ -65,3 +65,12 @@ export function formatHour(h: number): string {
   const M = Math.min(59, Math.floor((wrapped - H) * 60 + 1e-6));
   return `${((H + 11) % 12) + 1}:${String(M).padStart(2, '0')} ${H < 12 ? 'AM' : 'PM'}`;
 }
+
+/**
+ * Where sleep takes you. A nap in the day (5am–3pm) runs into the night; go to bed any
+ * other time and you wake up the next morning.
+ */
+export function wakeFrom(h: number): { h: number; tag: 'night' | 'morning' } {
+  const w = wrapHour(h);
+  return w >= 5 && w < 15 ? { h: 21, tag: 'night' } : { h: 7.5, tag: 'morning' };
+}

@@ -114,6 +114,17 @@
       font-size:11px;letter-spacing:.06em;opacity:0;transition:opacity .4s ease,transform .4s ease;pointer-events:none;}
     #toast.show{opacity:1;transform:translate(-50%,0);}
 
+    /* speedometer, while you ride or drive (bottom-left: clear of a right thumb) */
+    #speedo{position:fixed;left:16px;bottom:calc(17% + var(--safe-b));z-index:3;min-width:92px;padding:10px 14px 9px;
+      background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      border:1px solid rgba(246,241,230,.16);border-radius:16px;opacity:0;transform:translateY(8px);
+      transition:opacity .3s ease,transform .3s ease;pointer-events:none;}
+    #speedo.show{opacity:1;transform:none;}
+    #speedo .n{font-family:'Fraunces',serif;font-size:34px;line-height:1;font-variant-numeric:tabular-nums;}
+    #speedo .u{font-size:9px;letter-spacing:.24em;color:var(--mute);margin-left:4px;}
+    #speedo .bar{height:3px;border-radius:2px;background:rgba(246,241,230,.14);margin-top:8px;overflow:hidden;}
+    #speedo .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .1s linear;}
+
     /* note card */
     #card{position:fixed;left:16px;right:16px;bottom:calc(24px + var(--safe-b));max-width:420px;margin:0 auto;
       background:#f6f1e6;color:#1d1a16;border-radius:14px;padding:18px 18px 16px;
@@ -152,6 +163,7 @@
   </button>
   <button id="act" aria-live="polite"></button>
   <div id="toast" aria-live="polite"></div>
+  <div id="speedo"><span class="n">0</span><span class="u">MPH</span><div class="bar"><i></i></div></div>
   <div id="welcome"><div class="t">home</div><div class="s"></div></div>
   <div id="fade">zzz… morning</div>
   <div id="stick"><i></i></div>

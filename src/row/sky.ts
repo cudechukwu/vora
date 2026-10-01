@@ -17,17 +17,17 @@ interface Key {
 }
 
 const KEYS: Key[] = [
-  { h: 0,    top: 0x070b1c, horizon: 0x1a2140, sun: 0x8fa6ff, sunI: 0.35, hemiSky: 0x3a4a80, hemiGround: 0x0b0d14, hemiI: 0.55 },
-  { h: 5.2,  top: 0x0d1430, horizon: 0x2a2c4c, sun: 0x8fa6ff, sunI: 0.3,  hemiSky: 0x3a4a80, hemiGround: 0x0b0d14, hemiI: 0.55 },
+  { h: 0,    top: 0x070b1c, horizon: 0x1f2848, sun: 0x9fb4ff, sunI: 0.7, hemiSky: 0x5a6aa8, hemiGround: 0x1c2030, hemiI: 1.0 },
+  { h: 5.2,  top: 0x0d1430, horizon: 0x2a2c4c, sun: 0x9fb4ff, sunI: 0.6,  hemiSky: 0x5a6aa8, hemiGround: 0x1c2030, hemiI: 0.95 },
   { h: 6.4,  top: 0x2f4f8f, horizon: 0xe8a78a, sun: 0xffb38a, sunI: 0.9,  hemiSky: 0x9fb4d8, hemiGround: 0x3a3226, hemiI: 0.9 },
   { h: 8,    top: 0x5c9ad8, horizon: 0xf3d6b4, sun: 0xffe0b8, sunI: 2.0,  hemiSky: 0xbfd6f0, hemiGround: 0x4a4430, hemiI: 1.1 },
   { h: 12,   top: 0x3f86d4, horizon: 0xc9e3f4, sun: 0xfff4e2, sunI: 2.6,  hemiSky: 0xc8e0f6, hemiGround: 0x55503a, hemiI: 1.2 },
   { h: 15.5, top: 0x4a8ad0, horizon: 0xdbe6ea, sun: 0xffe6c4, sunI: 2.4,  hemiSky: 0xc4d8ee, hemiGround: 0x55503a, hemiI: 1.15 },
   { h: 17.4, top: 0x5f84c0, horizon: 0xffc98e, sun: 0xffb060, sunI: 2.1,  hemiSky: 0xd0c4c0, hemiGround: 0x4f4030, hemiI: 1.0 },
   { h: 18.6, top: 0x34427e, horizon: 0xff8a58, sun: 0xff7040, sunI: 1.1,  hemiSky: 0xc0a0b8, hemiGround: 0x4a3426, hemiI: 1.15 },
-  { h: 19.5, top: 0x161d44, horizon: 0x6a4468, sun: 0x9a78c0, sunI: 0.45, hemiSky: 0x55507a, hemiGround: 0x161218, hemiI: 0.6 },
-  { h: 21,   top: 0x070b1c, horizon: 0x1a2140, sun: 0x8fa6ff, sunI: 0.35, hemiSky: 0x3a4a80, hemiGround: 0x0b0d14, hemiI: 0.55 },
-  { h: 24,   top: 0x070b1c, horizon: 0x1a2140, sun: 0x8fa6ff, sunI: 0.35, hemiSky: 0x3a4a80, hemiGround: 0x0b0d14, hemiI: 0.55 },
+  { h: 19.5, top: 0x161d44, horizon: 0x6a4468, sun: 0x9a78c0, sunI: 0.6, hemiSky: 0x65609a, hemiGround: 0x1e1a22, hemiI: 0.9 },
+  { h: 21,   top: 0x070b1c, horizon: 0x1f2848, sun: 0x9fb4ff, sunI: 0.7, hemiSky: 0x5a6aa8, hemiGround: 0x1c2030, hemiI: 1.0 },
+  { h: 24,   top: 0x070b1c, horizon: 0x1f2848, sun: 0x9fb4ff, sunI: 0.7, hemiSky: 0x5a6aa8, hemiGround: 0x1c2030, hemiI: 1.0 },
 ];
 
 export interface Mood {

@@ -3,7 +3,7 @@ import {
   MOUNT_RADIUS, RACK_RADIUS, RUN_AFTER, SPEED, actionAt, carry, createMobility, dismount, freeSlot,
   isRunning, mount, newMover, slotPos, stepMover,
 } from '../../src/row/mobility';
-import { BUILDING_DEPTH, ROAD, byId, layoutRow } from '../../src/row/layout';
+import { ROAD, byId, layoutRow } from '../../src/row/layout';
 
 const { stops, crossings } = layoutRow();
 const SPAWN = { x: -0.6, z: byId(stops, 'usdan').z1 - 8 };
@@ -85,7 +85,7 @@ describe('bikes, scooters and racks', () => {
         expect(taken.has(k)).toBe(false);
         taken.add(k);
       }
-      const inBuilding = stops.some((s) => v.z < s.z0 && v.z > s.z1 && v.x < s.front && v.x > s.front - BUILDING_DEPTH);
+      const inBuilding = stops.some((s) => v.z < s.z0 && v.z > s.z1 && v.x < s.front && v.x > s.back);
       expect(inBuilding).toBe(false);
       expect(v.x < ROAD.x0 || v.x > ROAD.x1).toBe(true);
     }
@@ -178,5 +178,17 @@ describe('bikes, scooters and racks', () => {
       expect(slots.length).toBeLessThanOrEqual(rack.slots);
     }
     expect(RACK_RADIUS).toBeGreaterThan(MOUNT_RADIUS);
+  });
+});
+
+describe('building speed on wheels', () => {
+  it('a bike picks up speed the longer you pedal, topping out around 25 mph', () => {
+    const m = newMover();
+    m.mode = 'bike';
+    const at = (secs: number) => { for (let t = 0; t < secs; t += 1 / 60) stepMover(m, 1 / 60, 1); return m.speed; };
+    const a = at(1), b = at(2), c = at(20);
+    expect(b).toBeGreaterThan(a + 1);
+    expect(c).toBeCloseTo(SPEED.bike, 2);
+    expect(SPEED.bike * 2.237).toBeGreaterThan(23);
   });
 });

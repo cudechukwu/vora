@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FAR_WALK, PATH_HALF, ROAD, ROW, ROW_END_Z, WALK_MAX_Z, WALK_MIN_Z, byId, layoutRow,
+  BACK_FAR_WALK, BACK_ROAD, BACK_WALK, FAR_WALK, FIELD_X, PATH_HALF, ROAD, ROW, ROW_END_Z, WALK_MAX_Z, WALK_MIN_Z,
+  byId, layoutRow,
 } from '../../src/row/layout';
+import { resolveMove } from '../../src/row/collide';
+import { backRoadParking } from '../../src/row/cars';
 
 const { stops, crossings } = layoutRow();
 
@@ -67,5 +70,37 @@ describe('College Row layout', () => {
     expect(PATH_HALF).toBeLessThan(ROAD.x0);
     expect(ROAD.x1).toBeLessThanOrEqual(FAR_WALK.x0);
     for (const s of stops) expect(s.front).toBeLessThan(-PATH_HALF);
+  });
+});
+
+describe('behind the row: sidewalk, road, sidewalk, then Andrus Field', () => {
+  it('runs in that order, edge to edge, going back from the buildings', () => {
+    expect(BACK_WALK.x0).toBe(BACK_ROAD.x1);
+    expect(BACK_ROAD.x0).toBe(BACK_FAR_WALK.x1);
+    expect(BACK_FAR_WALK.x0).toBeGreaterThan(FIELD_X);
+    expect(BACK_ROAD.x1 - BACK_ROAD.x0).toBeGreaterThanOrEqual(6.5); // two lanes
+  });
+
+  it('every building ends before the back sidewalk (with room to walk behind it)', () => {
+    for (const s of stops) expect(s.back).toBeGreaterThan(BACK_WALK.x1 + 0.8);
+  });
+
+  it('you can walk the whole length of the back sidewalk, and come out of a walkway onto it', () => {
+    const x = (BACK_WALK.x0 + BACK_WALK.x1) / 2;
+    let p = { x, z: stops[0].z0 + 5 };
+    for (let i = 0; i < 2000 && p.z > stops[stops.length - 1].z1 - 5; i++) p = resolveMove(p, { x, z: p.z - 0.3 }, stops);
+    expect(p.z).toBeLessThan(stops[stops.length - 1].z1 - 4);
+    const c = crossings[0];
+    p = { x: -20, z: c.z };
+    for (let i = 0; i < 300; i++) p = resolveMove(p, { x: p.x - 0.2, z: c.z }, stops);
+    expect(p.x).toBeLessThan(BACK_FAR_WALK.x0); // straight across the road and onto the field
+  });
+
+  it('the cars parked on the back road sit in it, by the row-side curb, clear of the walkways', () => {
+    for (const c of backRoadParking()) {
+      expect(c.x).toBeGreaterThan(BACK_ROAD.x0 + 1);
+      expect(c.x).toBeLessThan(BACK_ROAD.x1 - 0.9);
+      for (const k of crossings) expect(Math.abs(c.z - k.z)).toBeGreaterThan(k.w / 2 + 3);
+    }
   });
 });

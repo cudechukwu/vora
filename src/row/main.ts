@@ -9,7 +9,7 @@ import { FRONT_X, PATH_HALF, WALK_MAX_Z, WALK_MIN_Z } from './layout';
 import { World } from './world';
 import { resolveMove } from './collide';
 import {
-  actionAt, carry, createMobility, dismount, isRunning, mount, newMover, stepMover,
+  SPEED, actionAt, carry, createMobility, dismount, isRunning, mount, newMover, stepMover,
 } from './mobility';
 import { RideView } from './rideables';
 import { HouseView } from './house/view';
@@ -21,10 +21,10 @@ import { ENTER_AT, EXIT_AT, Where, cameraClearance, nearDoor as byTheDoor, porta
 import { LANES, Obstacle, createTraffic, lightAt, stepTraffic } from './traffic';
 import { CarsView, Traffic } from './vehicles';
 import {
-  Car, carAt, carjack, clearRoad, createGarage, driveMove, driven, footprint, getIn, getOut, jackable,
-  loadMine, missing, onRoad, roadBlocks, saveMine, stepCar,
+  Car, asCar, carAt, carjack, distToCar, clearRoad, createGarage, driveMove, driven, footprint, getIn, getOut, jackable,
+  SPEC, loadMine, missing, mph, onRoad, roadBlocks, saveMine, stepCar,
 } from './cars';
-import { START_HOUR, advance, formatHour, nextPreset, periodOf, wrapHour } from './clock';
+import { START_HOUR, advance, formatHour, nextPreset, periodOf, wakeFrom, wrapHour } from './clock';
 import { Person, discGeometry, randomLook } from './people';
 import { Knock, OUCH, hits, launch, stepKnock } from './knock';
 import { Labels, Note, Trail, buildTrails } from './traces';
@@ -281,6 +281,19 @@ labels.add('🏠 your house<em>High St · 5 roommates</em>', new Vector3(porchSi
   () => !insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v));
 const fade = document.getElementById('fade')!;
 const toastEl = document.getElementById('toast')!;
+const speedo = document.getElementById('speedo')!;
+const speedoN = speedo.querySelector('.n')!, speedoBar = speedo.querySelector<HTMLElement>('.bar i')!;
+let shownMph = -1;
+/** Speedometer: shown while you're on wheels. */
+function updateSpeedo(speed: number) {
+  const car = driven(garage);
+  const top = car ? SPEC[car.kind].top : mover.mode === 'foot' ? 0 : SPEED[mover.mode];
+  speedo.classList.toggle('show', top > 0);
+  if (!top) return;
+  const n = Math.round(mph(speed));
+  if (n !== shownMph) { shownMph = n; speedoN.textContent = String(n); }
+  speedoBar.style.width = `${Math.min(100, (speed / top) * 100).toFixed(1)}%`;
+}
 let toastTimer = 0;
 function toast(text: string, secs = 2.6) {
   toastEl.textContent = text;
@@ -300,12 +313,13 @@ let lastHour = -1;
 let night = 0;
 const glass = new Color();
 // a soft light that walks with you, so you're not a silhouette after dark
-const fill = new PointLight(0xffe4c4, 0, 9, 1.6);
+const fill = new PointLight(0xffe4c4, 0, 15, 1.4);
 scene.add(fill);
 function applyMood(h: number) {
   const m = moodAt(h);
   night = m.night;
-  fill.intensity = m.night * 14;
+  fill.intensity = m.night * 22;
+  renderer.toneMappingExposure = 1.05 + m.night * 0.3; // let your eyes adjust
   trafficView.setNight(m.night);
   house.setNight(m.night);
   sky.apply(m);
@@ -362,10 +376,11 @@ function standUp() {
   sittingOn = null;
 }
 function sleep() {
+  const wake = wakeFrom(hour); // a nap in the day runs into the night; otherwise, the next morning
+  fade.textContent = `zzz… ${wake.tag}`;
   fade.classList.add('show');
   setTimeout(() => {
-    hour = hour < 7.5 ? 7.5 : 7.5 + 24; // to the next morning
-    hour %= 24;
+    hour = wake.h;
     lastHour = hour;
     applyMood(hour);
     saveHour();
@@ -609,10 +624,10 @@ function currentAction(): Act | null {
     const c = carAt(garage, pos);
     if (c) {
       const label = c.owner === 'you' ? '🔑  Drive' : c.owner ? `😈  Steal ${c.owner}'s car` : '😈  Steal car';
-      options.push({ key: `car-${c.id}`, label, dist: 0.5, run: () => enterCar(c) });
+      options.push({ key: `car-${c.id}`, label, dist: distToCar(c, pos), run: () => enterCar(c) });
     }
     const v = jackable(traffic, pos);
-    if (v) options.push({ key: `jack-${v.id}`, label: '👊  Carjack', dist: 0.4, run: () => jack(v.id) });
+    if (v) options.push({ key: `jack-${v.id}`, label: '👊  Carjack', dist: distToCar(asCar(v), pos), run: () => jack(v.id) });
   }
   const taken = roommates.seatsTaken();
   for (const seat of SEATS) {
@@ -701,6 +716,7 @@ function frame(now: number) {
   carry(mob, mover, pos, me.heading);
   rideView.update(mob, mover.riding, speed, dt);
   carsView.update(garage, dt, secs);
+  updateSpeedo(speed);
   updateFleers(dt);
   const act = currentAction();
   const key = act ? act.key : '';
@@ -770,7 +786,7 @@ function frame(now: number) {
   // camera: intro swoop, then follow
   const portrait = innerWidth < innerHeight;
   // sit a little out over the field (+x) and look back across the facades
-  const fast = (1 + Math.max(0, mover.speed - 3) / 22) * (car ? 1.3 : 1); // pull back a little when you're moving fast
+  const fast = (1 + Math.min(0.55, Math.max(0, mover.speed - 3) / 26)) * (car ? 1.3 : 1); // pull back a little when you're moving fast
   // indoors: closer and higher, looking down into the room (walls in the way are cut away)
   const dist = indoors ? 5.2 : (portrait ? 9 : 8.6) * fast;
   const up = (indoors ? 7.4 : (portrait ? 6 : 4.4) * fast) * (1 + rig.pitch);
@@ -806,6 +822,8 @@ function frame(now: number) {
   sun.target.position.copy(pos).addScaledVector(fwd, 18);
   sky.follow(camera.position);
   fill.position.set(pos.x, pos.y + 2.6, pos.z).addScaledVector(fwd, -1.5);
+
+  if (frames % 15 === 0 && where === 'out') world.lightNear(pos);
 
   // "now passing"
   const stop = pos.x < 8 ? stops.find((s) => pos.z <= s.z0 + 2 && pos.z >= s.z1 - 2) : undefined;

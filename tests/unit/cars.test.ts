@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   Car, JACK_SPEED, LEAVE_AFTER, REACH, SPEC, carAt, carjack, clearRoad, createGarage, distToCar,
   driveMove, driven, drivewaySpot, footprint, getIn, getOut, inDriveway, jackable, laneFor, loadMine, missing,
-  onRoad, roadBlocks, saveMine, stepCar,
+  mph, onRoad, roadBlocks, saveMine, stepCar,
 } from '../../src/row/cars';
 import { Extra, blockedAt, resolveMove } from '../../src/row/collide';
 import { FAR_WALK, ROAD, byId, layoutRow } from '../../src/row/layout';
@@ -117,17 +117,21 @@ describe('getting in and out', () => {
 describe('driving', () => {
   const fresh = (): Car => ({ id: 9, kind: 'car', len: 4.4, color: 0, x: 15.5, z: -100, heading: 0, speed: 0, owner: 'you', cruise: 10, stolen: false });
 
-  it('pushes up to top speed going straight', () => {
+  it('builds speed the longer you hold it — flat out only after a good while', () => {
     const c = fresh();
-    drive(c, { x: 0, z: 1 }, 6, {});
-    expect(c.speed).toBeCloseTo(SPEC.car.top, 3);
+    const at = (secs: number) => { for (let t = 0; t < secs; t += STEP) stepCar(c, STEP, { x: 0, z: 1 }); return c.speed; };
+    const s2 = at(2), s6 = at(4), s20 = at(14);
+    expect(s2).toBeGreaterThan(8); // brisk off the line
+    expect(s6).toBeGreaterThan(s2 + 4);
+    expect(s20).toBeGreaterThan(s6);
+    expect(s20).toBeCloseTo(SPEC.car.top, 1);
+    expect(mph(SPEC.car.top)).toBeGreaterThan(45);
     expect(c.heading).toBeCloseTo(0, 6);
-    expect(c.z).toBeGreaterThan(-100 + 40);
   });
 
   it('a light push goes slower', () => {
     const c = fresh();
-    drive(c, { x: 0, z: 0.4 }, 8, {});
+    drive(c, { x: 0, z: 0.4 }, 12, {});
     expect(c.speed).toBeCloseTo(SPEC.car.top * 0.4, 3);
   });
 
@@ -161,8 +165,9 @@ describe('driving', () => {
 
   it('trucks are slower', () => {
     const c = { ...fresh(), kind: 'truck' as const, len: 8 };
-    drive(c, { x: 0, z: 1 }, 10, {});
-    expect(c.speed).toBeCloseTo(SPEC.truck.top, 3);
+    for (let t = 0; t < 30; t += STEP) stepCar(c, STEP, { x: 0, z: 1 }); // open road, no walls
+    expect(c.speed).toBeCloseTo(SPEC.truck.top, 1);
+    expect(SPEC.truck.top).toBeLessThan(SPEC.car.top);
   });
 
   it('a bogus frame changes nothing', () => {

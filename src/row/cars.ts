@@ -1,5 +1,5 @@
 import { Box, Extra, XZ, blockedAt, inBox } from './collide';
-import { ROAD, RowStop } from './layout';
+import { BACK_ROAD, ROAD, RowStop, byId, layoutRow } from './layout';
 import { LANES, TrafficState, Vehicle, addVehicle, laneX, removeVehicle } from './traffic';
 import { DRIVEWAYS, RoommateId, toWorld } from './house/plan';
 
@@ -36,8 +36,8 @@ export interface Car {
 export interface Garage { cars: Car[]; driving: number | null }
 
 export const SPEC = {
-  car: { top: 16, reverse: 5, accel: 6, turn: 2.1, halfW: 0.95 },
-  truck: { top: 11, reverse: 3.5, accel: 3.5, turn: 1.5, halfW: 1.2 },
+  car: { top: 22, reverse: 5, accel: 6, turn: 2.1, halfW: 0.95 }, // ~49 mph
+  truck: { top: 15, reverse: 3.5, accel: 3.5, turn: 1.5, halfW: 1.2 }, // ~34 mph
 } as const;
 const BRAKE = 14; // m/s² when you pull the stick the other way
 const COAST = 4; // m/s² when you let go
@@ -68,10 +68,23 @@ export function drivewaySpot(owner: 'you' | RoommateId) {
 const mkCar = (id: number, owner: Owner, color: number, at: { x: number; z: number; heading: number }): Car =>
   ({ id, kind: 'car', len: 4.4, color, ...at, speed: 0, owner, cruise: 10.5, stolen: false });
 
-/** Your car + kofi's, each in its driveway (yours wherever you last left it, if saved). */
+/** Strangers' cars parked along the back road, at the curb on the row side. */
+export function backRoadParking(): { x: number; z: number; heading: number; color: number }[] {
+  const { stops } = layoutRow();
+  const x = BACK_ROAD.x1 - 1.25;
+  return [
+    { x, z: byId(stops, 'boger').zc + 6, heading: Math.PI, color: 0x8a9aa6 },
+    { x, z: byId(stops, 'north').zc - 4, heading: Math.PI, color: 0x6b2d2a },
+    { x, z: byId(stops, 'north').zc + 2, heading: Math.PI, color: 0xf1f1ee },
+    { x, z: byId(stops, 'judd').zc, heading: Math.PI, color: 0x3d6b4f },
+  ];
+}
+
+/** Your car + kofi's, each in its driveway (yours wherever you last left it, if saved), + a few strangers'. */
 export function createGarage(saved: SavedCar | null = null): Garage {
+  const strangers = backRoadParking().map(({ color, ...at }, i) => mkCar(2 + i, null, color, at));
   return {
-    cars: [mkCar(0, 'you', YOUR_PAINT, saved ?? drivewaySpot('you')), mkCar(1, 'kofi', KOFI_PAINT, drivewaySpot('kofi'))],
+    cars: [mkCar(0, 'you', YOUR_PAINT, saved ?? drivewaySpot('you')), mkCar(1, 'kofi', KOFI_PAINT, drivewaySpot('kofi')), ...strangers],
     driving: null,
   };
 }
@@ -174,7 +187,9 @@ export function stepCar(c: Car, dt: number, stick: XZ): XZ {
   const d = target - c.speed;
   const braking = mag > 0.05 && (target * c.speed < 0 || (target === 0 && c.speed !== 0));
   const slowing = Math.abs(target) < Math.abs(c.speed);
-  const rate = braking ? BRAKE : slowing ? COAST : spec.accel;
+  // pulls hard off the line, then less and less as you near top speed: keep your foot down to go faster
+  const pull = spec.accel * (1 - 0.85 * Math.min(1, Math.abs(c.speed) / spec.top) ** 2);
+  const rate = braking ? BRAKE : slowing ? COAST : pull;
   c.speed += Math.sign(d) * Math.min(Math.abs(d), rate * dt);
   // a car only turns while it rolls, and it turns about its back axle: the nose swings, the tail follows
   const turn = spec.turn * Math.min(1, Math.abs(c.speed) / 3) * dt;
@@ -328,3 +343,6 @@ export function loadMine(raw: string | null): SavedCar | null {
     return { x: s.x, z: s.z, heading: s.heading };
   } catch { return null; }
 }
+
+/** m/s → mph, for the speedometer. */
+export const mph = (ms: number) => Math.abs(ms) * 2.23694;

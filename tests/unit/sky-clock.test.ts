@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { moodAt } from '../../src/row/sky';
 import {
-  NIGHT_SPEEDUP, PRESETS, START_HOUR, advance, formatHour, isNightHour, nextPreset, periodOf,
+  NIGHT_SPEEDUP, PRESETS, START_HOUR, advance, formatHour, isNightHour, nextPreset, periodOf, wakeFrom,
 } from '../../src/row/clock';
 
 describe('time of day', () => {
@@ -106,5 +106,14 @@ describe('game clock', () => {
     let h = 0;
     const seen = PRESETS.map(() => { h = nextPreset(h).h; return periodOf(h); });
     expect(seen).toEqual(['MORNING', 'MIDDAY', 'GOLDEN', 'SUNSET', 'NIGHT']);
+  });
+});
+
+describe('sleep', () => {
+  it('a nap in the day (before 3pm) runs into the night', () => {
+    for (const h of [5, 9, 13, 14.9]) expect(wakeFrom(h)).toEqual({ h: 21, tag: 'night' });
+  });
+  it('going to bed in the afternoon, evening or small hours: up the next morning', () => {
+    for (const h of [15, 18, 23.5, 0, 2, 4.9]) expect(wakeFrom(h)).toEqual({ h: 7.5, tag: 'morning' });
   });
 });

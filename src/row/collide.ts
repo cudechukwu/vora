@@ -1,8 +1,8 @@
-import { BOUNDS, BUILDING_DEPTH, RowStop } from './layout';
+import { BOUNDS, RowStop } from './layout';
 
 // ─── Where you can walk ────────────────────────────────────────────────
-// Buildings on the row are solid slabs from their facade back BUILDING_DEPTH
-// metres. The gaps between them (walkways) are open, so you can cut through
+// Buildings on the row are solid slabs from their facade to their back wall.
+// The gaps between them (walkways) are open, so you can cut through
 // to Andrus Field. Pure function: old position + wanted position → allowed.
 //
 // `extra` adds finer rules (used for your house): solid boxes, an optional
@@ -18,7 +18,7 @@ const PAD = 0.8; // keep this far off a wall
 export const inBox = (p: XZ, b: Box) => p.x > b.x0 && p.x < b.x1 && p.z > b.z0 && p.z < b.z1;
 
 function inside(stops: RowStop[], x: number, z: number): RowStop | undefined {
-  return stops.find((s) => z <= s.z0 + 0.5 && z >= s.z1 - 0.5 && x < s.front + PAD && x > s.front - BUILDING_DEPTH);
+  return stops.find((s) => z <= s.z0 + 0.5 && z >= s.z1 - 0.5 && x < s.front + PAD && x > s.back - PAD);
 }
 
 function rowMove(prev: XZ, want: XZ, stops: RowStop[], xMax: number): XZ {
@@ -28,7 +28,7 @@ function rowMove(prev: XZ, want: XZ, stops: RowStop[], xMax: number): XZ {
   if (!hit) return { x, z };
   // slide along whichever wall you ran into
   if (prev.x >= hit.front + PAD) x = hit.front + PAD; // facade, from the walk
-  else if (prev.x <= hit.front - BUILDING_DEPTH) x = hit.front - BUILDING_DEPTH; // back wall, from the field
+  else if (prev.x <= hit.back - PAD) x = hit.back - PAD; // back wall, from the back road
   else z = prev.z; // side wall, from a walkway
   // still stuck (e.g. a corner)? stay put
   return inside(stops, x, z) ? { x: prev.x, z: prev.z } : { x, z };

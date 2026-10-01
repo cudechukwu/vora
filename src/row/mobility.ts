@@ -10,7 +10,7 @@ export type Mode = 'foot' | 'scooter' | 'bike';
 export type RideKind = 'bike' | 'scooter';
 
 /** Top speeds, m/s. */
-export const SPEED = { walk: 3.2, run: 6.8, scooter: 8.5, bike: 10.5 } as const;
+export const SPEED = { walk: 3.2, run: 6.8, scooter: 8.5, bike: 11 } as const; // bike ~25 mph flat out
 export const RUN_AFTER = 2; // seconds of holding the stick pushed before you run
 export const RUN_MAG = 0.75; // how far the stick counts as "pushed"
 const ACCEL: Record<Mode, number> = { foot: 9, scooter: 5, bike: 4.5 };
@@ -46,7 +46,9 @@ export function stepMover(m: Mover, dt: number, mag: number): number {
   m.held = mag >= RUN_MAG ? m.held + dt : 0;
   const target = targetSpeed(m, mag);
   const d = target - m.speed;
-  m.speed += d > 0 ? Math.min(d, ACCEL[m.mode] * dt) : Math.max(d, -BRAKE * dt);
+  // on wheels, you build speed: quick off the line, slower and slower toward the top
+  const pull = m.mode === 'foot' ? ACCEL.foot : ACCEL[m.mode] * (1 - 0.8 * Math.min(1, m.speed / SPEED[m.mode]) ** 2);
+  m.speed += d > 0 ? Math.min(d, pull * dt) : Math.max(d, -BRAKE * dt);
   return m.speed;
 }
 
