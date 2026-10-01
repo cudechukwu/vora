@@ -669,3 +669,13 @@ test('into Usdan from the plaza, across to the atrium, and back out @smoke', asy
   expect(out.x).toBeGreaterThan(-60); // on the plaza
   expect(errors).toEqual([]);
 });
+
+test('walk up the path into the glass entrance off the walkway and you are inside Usdan', async ({ page }) => {
+  const errors = await open(page, 't=13&x=-65.2&z=-168&yaw=0.1'); // on the path, looking at the entrance (north)
+  await page.keyboard.down('w');
+  await page.waitForFunction(() => (window as any).__vora.where === 'usdan', null, { timeout: 60_000 });
+  await page.keyboard.up('w');
+  const s = await state(page);
+  expect(s.z).toBeLessThan(-178); // in the lobby
+  expect(errors).toEqual([]);
+});

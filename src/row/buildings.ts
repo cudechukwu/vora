@@ -1,10 +1,12 @@
 import {
-  BoxGeometry, ConeGeometry, CylinderGeometry, ExtrudeGeometry, Group, Material, Mesh, Path, Shape, SphereGeometry,
+  BoxGeometry, CanvasTexture, ConeGeometry, CylinderGeometry, DoubleSide, ExtrudeGeometry, Group, Material, Mesh, MeshBasicMaterial,
+  MeshPhongMaterial, Path, PlaneGeometry, SRGBColorSpace, Shape, SphereGeometry,
 } from 'three';
 import {
   BoxBank, Facing, PAL, WindowBank, WindowKind, block, brickMap, hipRoof, lambert, prism, stoneMap,
 } from './kit';
 import { BuildingId, FRONT_X, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
+import { DOORS, Door, VESTIBULE } from './usdan/plan';
 
 // ─── College Row buildings ─────────────────────────────────────────────
 // Stylized, never literal (brief R/05): each building keeps the one or two
@@ -314,11 +316,73 @@ function usdan(k: Kit) {
     for (let j = 0; j < n; j++) {
       const t = (j + 0.5) / n, x = a.x + dx * t, z = a.z + dz * t;
       win.add('rect', x + nx * 0.03, 6.7, z + nz * 0.03, Math.min(2.4, len / n - 0.8), 2.8, face);
-      if (j % 2 === 0) win.add('rect', x + nx * 0.03, 2.4, z + nz * 0.03, 2.2, 2.6, face);
+      const byDoor = DOORS.some((d) => Math.hypot(d.x - x, d.z - z) < d.w / 2 + (d.main ? VESTIBULE.extra : 0) + 1.6);
+      if (j % 2 === 0 && !byDoor) win.add('rect', x + nx * 0.03, 2.4, z + nz * 0.03, 2.2, 2.6, face);
     }
   });
-  // the entrance off the Boger–South walkway: a glass porch on the south side
-  const e = { x: (USDAN[1].x + USDAN[2].x) / 2 + 4, z: (USDAN[1].z + USDAN[2].z) / 2 };
-  box.add(e.x, 1.6, e.z + 1.4, 5, 3.2, 2.6, 0x3a4e5a);
-  box.add(e.x, 3.35, e.z + 1.6, 6, 0.3, 3.2, PAL.trim);
+  for (const d of DOORS) usdanDoor(k, d);
+}
+
+// ── Usdan's doors, from outside ──
+const GLASS = new MeshPhongMaterial({ color: 0xa9cad6, transparent: true, opacity: 0.32, shininess: 120, specular: 0xffffff, depthWrite: false, side: DoubleSide });
+const LIT = new MeshBasicMaterial({ color: 0xf3e2bd }); // warm light from inside, through the doors
+const FRAME = 0x2a3036;
+
+function usdanSign(): MeshBasicMaterial {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 64;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#2a3036'; g.fillRect(0, 0, 512, 64);
+  g.fillStyle = '#f2ede2'; g.font = 'bold 30px sans-serif'; g.textAlign = 'center';
+  g.fillText('USDAN UNIVERSITY CENTER', 256, 43);
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return new MeshBasicMaterial({ map: t });
+}
+let SIGN: MeshBasicMaterial | null = null;
+
+/**
+ * A door from outside: lit glass double doors in a dark frame, a mat, and a path leading out to it.
+ * The main doors sit at the back of a glass vestibule that sticks out from the wall, with a canopy and the sign.
+ */
+function usdanDoor(k: Kit, d: Door) {
+  const { g, box } = k;
+  const face = Math.atan2(d.nx, d.nz), tx = -d.nz, tz = d.nx;
+  const at = (out: number, along: number, y: number) => [d.x + d.nx * out + tx * along, y, d.z + d.nz * out + tz * along] as const;
+  const plane = (w: number, h: number, mat: Material, out: number, along: number, y: number, rot = face) => {
+    const m = new Mesh(new PlaneGeometry(w, h), mat);
+    m.position.set(...at(out, along, y));
+    m.rotation.y = rot;
+    g.add(m);
+    return m;
+  };
+  // the doors: two lit panes in a dark frame, set just proud of the wall
+  for (const s of [-1, 1]) plane(d.w / 2 - 0.12, 2.4, LIT, 0.06, (s * d.w) / 4, 1.22);
+  box.add(...at(0.05, 0, 2.5), d.w + 0.3, 0.16, 0.14, FRAME, face); // head
+  for (const s of [-1, 0, 1]) box.add(...at(0.05, (s * d.w) / 2, 1.25), 0.1, 2.5, 0.14, FRAME, face); // jambs + centre
+  for (const s of [-0.18, 0.18]) box.add(...at(0.1, s, 1.15), 0.04, 0.4, 0.06, 0xc0c4c8, face); // pull handles
+  // a path out to it, and a mat
+  const pathLen = d.main ? 11 : 8;
+  box.add(...at(pathLen / 2 + (d.main ? VESTIBULE.depth : 0), 0, 0.03), d.w + 1.2, 0.03, pathLen, 0xcfc4ab, face);
+  box.add(...at(d.main ? VESTIBULE.depth / 2 : 0.8, 0, 0.05), d.w, 0.02, d.main ? VESTIBULE.depth - 0.2 : 1.4, 0x1a1c1e, face);
+  if (!d.main) {
+    box.add(...at(0.8, 0, 3.1), d.w + 1.2, 0.2, 1.6, 0x3a4046, face); // a small canopy
+    box.add(...at(0.12, d.w / 2 + 0.5, 2.6), 0.22, 0.3, 0.16, 0xf6efd8, face); // a lamp beside it
+    return;
+  }
+  // the vestibule: glass front and sides on dark mullions, a flat roof, the sign on top
+  const half = (d.w + VESTIBULE.extra) / 2, D = VESTIBULE.depth, H = VESTIBULE.h;
+  for (const side of [-1, 1]) {
+    plane(D, H - 0.2, GLASS, D / 2, side * half, (H - 0.2) / 2, face + Math.PI / 2); // side glass
+    plane(half - d.w / 2, H - 0.2, GLASS, D, side * (d.w / 2 + (half - d.w / 2) / 2), (H - 0.2) / 2); // front glass beside the opening
+    box.add(...at(D, side * half, H / 2), 0.12, H, 0.12, FRAME, face); // corner posts
+    box.add(...at(0.05, side * half, H / 2), 0.12, H, 0.12, FRAME, face);
+    box.add(...at(D, side * d.w / 2, H / 2), 0.1, H, 0.1, FRAME, face); // either side of the opening
+    box.add(...at(D / 2, side * half, 1.1), 0.06, 0.06, D, FRAME, face); // rails across the side glass
+  }
+  plane(d.w, H - 2.6, GLASS, D, 0, 2.6 + (H - 2.6) / 2); // transom over the opening
+  box.add(...at(D / 2 + 0.2, 0, H + 0.12), d.w + VESTIBULE.extra + 0.6, 0.24, D + 0.7, 0x3a4046, face); // roof / canopy
+  box.add(...at(D, 0, 2.62), d.w + 0.1, 0.08, 0.1, FRAME, face); // head of the opening
+  SIGN ??= usdanSign();
+  plane(4.2, 0.52, SIGN, D + 0.56, 0, H + 0.12); // the sign, on the canopy's edge
 }

@@ -5,6 +5,7 @@ import {
 } from 'three';
 import { BoxBank, PAL, lambert, prism } from './kit';
 import type { Box } from './collide';
+import { vestibuleSolids } from './usdan/plan';
 import {
   BED, FOOTBALL, ITEMS, Item, PATH_ITEMS, chairs, fenceObstacles, fenceRuns, half, pathObstacles, plazaObstacles,
 } from './plaza';
@@ -56,7 +57,7 @@ export class World {
     this.benchesAlongLawn(box);
     this.plaza(box);
     this.pathSide(box);
-    this.obstacles.push(...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, this.fz));
+    this.obstacles.push(...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, this.fz), ...vestibuleSolids());
   }
 
   private ground() {

@@ -30,10 +30,18 @@ function reachable(from: { x: number; z: number }) {
 }
 
 describe('Usdan\'s doors', () => {
-  it('sit on its outline: one onto the walkway (south), one onto the plaza (east)', () => {
-    for (const d of DOORS) expect(distToPoly(d, USDAN)).toBeLessThan(0.05);
-    expect(DOORS.find((d) => d.id === 'south')!.nz).toBeGreaterThan(0.9); // faces south (+z)
-    expect(DOORS.find((d) => d.id === 'east')!.nx).toBeGreaterThan(0.9); // faces east (+x)
+  it('there are lots of them, all round the building, on its outline, facing out', () => {
+    expect(DOORS.length).toBeGreaterThanOrEqual(5);
+    for (const d of DOORS) {
+      expect(distToPoly(d, USDAN)).toBeLessThan(0.05);
+      expect(inPoly({ x: d.x + d.nx, z: d.z + d.nz }, USDAN)).toBe(false); // the normal points outside
+      expect(inPoly({ x: d.x - d.nx, z: d.z - d.nz }, USDAN)).toBe(true);
+    }
+    expect(DOORS.find((d) => d.id === 'walkway')!.nz).toBeGreaterThan(0.9); // faces south (+z), onto the walkway
+    expect(DOORS.find((d) => d.id === 'plaza')!.nx).toBeGreaterThan(0.9); // faces east (+x), onto the plaza
+    expect(DOORS.find((d) => d.id === 'north')!.nz).toBeLessThan(-0.5); // faces north
+    // spread out: no two doors on top of each other
+    for (const a of DOORS) for (const b of DOORS) if (a !== b) expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(8);
   });
 
   it('walking up to one from outside takes you in; you arrive inside, clear of everything, facing in', () => {
@@ -76,7 +84,8 @@ describe('Usdan\'s doors', () => {
 });
 
 describe('inside Usdan', () => {
-  const inSouth = arriveAt(DOORS[0], 'enter'), inEast = arriveAt(DOORS[1], 'enter');
+  const door = (id: string) => DOORS.find((d) => d.id === id)!;
+  const inSouth = arriveAt(door('walkway'), 'enter'), inEast = arriveAt(door('plaza'), 'enter');
   const canReach = reachable(inSouth);
 
   it('every room is inside the building', () => {
@@ -98,6 +107,20 @@ describe('inside Usdan', () => {
       elevator: { x: -69.2, z: -219.5 },
     };
     for (const [name, p] of Object.entries(spots)) expect([name, canReach(p)]).toEqual([name, true]);
+  });
+
+  it('you can walk inside to every single door, and out through it', () => {
+    for (const d of DOORS) {
+      const at = arriveAt(d, 'enter');
+      expect([d.id, canReach(at)]).toEqual([d.id, true]);
+      // walk out from there: straight at the door, it takes you out
+      let p = { x: at.x, z: at.z }, out = false;
+      for (let i = 0; i < 60 && !out; i++) {
+        p = resolveMove(p, { x: p.x + d.nx * 0.1, z: p.z + d.nz * 0.1 }, stops, usdanExtra());
+        out = usdanPortalAt('usdan', p)?.door === d;
+      }
+      expect([d.id, out]).toEqual([d.id, true]);
+    }
   });
 
   it('but not into the closed-off west wing or behind the café counter', () => {

@@ -22,16 +22,25 @@ import { USDAN, distToPoly, inPoly } from '../layout';
 const R = 0.3; // your radius
 
 // ── the doors ──
-export interface Door { id: 'south' | 'east'; x: number; z: number; nx: number; nz: number; w: number; label: string }
-const norm = (x: number, z: number) => { const l = Math.hypot(x, z); return [x / l, z / l] as const; };
-const [snx, snz] = norm(2, 20), [enx, enz] = norm(60, -2);
-export const DOORS: Door[] = [
-  // on the south face, off the walkway between Boger and South College
-  { id: 'south', x: -66, z: -177.4, nx: snx, nz: snz, w: 3, label: 'the walkway' },
-  // on the east face, from the plaza
-  { id: 'east', x: -60.633, z: -197, nx: enx, nz: enz, w: 3, label: 'the plaza' },
-];
+// Six of them, all the way round, each with a path leading up to it outside and a clear way to it inside.
+export type DoorId = 'plaza' | 'plazaNorth' | 'walkway' | 'field' | 'fieldWest' | 'north';
+export interface Door { id: DoorId; x: number; z: number; nx: number; nz: number; w: number; label: string; main: boolean }
 
+/** A door on edge i of Usdan's outline (from corner i to corner i+1), `t` of the way along, facing out. */
+function doorOn(id: DoorId, i: number, t: number, label: string, main = false, w = 3): Door {
+  const a = USDAN[i], b = USDAN[(i + 1) % USDAN.length];
+  const dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz);
+  return { id, x: a.x + dx * t, z: a.z + dz * t, nx: dz / l, nz: -dx / l, w, label, main };
+}
+
+export const DOORS: Door[] = [
+  doorOn('plaza', 0, 41 / 60, 'the plaza', true), // east face → the lounge
+  doorOn('plazaNorth', 0, 12 / 60, 'the plaza'), // east face, north end → the corridor
+  doorOn('walkway', 1, 0.3, 'the walkway', true), // south face, off the Boger–South walkway → the lobby
+  doorOn('field', 2, 0.25, 'Andrus Field'), // south-west face → Flex Dining
+  doorOn('fieldWest', 2, 0.66, 'Andrus Field'), // …its west end
+  doorOn('north', 4, 0.8, 'Wyllys Ave', true), // north face → the corridor's north end
+];
 /** Where you are relative to a door: `d` outward from the wall (+ = outside), `lat` along it. */
 export function doorFrame(door: Door, p: XZ) {
   const dx = p.x - door.x, dz = p.z - door.z;
@@ -62,9 +71,12 @@ export function nearUsdanDoor(where: InOut | string, p: XZ): Door | null {
   return null;
 }
 
+/** The main doors have a glass entrance vestibule that sticks out from the wall: this deep, this wide. */
+export const VESTIBULE = { depth: 2.6, extra: 1.6, h: 3.3 } as const;
+
 /** Where you end up after going through `door`, and which way you face. */
 export function arriveAt(door: Door, kind: 'enter' | 'exit') {
-  const s = kind === 'enter' ? -2.6 : 2.4;
+  const s = kind === 'enter' ? -2.6 : door.main ? VESTIBULE.depth + 1.4 : 2.4; // (out past the vestibule)
   const x = door.x + door.nx * s, z = door.z + door.nz * s;
   const heading = Math.atan2(door.nx * Math.sign(s), door.nz * Math.sign(s));
   return { x, z, heading };
@@ -235,3 +247,27 @@ export function usdanSolids(pad = R): Box[] {
 const SOLIDS = usdanSolids();
 /** Collision rules inside: stay within the outline, don't walk through walls or furniture. */
 export const usdanExtra = (): Extra => ({ solids: SOLIDS, interior: insideUsdan });
+
+/**
+ * Outside: the glass sides of each vestibule are solid (you go in through its front), as a run of
+ * small boxes so they work at any angle.
+ */
+export function vestibuleSolids(pad = R): Box[] {
+  const out: Box[] = [];
+  for (const d of DOORS) {
+    if (!d.main) continue;
+    const half = (d.w + VESTIBULE.extra) / 2, tx = -d.nz, tz = d.nx;
+    for (const side of [-1, 1]) {
+      for (let k = 0.2; k <= VESTIBULE.depth; k += 0.3) {
+        const x = d.x + d.nx * k + tx * side * half, z = d.z + d.nz * k + tz * side * half;
+        out.push({ x0: x - 0.12 - pad, x1: x + 0.12 + pad, z0: z - 0.12 - pad, z1: z + 0.12 + pad });
+      }
+      // the front panels either side of the opening
+      for (let l = d.w / 2 + 0.1; l <= half; l += 0.3) {
+        const x = d.x + d.nx * VESTIBULE.depth + tx * side * l, z = d.z + d.nz * VESTIBULE.depth + tz * side * l;
+        out.push({ x0: x - 0.12 - pad, x1: x + 0.12 + pad, z0: z - 0.12 - pad, z1: z + 0.12 + pad });
+      }
+    }
+  }
+  return out;
+}
