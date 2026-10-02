@@ -458,12 +458,16 @@ const input = new Input();
 // sound: starts on the first touch / key (browsers only allow audio after one); paused while the page is hidden
 const sound = new Sound();
 const unlock = () => sound.start();
-addEventListener('pointerdown', unlock, { capture: true });
-addEventListener('keydown', unlock, { capture: true });
+for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const) addEventListener(ev, unlock, { capture: true });
 document.addEventListener('visibilitychange', () => sound.suspend(document.visibilityState === 'hidden'));
 const muteBtn = document.getElementById('mute')!;
 const showMute = () => { muteBtn.innerHTML = sound.muted ? ICON.muted : ICON.sound; muteBtn.setAttribute('aria-label', sound.muted ? 'Sound off' : 'Sound on'); };
-muteBtn.addEventListener('click', () => { sound.start(); sound.setMuted(!sound.muted); showMute(); });
+muteBtn.addEventListener('click', () => {
+  sound.start();
+  sound.setMuted(!sound.muted);
+  showMute();
+  toast(sound.muted ? 'sound off' : `sound on · audio ${sound.state}`); // (the state helps if a phone stays silent)
+});
 showMute();
 /** Where a sound at (x, z) sits for your ears: loudness by distance, left/right by where it is on screen. */
 const ears = (x: number, z: number, range = 60) => {
@@ -1120,7 +1124,7 @@ Object.assign(window, {
     get jumpY() { return jump.y; },
     get speedo() { return speedo.reading; },
     get marks() { return tyres.count; },
-    get sound() { return { started: sound.started, muted: sound.muted, log: sound.log.slice(-20) }; },
+    get sound() { return { started: sound.started, state: sound.state, muted: sound.muted, log: sound.log.slice(-20) }; },
     get hour() { return hour; },
     get mode() { return periodOf(hour); },
     /** Render now and count distinct colours on a 12×12 grid — a blank/broken canvas gives ~1. */

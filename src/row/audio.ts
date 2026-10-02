@@ -14,6 +14,9 @@ const FILES = import.meta.glob('./sounds/*.{mp3,m4a,wav,ogg,aac}', { eager: true
 const fileFor = (name: string) => Object.entries(FILES).find(([p]) => p.replace(/^.*\//, '').replace(/\.[^.]+$/, '') === name)?.[1];
 const filesLike = (prefix: string) => Object.entries(FILES).filter(([p]) => p.replace(/^.*\//, '').startsWith(prefix)).map(([, u]) => u);
 
+/** Overall loudness (before the limiter): phone speakers need it. */
+const LOUD = 2.2;
+
 type Bed = 'birds' | 'crickets' | 'wind' | 'road' | 'crowd' | 'room' | 'engine' | 'tyres' | 'skid';
 /** Which recording (if any) replaces each always-on bed. */
 const BED_FILE: Partial<Record<Bed, string>> = { birds: 'day', crickets: 'night', road: 'traffic', crowd: 'crowd', room: 'room' };
@@ -44,28 +47,76 @@ export class Sound {
 
   get started() { return this.ctx !== null && this.ctx.state === 'running'; }
 
-  /** Call from a user gesture. Safe to call again. */
+  /**
+   * Call from a user gesture (every tap is fine — it's cheap). iPhones are picky:
+   *  - sound only unlocks on the *end* of a tap (touchend / click), not touch-down;
+   *  - with the ring/silent switch on silent, web audio is muted unless the page says it's media
+   *    (`navigator.audioSession.type = 'playback'`, Safari 16.4+), and on older iOS unless an
+   *    <audio> element is playing — so we also loop a silent one.
+   */
   start() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') void this.ctx.resume(); return; }
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session) { try { session.type = 'playback'; } catch { /* ignore */ } }
+    this.keepAwake();
+    if (this.ctx) {
+      if (this.ctx.state !== 'running') void this.ctx.resume();
+      this.blip();
+      return;
+    }
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
     const ctx = (this.ctx = new AC());
+    if (ctx.state !== 'running') void ctx.resume();
     this.master = ctx.createGain();
-    this.master.gain.value = this.muted ? 0 : 0.9;
-    this.master.connect(ctx.destination);
+    this.master.gain.value = this.muted ? 0 : LOUD;
+    // a limiter at the end, so it can be loud on a phone speaker without crackling
+    const lim = ctx.createDynamicsCompressor();
+    lim.threshold.value = -14; lim.knee.value = 8; lim.ratio.value = 6; lim.attack.value = 0.004; lim.release.value = 0.2;
+    this.master.connect(lim).connect(ctx.destination);
     // two seconds of white noise to filter into wind, road, tyres, crowd
     this.noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    this.blip();
     this.buildBeds();
     for (const url of Object.values(FILES)) void this.load(url);
     if (this.mix) this.setMix(this.mix, 0);
   }
 
+  /** Play one silent sample through the context: the classic iOS unlock. */
+  private blip() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const b = ctx.createBuffer(1, 1, ctx.sampleRate), s = ctx.createBufferSource();
+    s.buffer = b; s.connect(ctx.destination); s.start(0);
+  }
+
+  private silent: HTMLAudioElement | null = null;
+  /** A looping, silent <audio> element: on older iOS this is what lets sound through the silent switch. */
+  private keepAwake() {
+    if (!this.silent) {
+      // 0.1 s of 8-bit mono silence as a WAV
+      const n = 800, bytes = new Uint8Array(44 + n), v = new DataView(bytes.buffer);
+      const str = (o: number, t: string) => { for (let i = 0; i < t.length; i++) bytes[o + i] = t.charCodeAt(i); };
+      str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true);
+      v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+      v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, 'data'); v.setUint32(40, n, true);
+      bytes.fill(128, 44);
+      const a = new Audio(URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' })));
+      a.loop = true;
+      a.setAttribute('playsinline', '');
+      this.silent = a;
+    }
+    if (this.silent.paused) void this.silent.play().catch(() => { /* not allowed yet: next tap */ });
+  }
+
+  /** What the browser thinks (for the debug hook). */
+  get state() { return this.ctx?.state ?? 'none'; }
+
   setMuted(m: boolean) {
     this.muted = m;
     try { localStorage.setItem('vora.row.muted', m ? '1' : '0'); } catch { /* ignore */ }
-    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.05);
+    if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : LOUD, this.ctx.currentTime, 0.05);
     if (m) speechSynthesis?.cancel();
   }
 
