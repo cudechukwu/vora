@@ -14,8 +14,8 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 
 ## How to run
 - `npm run dev` → http://localhost:5173/row.html. This is the game. `/` is the old Pixi Foss Hill greybox, which is still working but parked.
-- `npm test`: Vitest unit tests (224, about 8 s).
-- Browser tests (Playwright, 56) run against a **built copy** (`vite build` into `dist-e2e/`, served by `vite preview` on port 5189), snapshotted when the run starts. So you **can keep editing source while they run**. They use the installed Google Chrome with SwiftShader WebGL, 2 workers (`-- --workers=1` when the machine is busy).
+- `npm test`: Vitest unit tests (235, about 8 s).
+- Browser tests (Playwright, 58) run against a **built copy** (`vite build` into `dist-e2e/`, served by `vite preview` on port 5189), snapshotted when the run starts. So you **can keep editing source while they run**. They use the installed Google Chrome with SwiftShader WebGL, 2 workers (`-- --workers=1` when the machine is busy).
   - `npm run test:smoke`: 11 key tests tagged `@smoke`, about 3 min. Run after each feature.
   - `npm run test:e2e -- -g carjack`: just the tests whose names match.
   - `npm run test:e2e`: everything, 10+ min. Run it in the background.
@@ -54,6 +54,7 @@ You **start the game outside your house**, on the sidewalk at the end of your fr
 | `world.ts` / `buildings.ts` / `kit.ts` | Ground, field, walks, trees, lamps, benches, street and houses; building kits; instanced window and box banks. |
 | `people.ts` / `traces.ts` | Blocky people with knees, elbows, hands and eyes. Each body segment is one merged vertex-coloured mesh (≤12 meshes per person). `gait(phase, speed)` is a pure walk↔run blend: knees fold and arms pump when running. Also sit/ride/scoot, idle breathing, blinking and glances, plus `flail`/`limp` for being hit. Traces: demo social traces (friend footstep trails, notes, labels). All social data is **demo/fake** for now. |
 | `knock.ts` | Being hit by your car (pure): `hits`, `launch`, `stepKnock` (air → down → up → done). main.ts keeps a `bodies` registry of everyone hittable (walkers, sitters, frisbee players, carjacked drivers), each with how it recovers. |
+| `soundscape.ts` / `audio.ts` | **Sound.** `mixAt` (pure, tested) sets the levels of the always-on sounds: birds by day, crickets at night, wind, the High Street hum (by distance and traffic), crowd murmur, indoor room tone, your engine (rpm), tyres (rougher on grass and paving) and skids. `honkNow` and the traffic's `waited` timer make held-up drivers honk. `audio.ts` synthesises everything with Web Audio **unless a recording exists**: drop `src/row/sounds/<name>.m4a` (the names are in `sounds/README.md`, and the user offered to record) and it's used automatically. Voices use recordings `yell_*`/`hey_*`, otherwise the phone's speech synthesis. Sound starts on the first touch (an iOS rule) and pauses when hidden. The mute button under the clock is remembered. `__vora.sound.log` lists what has played (tests use it). |
 | `save.ts` | Where you were (`vora.row.spot` in localStorage): your place (outside, house or Usdan), position, heading and floor. Saved every 3 s and on pagehide or visibilitychange; restored on load (no intro swoop) unless older than 12 h or the URL has `?x=`/`?z=`. The dev server's reloads and iOS dropping background tabs were sending the user back to their house. |
 | `main.ts` | Wiring, game loop, actions, the scenes. |
 
@@ -76,6 +77,8 @@ A two-storey wood frame across High Street (local coordinates: `u` from the fron
 ## Backlog (user's list, 2026-10-01; tick off as done)
 - [ ] **Usdan upstairs and dining.** Up the stairs, someone sits at a glass desk with a computer on each side (two staff); students scan their Wes IDs to get into dining. From there, a path **left** leads to the loud side (an athletes' table, big friend groups, energetic) and a path **right** to the quiet side (indie film people; tables like the lobby's plus long rectangular tables in the centre, red pillars). Straight down the middle is the **food area**: stir-fry, self-serve, burgers, classic food and so on. Keep the inside *recognisable*: true where we can be, just not an exact floor plan.
 - [ ] **Phone:** contacts, interactions (after the items below).
+- [ ] **Recordings from the user** (voices, ambience, doors, horn) go in `src/row/sounds/`; see the README there.
+- [x] Sound: ambience, horns, engine, doors, hits and voices.
 - [x] Tire marks when driving on grass, and exhaust smoke.
 - [x] Jump (game-feel actions).
 - [x] Driving with gas and brake pedal buttons, plus a real dial speedometer (not the italic numbers).

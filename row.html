@@ -78,6 +78,7 @@
     #gas{right:14px;bottom:calc(3% + var(--safe-b));width:70px;height:96px;border-radius:22px;}
     #brake{right:96px;bottom:calc(3% + var(--safe-b));width:76px;height:62px;border-radius:20px;}
     #gas.show,#brake.show{pointer-events:auto;}
+    #mute{right:16px;top:calc(68px + var(--safe-t));width:40px;height:40px;opacity:1;transform:none;pointer-events:auto;}
     body.driving #act{bottom:calc(3% + 110px + var(--safe-b));}
     body.driving #look{bottom:calc(3% + 196px + var(--safe-b));}
 
@@ -177,6 +178,7 @@
   </button>
   <button id="act" class="gbtn" aria-live="polite"></button>
   <button id="jump" class="gbtn" aria-label="Jump"></button>
+  <button id="mute" class="gbtn show" aria-label="Sound on"></button>
   <button id="brake" class="gbtn" aria-label="Brake / reverse"></button>
   <button id="gas" class="gbtn" aria-label="Gas"></button>
   <div id="toast" aria-live="polite"></div>

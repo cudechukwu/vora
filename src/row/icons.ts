@@ -25,6 +25,9 @@ export const ICON = {
   bed: svg('<path d="M3 18V7M3 14h18v4M21 14v-2.5a2.5 2.5 0 0 0-2.5-2.5H11v5"/><circle cx="7" cy="11" r="1.8"/>'),
   /** jump: a figure with an arrow up */
   jump: svg('<path d="M12 3v6M9 6l3-3 3 3"/><circle cx="12" cy="12" r="1.6"/><path d="M12 14v3l-3 4M12 17l3 4M8.5 14.5 12 14l3.5.5"/>'),
+  /** sound on / off */
+  sound: svg('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>'),
+  muted: svg('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>'),
   /** pedals */
   gas: svg('<rect x="7" y="2.5" width="10" height="19" rx="3"/><path d="M10 7h4M10 10.5h4M10 14h4M10 17.5h4"/>'),
   brake: svg('<rect x="3.5" y="7" width="17" height="10" rx="3"/><path d="M7.5 10.5v3M10.5 10.5v3M13.5 10.5v3M16.5 10.5v3"/>'),

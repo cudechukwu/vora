@@ -33,7 +33,9 @@ import { Knock, OUCH, hits, launch, stepKnock } from './knock';
 import { ICON, IconName } from './icons';
 import { Speedometer } from './hud';
 import { SPOT_KEY, loadSpot, saveSpot } from './save';
-import { surfaceAt } from './surface';
+import { Sound } from './audio';
+import { falloff, honkNow, mixAt } from './soundscape';
+import { leavesMark, surfaceAt } from './surface';
 import { ITEMS, SITTERS, chairs } from './plaza';
 import { UsdanView } from './usdan/view';
 import {
@@ -453,6 +455,24 @@ function applyMood(h: number) {
 
 // ── input + camera ──
 const input = new Input();
+// sound: starts on the first touch / key (browsers only allow audio after one); paused while the page is hidden
+const sound = new Sound();
+const unlock = () => sound.start();
+addEventListener('pointerdown', unlock, { capture: true });
+addEventListener('keydown', unlock, { capture: true });
+document.addEventListener('visibilitychange', () => sound.suspend(document.visibilityState === 'hidden'));
+const muteBtn = document.getElementById('mute')!;
+const showMute = () => { muteBtn.innerHTML = sound.muted ? ICON.muted : ICON.sound; muteBtn.setAttribute('aria-label', sound.muted ? 'Sound off' : 'Sound on'); };
+muteBtn.addEventListener('click', () => { sound.start(); sound.setMuted(!sound.muted); showMute(); });
+showMute();
+/** Where a sound at (x, z) sits for your ears: loudness by distance, left/right by where it is on screen. */
+const ears = (x: number, z: number, range = 60) => {
+  const dx = x - pos.x, dz = z - pos.z, d = Math.hypot(dx, dz) || 1;
+  return { vol: falloff(d, range), pan: (dx * right.x + dz * right.z) / d };
+};
+const honkedAt = new Map<number, number>();
+let mixT = 0;
+let wasAirborne = false;
 input.onFirstMove = () => setTimeout(() => hint.classList.add('gone'), 2500);
 const rig = new CameraRig(params.has('yaw') ? parseFloat(params.get('yaw')!) : resumed ? resumed.heading + Math.PI : Math.PI); // π = looking +z, up High Street / down the row; ?yaw= for screenshots
 // the opening swoop: at home, from across the street looking back at you in front of your house; else from high over the row
@@ -534,6 +554,7 @@ function collisions() {
 
 /** Through the front door: a quick fade, and you're in the other world, facing the right way. */
 function goThrough(kind: 'enter' | 'exit') {
+  sound.play('houseDoor', 0.8);
   const at = kind === 'enter' ? ENTER_AT : EXIT_AT;
   const w = toWorld(at.u, at.v);
   pos.set(w.x, 0, w.z);
@@ -552,6 +573,7 @@ function goThrough(kind: 'enter' | 'exit') {
 
 /** Through one of Usdan's doors: a blink, and you're inside (or back out, facing away from the building). */
 function goUsdan(door: Door, kind: 'enter' | 'exit') {
+  sound.play('glassDoor', 0.8);
   const at = arriveAt(door, kind);
   pos.set(at.x, 0, at.z);
   level = 0;
@@ -579,10 +601,11 @@ function welcomeHome() {
   welcome.classList.add('show');
   clearTimeout(welcomeTimer);
   welcomeTimer = window.setTimeout(() => welcome.classList.remove('show'), 3600);
-  if (h.greeter) setTimeout(() => roommates.say(h.greeter!, h.line), 700);
+  if (h.greeter) setTimeout(() => { roommates.say(h.greeter!, h.line); sound.say(h.line, 'greet', 0.8); }, 700);
   // took kofi's car? he's noticed
   if (h.home.includes('kofi') && missing(garage, 'kofi')) {
-    setTimeout(() => roommates.say('kofi', pick(['wait… where\'s my car??', 'did you take my car?', 'bro. my car. where is it.'])), h.greeter === 'kofi' ? 3200 : 1800);
+    const line = pick(['wait… where\'s my car??', 'did you take my car?', 'bro. my car. where is it.']);
+    setTimeout(() => { roommates.say('kofi', line); sound.say(line, 'greet', 0.9); }, h.greeter === 'kofi' ? 3200 : 1800);
   }
 }
 
@@ -590,6 +613,7 @@ const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
 
 function enterCar(c: Car) {
   const wasMine = c.owner === 'you';
+  sound.play('carDoor', 0.9);
   getIn(garage, c.id);
   mover.speed = 0;
   pos.set(c.x, 0, c.z);
@@ -601,6 +625,7 @@ function enterCar(c: Car) {
 function leaveCar() {
   const at = getOut(garage);
   if (!at) return;
+  sound.play('carDoor', 0.9);
   const r = resolveMove(pos, at, stops, collisions());
   pos.set(r.x, 0, r.z);
   mover.speed = 0;
@@ -624,7 +649,10 @@ function jack(vehicleId: number) {
   const f: Fleer = { p, x: r.driver.x - out.x * 0.8, z: r.driver.z - out.z * 0.8, out, t: 0, bubble: null!, body: null! };
   // hit them as well, and they get up and keep running
   f.body = hittable(p, null, { land: (x, z) => { f.x = x; f.z = z; f.t = Math.max(f.t, 1.7); } });
-  f.bubble = labels.add(pick(YELLS), new Vector3(), 22, undefined,
+  const yell = pick(YELLS);
+  sound.play('carDoor', 1);
+  setTimeout(() => sound.say(yell, 'yell'), 450);
+  f.bubble = labels.add(yell, new Vector3(), 22, undefined,
     () => p.root.position.clone().setY(2.5), () => f.t > 0.5 && f.t < 4.5);
   f.bubble.classList.add('say');
   scene.add(p.root);
@@ -689,7 +717,10 @@ function updateBodies(dt: number) {
       b.returning = false;
       car.speed *= 0.8; // you feel it
       shake = Math.min(0.6, shake + 0.12 + Math.abs(car.speed) * 0.02);
-      say(b, pick(OUCH), 3.2);
+      const line = pick(OUCH);
+      say(b, line, 3.2);
+      sound.play('thud', 1);
+      setTimeout(() => sound.say(line, 'yell'), 250);
     }
     if (b.knock) {
       const k = b.knock;
@@ -845,8 +876,10 @@ function frame(now: number) {
   rig.follow(dt, me.heading, speed > 0.3, secs);
   fwd.set(-Math.sin(rig.yaw), 0, -Math.cos(rig.yaw));
   right.set(Math.cos(rig.yaw), 0, -Math.sin(rig.yaw));
-  if (input.consumeJump() && !car && !sittingOn && startJump(jump, mover)) mover.held = Math.min(mover.held, 1); // a hop doesn't start a run
+  if (input.consumeJump() && !car && !sittingOn && startJump(jump, mover)) { mover.held = Math.min(mover.held, 1); sound.play('jump', 0.6); } // a hop doesn't start a run
   stepJump(jump, dt);
+  if (wasAirborne && !airborne(jump)) sound.play('land', 0.7);
+  wasAirborne = airborne(jump);
   pos.y = floorY(level, pos.x, pos.z);
   me.root.position.copy(pos);
   me.root.position.y += jump.y;
@@ -932,6 +965,34 @@ function frame(now: number) {
   for (const b of bodies) if (busy(b) && onRoad(b.p.root.position)) inRoad.push(b.p.root.position); // someone lying in the road
   if (garage.driving === null) inRoad.push(pos);
   stepTraffic(traffic, dt, inRoad);
+  // impatient drivers lean on the horn
+  for (const v of traffic.vehicles) {
+    const w = v.waited ?? 0;
+    if (w === 0) { honkedAt.delete(v.id); continue; }
+    if (honkNow(w, honkedAt.get(v.id) ?? -1)) {
+      honkedAt.set(v.id, w);
+      const e = ears(LANES[v.lane].x, v.z, 90);
+      sound.play('horn', e.vol * (where === 'out' ? 1 : 0.2), e.pan);
+    }
+  }
+  // the always-on sound, a few times a second
+  mixT += dt;
+  if (mixT > 0.15) {
+    mixT = 0;
+    let busy = 0, people = 0;
+    for (const v of traffic.vehicles) { const d = Math.hypot(LANES[v.lane].x - pos.x, v.z - pos.z); if (d < 40) busy += (1 - d / 40) * 0.35; }
+    if (where === 'usdan') people = insiders.length;
+    else if (where === 'in') people = 3;
+    else for (const b of bodies) if (Math.hypot(b.p.root.position.x - pos.x, b.p.root.position.z - pos.z) < 15) people++;
+    const c = driven(garage), surf = c ? surfaceAt(c, crossings) : 'grass';
+    const pd = input.pedals;
+    sound.setMix(mixAt({
+      hour, where, roadDist: Math.abs(pos.x - (ROAD.x0 + ROAD.x1) / 2), traffic: busy, people,
+      car: c ? c.speed : null, gas: c ? pd.gas : 0, surface: surf,
+      skidding: !!c && surf !== 'grass' && leavesMark(surf, c.speed, pd.steer, pd.brake > 0 && c.speed > 0.5),
+    }), 0.15);
+  }
+  sound.tick();
   trafficView.update(dt);
   // cars left in the road get moved once you've walked off
   if (frames % 30 === 0) {
@@ -1059,6 +1120,7 @@ Object.assign(window, {
     get jumpY() { return jump.y; },
     get speedo() { return speedo.reading; },
     get marks() { return tyres.count; },
+    get sound() { return { started: sound.started, muted: sound.muted, log: sound.log.slice(-20) }; },
     get hour() { return hour; },
     get mode() { return periodOf(hour); },
     /** Render now and count distinct colours on a 12×12 grid — a blank/broken canvas gives ~1. */

@@ -153,3 +153,26 @@ function assertNoOverlap(s: TrafficState) {
     }
   });
 }
+
+describe('impatient drivers', () => {
+  it('a car stopped for someone standing in the road counts how long it has waited (that\'s when it honks)', async () => {
+    const { addVehicle, createTraffic, stepTraffic, LANES } = await import('../../src/row/traffic');
+    const t = createTraffic([], 0, 0);
+    const v = addVehicle(t, { kind: 'car', lane: 0, z: -140, cruise: 10, len: 4.4, color: 0 });
+    v.speed = 10;
+    const you = { x: LANES[0].x, z: -100 };
+    for (let i = 0; i < 60 * 12; i++) stepTraffic(t, 1 / 60, [you]);
+    expect(v.speed).toBeLessThan(0.01);
+    expect(v.waited!).toBeGreaterThan(5);
+    stepTraffic(t, 1 / 60, []); // you step out of the way
+    expect(v.waited).toBe(0);
+  });
+
+  it('waiting at a red light isn\'t waiting on you', async () => {
+    const { createTraffic, stepTraffic } = await import('../../src/row/traffic');
+    const { layoutRow } = await import('../../src/row/layout');
+    const t = createTraffic(layoutRow().crossings);
+    for (let i = 0; i < 60 * 60; i++) stepTraffic(t, 1 / 60, []);
+    expect(t.vehicles.every((v) => (v.waited ?? 0) === 0)).toBe(true);
+  });
+});

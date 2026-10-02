@@ -51,6 +51,8 @@ export interface Vehicle {
   cruise: number;
   len: number;
   color: number;
+  /** seconds this vehicle has been held up by someone standing in its way (drivers honk at that) */
+  waited?: number;
 }
 
 export interface TrafficState {
@@ -115,7 +117,7 @@ export function stepTraffic(s: TrafficState, dt: number, people: Obstacle[] = []
     const vs = s.vehicles.filter((v) => v.lane === li).sort((a, b) => (b.z - a.z) * d);
     vs.forEach((v, i) => {
       const front = v.z + (d * v.len) / 2;
-      let room = Infinity;
+      let room = Infinity, personRoom = Infinity;
 
       if (i > 0) {
         const lead = vs[i - 1];
@@ -138,8 +140,12 @@ export function stepTraffic(s: TrafficState, dt: number, people: Obstacle[] = []
         const ahead = (p.z - front) * d - hl;
         if (ahead < -v.len - 2 * hl || ahead > LOOKAHEAD) continue;
         room = Math.min(room, ahead - PED_GAP);
+        personRoom = Math.min(personRoom, ahead - PED_GAP);
       }
 
+      // held up by a person (not a light or the car ahead) and stopped: the driver's getting impatient
+      const heldByPerson = personRoom <= room + 1e-6 && personRoom < 3 && v.speed < 0.5;
+      v.waited = heldByPerson ? (v.waited ?? 0) + dt : 0;
       const target = Math.min(v.cruise, brakeSpeed(room));
       v.speed = target < v.speed ? Math.max(target, v.speed - HARD_BRAKE * dt) : Math.min(target, v.speed + ACCEL * dt);
       let step = v.speed * dt;
