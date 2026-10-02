@@ -209,37 +209,6 @@ test('you can walk by dragging anywhere — including bottom-right, where a righ
   await page.mouse.up();
 });
 
-/** Centre of the look button. */
-async function lookButton(page: Page) {
-  const b = (await page.locator('#look').boundingBox())!;
-  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
-}
-
-test('dragging the look button looks around without moving you', async ({ page }) => {
-  await open(page);
-  await expect(page.locator('#look')).toBeVisible();
-  const before = await state(page);
-  const c = await lookButton(page);
-  await page.mouse.move(c.x, c.y);
-  await page.mouse.down();
-  await page.mouse.move(c.x - 90, c.y, { steps: 8 }); // drag left → view turns left (keeps working off the button)
-  await page.mouse.up();
-  await page.waitForTimeout(200);
-  const after = await state(page);
-  expect(wrap(after.yaw - before.yaw)).toBeGreaterThan(0.3);
-  expect(after.x).toBeCloseTo(before.x, 6);
-  expect(after.z).toBeCloseTo(before.z, 6);
-});
-
-test('tapping the look button looks behind you', async ({ page }) => {
-  await open(page);
-  const before = await state(page);
-  const c = await lookButton(page);
-  await page.mouse.click(c.x, c.y);
-  await expect.poll(async () => Math.abs(wrap((await state(page)).yaw - before.yaw - Math.PI)), { timeout: 10_000 }).toBeLessThan(0.02);
-  const after = await state(page);
-  expect(after.z).toBeCloseTo(before.z, 6);
-});
 
 test('dragging the top strip looks around without moving you', async ({ page }) => {
   await open(page);
@@ -812,4 +781,28 @@ test('sound: hitting someone with your car — a thud, then they yell (spoken)',
   await page.keyboard.up('w');
   await expect.poll(async () => (await sounds(page)).log).toContain('thud');
   await expect.poll(async () => (await sounds(page)).log.some((l) => l.startsWith('say:'))).toBe(true);
+});
+
+// ── the map ──
+
+test('the eye button is gone; the mini map is there, and tapping it opens the campus map @smoke', async ({ page }) => {
+  await open(page, 't=13', true);
+  expect(await page.locator('#look').count()).toBe(0);
+  await expect(page.locator('#minimap')).toBeVisible();
+  await page.locator('#minimap').click();
+  await expect(page.locator('#mapfull')).toHaveClass(/show/);
+  await page.locator('#mapfull .close').click();
+  await expect(page.locator('#mapfull')).not.toHaveClass(/show/);
+});
+
+test('jump anywhere from the map: pick Usdan, Go, and you are there — even from inside your house', async ({ page }) => {
+  await open(page, `t=13&${hw(5, -1.5)}&yaw=0`); // in the living room
+  expect(await page.evaluate(() => (window as any).__vora.where)).toBe('in');
+  await page.locator('#minimap').click();
+  await page.evaluate(() => (window as any).__vora.mapPick('usdan'));
+  await expect(page.locator('#mapfull .bar')).toContainText('Usdan');
+  await page.locator('#mapfull .go').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.where)).toBe('out');
+  await expect.poll(async () => { const s = await state(page); return Math.hypot(s.x - -65.3, s.z - -170.4) < 2; }, { timeout: 20_000 }).toBe(true); // by Usdan's walkway entrance
+  await expect(page.locator('#passing .v')).toHaveText('Usdan University Center', { timeout: 20_000 });
 });

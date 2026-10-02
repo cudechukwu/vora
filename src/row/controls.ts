@@ -2,9 +2,7 @@
 // Built for one right thumb: press anywhere and drag to walk (a joystick
 // appears under your thumb) — the camera follows you, so that's usually
 // all you need. To look around on purpose:
-//   • the round look button on the right edge: drag it to look, tap it to
-//     look behind you;
-//   • or drag along the top strip of the screen (two hands / other thumb);
+//   • drag along the top strip of the screen (two hands / other thumb);
 //     double-tap there to snap the view back behind you.
 // Desktop: WASD / ↑↓ to walk, ←→ or Q/E to turn, drag the top strip to look,
 // F for the action button (ride / park / get off / drive / doors), Space to jump.
@@ -70,7 +68,7 @@ export class Input {
         this.startLook(e, true);
         return;
       }
-      if (t.closest('button, #card, .tap')) return;
+      if (t.closest('button, #card, .tap, #mapfull')) return;
       if (e.clientY > innerHeight * LOOK_STRIP) {
         if (this.moveId !== null) return;
         this.moveId = e.pointerId;

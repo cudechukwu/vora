@@ -33,6 +33,8 @@ import { Knock, OUCH, hits, launch, stepKnock } from './knock';
 import { ICON, IconName } from './icons';
 import { Speedometer } from './hud';
 import { SPOT_KEY, loadSpot, saveSpot } from './save';
+import { FullMap, MiniMap } from './mapview';
+import type { Place } from './map';
 import { Sound } from './audio';
 import { falloff, honkNow, mixAt } from './soundscape';
 import { leavesMark, surfaceAt } from './surface';
@@ -575,6 +577,32 @@ function goThrough(kind: 'enter' | 'exit') {
   if (where === 'in') welcomeHome();
 }
 
+// ── the map: a mini map top-right; tap it for the whole campus, pick a place and jump there ──
+const fieldZ = S('Memorial').doorZ;
+const miniMap = new MiniMap(document.querySelector('#minimap canvas') as HTMLCanvasElement, stops, fieldZ);
+const fullMap = new FullMap(document.getElementById('mapfull')!, stops, fieldZ);
+document.getElementById('minimap')!.addEventListener('click', () => fullMap.open(pos, me.heading));
+fullMap.onGo = (p) => travelTo(p);
+
+/** Jump straight to a place on the map: out of whatever you're in or on, a blink, and you're there. */
+function travelTo(p: Place) {
+  if (sittingOn) standUp();
+  if (garage.driving !== null) leaveCar(); // your car stays where you left it
+  if (mover.riding !== null) dismount(mob, mover, pos, me.heading);
+  if (where !== 'out') { where = 'out'; scene.add(me.root, fill); }
+  level = 0;
+  pos.set(p.spawn.x, 0, p.spawn.z);
+  me.face(p.spawn.heading);
+  lastDir.set(Math.sin(p.spawn.heading), 0, Math.cos(p.spawn.heading));
+  mover.speed = 0;
+  rig.snapBehind(p.spawn.heading);
+  snapCamera = true;
+  fade.classList.add('blink');
+  setTimeout(() => fade.classList.remove('blink'), 260);
+  toast(p.name);
+  saveWhere();
+}
+
 /** Through one of Usdan's doors: a blink, and you're inside (or back out, facing away from the building). */
 function goUsdan(door: Door, kind: 'enter' | 'exit') {
   sound.play('glassDoor', 0.8);
@@ -1082,6 +1110,7 @@ function frame(now: number) {
   fill.position.set(pos.x, pos.y + 2.6, pos.z).addScaledVector(fwd, -1.5);
 
   if (frames % 15 === 0 && where === 'out') world.lightNear(pos);
+  if (frames % 6 === 0) miniMap.draw(pos, me.heading);
 
   // "now passing"
   const byUsdan = inPoly(pos, USDAN) || distToPoly(pos, USDAN) < 9;
@@ -1124,6 +1153,8 @@ Object.assign(window, {
     get jumpY() { return jump.y; },
     get speedo() { return speedo.reading; },
     get marks() { return tyres.count; },
+    get mapOpen() { return fullMap.isOpen; },
+    mapPick(id: string) { fullMap.pick(id); },
     get sound() { return { started: sound.started, state: sound.state, muted: sound.muted, log: sound.log.slice(-20) }; },
     get hour() { return hour; },
     get mode() { return periodOf(hour); },

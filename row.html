@@ -35,11 +35,11 @@
     #hud.show{opacity:1;}
     .shadow{text-shadow:0 1px 2px rgba(0,0,0,.55),0 4px 18px rgba(0,0,0,.35);}
     #place{position:absolute;left:18px;top:calc(16px + var(--safe-t));}
-    #place .name{font-family:'Fraunces',serif;font-style:italic;font-weight:600;font-size:34px;line-height:1;letter-spacing:-.02em;}
+    #place .name{font-family:'Fraunces',serif;font-style:italic;font-weight:600;font-size:26px;line-height:1;letter-spacing:-.02em;}
     #place .meta{margin-top:8px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mute);display:flex;align-items:center;gap:8px;}
     .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 2s ease-in-out infinite;}
     @keyframes pulse{50%{opacity:.35}}
-    #clock{position:absolute;right:14px;top:calc(14px + var(--safe-t));pointer-events:auto;cursor:pointer;
+    #clock{position:absolute;right:14px;top:calc(128px + var(--safe-t));pointer-events:auto;cursor:pointer;
       background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
       border:1px solid rgba(246,241,230,.14);border-radius:999px;padding:9px 14px;
       font:500 11px 'JetBrains Mono',monospace;letter-spacing:.08em;color:var(--paper);}
@@ -53,15 +53,6 @@
       font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--mute);transition:opacity .8s;}
     #hint.gone{opacity:0;}
 
-    /* look button: drag to look around, tap to look behind you */
-    #look{position:fixed;right:14px;bottom:calc(30% + var(--safe-b));width:58px;height:58px;border-radius:50%;
-      display:flex;align-items:center;justify-content:center;touch-action:none;cursor:grab;z-index:3;
-      background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-      border:1px solid rgba(246,241,230,.2);color:var(--paper);box-shadow:0 4px 18px rgba(0,0,0,.3);
-      opacity:0;transition:opacity .8s ease,transform .15s ease,background .15s ease;}
-    #hud.show ~ #look{opacity:1;}
-    #look.active{transform:scale(1.12);background:rgba(246,241,230,.28);}
-    #look svg{width:26px;height:26px;pointer-events:none;}
 
     /* round translucent glass buttons with line icons: the context action, jump, the pedals */
     .gbtn{position:fixed;z-index:3;border-radius:50%;touch-action:none;cursor:pointer;color:var(--paper);
@@ -73,15 +64,14 @@
     .gbtn:active,.gbtn.down{transform:scale(.92);background:rgba(246,241,230,.32);}
     .gbtn svg{width:46%;height:46%;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
     /* context action (ride / park / get off / drive / door / sit / sleep) — right where the thumb rests */
-    #act{right:14px;bottom:calc(17% + var(--safe-b));width:68px;height:68px;}
-    #jump{right:96px;bottom:calc(9% + var(--safe-b));width:56px;height:56px;}
+    #act{right:16px;bottom:calc(15% + var(--safe-b));width:60px;height:60px;}
+    #jump{right:88px;bottom:calc(10% + var(--safe-b));width:46px;height:46px;}
     /* driving: pedals bottom-right, gas tall, brake beside it; the door button moves up out of the way */
-    #gas{right:14px;bottom:calc(3% + var(--safe-b));width:70px;height:96px;border-radius:22px;}
-    #brake{right:96px;bottom:calc(3% + var(--safe-b));width:76px;height:62px;border-radius:20px;}
+    #gas{right:16px;bottom:calc(3% + var(--safe-b));width:58px;height:82px;border-radius:18px;}
+    #brake{right:84px;bottom:calc(3% + var(--safe-b));width:62px;height:52px;border-radius:16px;}
     #gas.show,#brake.show{pointer-events:auto;}
-    #mute{right:16px;top:calc(68px + var(--safe-t));width:40px;height:40px;opacity:1;transform:none;pointer-events:auto;}
-    body.driving #act{bottom:calc(3% + 110px + var(--safe-b));}
-    body.driving #look{bottom:calc(3% + 196px + var(--safe-b));}
+    #mute{right:16px;top:calc(172px + var(--safe-t));width:34px;height:34px;opacity:1;transform:none;pointer-events:auto;}
+    body.driving #act{bottom:calc(3% + 94px + var(--safe-b));width:50px;height:50px;}
 
     /* sleep: fade to black, wake up in the morning */
     #fade{position:fixed;inset:0;z-index:8;background:#05070a;opacity:0;pointer-events:none;transition:opacity .8s ease;
@@ -126,8 +116,30 @@
       font-size:11px;letter-spacing:.06em;opacity:0;transition:opacity .4s ease,transform .4s ease;pointer-events:none;}
     #toast.show{opacity:1;transform:translate(-50%,0);}
 
+    /* the mini map (tap for the whole campus) */
+    #minimap{position:fixed;right:14px;top:calc(14px + var(--safe-t));width:104px;height:104px;padding:0;z-index:3;
+      border-radius:14px;overflow:hidden;border:1px solid rgba(246,241,230,.35);box-shadow:0 6px 18px rgba(0,0,0,.35);
+      background:#4f7a3a;cursor:pointer;opacity:0;transition:opacity .5s;}
+    #hud.show ~ #minimap{opacity:1;}
+    #minimap canvas{width:100%;height:100%;display:block;pointer-events:none;}
+    #mapfull{position:fixed;inset:0;z-index:8;background:rgba(10,13,16,.92);display:none;flex-direction:column;
+      padding:calc(14px + var(--safe-t)) 14px calc(14px + var(--safe-b));}
+    #mapfull.show{display:flex;}
+    #mapfull .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+    #mapfull .t{font-family:'Fraunces',serif;font-style:italic;font-size:24px;}
+    #mapfull .sub{font-size:9px;letter-spacing:.2em;color:var(--mute);text-transform:uppercase;margin-top:2px;}
+    #mapfull .close{background:none;border:1px solid rgba(246,241,230,.35);color:var(--paper);border-radius:999px;
+      padding:7px 14px;font:600 10px 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;}
+    #mapfull canvas{flex:1;width:100%;min-height:0;border-radius:14px;touch-action:none;}
+    #mapfull .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;min-height:48px;
+      opacity:0;transition:opacity .2s;}
+    #mapfull .bar.show{opacity:1;}
+    #mapfull .bar .n{font-family:'Fraunces',serif;font-style:italic;font-size:20px;}
+    #mapfull .go{background:var(--accent);color:#08130d;border:0;border-radius:999px;padding:12px 22px;
+      font:700 12px 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;}
+
     /* speedometer: a real dial, while you ride or drive (bottom-left: clear of a right thumb) */
-    #speedo{position:fixed;left:12px;bottom:calc(3% + var(--safe-b));z-index:3;width:132px;height:132px;
+    #speedo{position:fixed;left:12px;bottom:calc(3% + var(--safe-b));z-index:3;width:112px;height:112px;
       opacity:0;transform:translateY(8px);transition:opacity .3s ease,transform .3s ease;pointer-events:none;}
     #speedo.show{opacity:1;transform:none;}
     #speedo svg{width:100%;height:100%;overflow:visible;}
@@ -172,14 +184,15 @@
     <div id="passing" class="shadow"><div class="k">now passing</div><div class="v"></div></div>
     <div id="hint" class="shadow">drag anywhere to walk</div>
   </div>
-  <button id="look" aria-label="Look around: drag to look, tap to look behind you">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/>
-    </svg>
-  </button>
   <button id="act" class="gbtn" aria-live="polite"></button>
   <button id="jump" class="gbtn" aria-label="Jump"></button>
   <button id="mute" class="gbtn show" aria-label="Sound on"></button>
+  <button id="minimap" aria-label="Map"><canvas></canvas></button>
+  <div id="mapfull" role="dialog" aria-label="Campus map">
+    <div class="top"><div><div class="t">Campus</div><div class="sub">tap a place to go there</div></div><button class="close">close</button></div>
+    <canvas></canvas>
+    <div class="bar"><span class="n"></span><button class="go">Go there</button></div>
+  </div>
   <button id="brake" class="gbtn" aria-label="Brake / reverse"></button>
   <button id="gas" class="gbtn" aria-label="Gas"></button>
   <div id="toast" aria-live="polite"></div>
