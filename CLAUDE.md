@@ -14,8 +14,8 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 
 ## How to run
 - `npm run dev` → http://localhost:5173/. That's the game (`index.html` → `src/row/main.ts`). The old Pixi Foss Hill greybox was deleted 2026-10-02 (it's in git history before that date); `/row.html` redirects to `/` on Vercel.
-- `npm test`: Vitest unit tests (235, about 8 s).
-- Browser tests (Playwright, 58) run against a **built copy** (`vite build` into `dist-e2e/`, served by `vite preview` on port 5189), snapshotted when the run starts. So you **can keep editing source while they run**. They use the installed Google Chrome with SwiftShader WebGL, 2 workers (`-- --workers=1` when the machine is busy).
+- `npm test`: Vitest unit tests (240, about 10 s).
+- Browser tests (Playwright, 57) run against a **built copy** (`vite build` into `dist-e2e/`, served by `vite preview` on port 5189), snapshotted when the run starts. So you **can keep editing source while they run**. They use the installed Google Chrome with SwiftShader WebGL, 2 workers (`-- --workers=1` when the machine is busy).
   - `npm run test:smoke`: 11 key tests tagged `@smoke`, about 3 min. Run after each feature.
   - `npm run test:e2e -- -g carjack`: just the tests whose names match.
   - `npm run test:e2e`: everything, 10+ min. Run it in the background.

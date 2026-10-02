@@ -188,15 +188,6 @@ test('renders in landscape too', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('the original Foss Hill greybox still boots', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/');
-  await expect(page.locator('canvas')).toHaveCount(1, { timeout: 15_000 });
-  await page.waitForTimeout(1500);
-  expect(errors).toEqual([]);
-});
-
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 test('you can walk by dragging anywhere — including bottom-right, where a right thumb rests', async ({ page }) => {
