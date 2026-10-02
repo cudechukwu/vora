@@ -48,7 +48,7 @@ import { Labels, Note, Trail, buildTrails } from './traces';
 import { Input } from './controls';
 import { CameraRig, wrap } from './camera';
 import { ROAD } from './layout';
-import { rng } from '../noise';
+import { rng } from './noise';
 
 // ─── College Row — vibe test ───────────────────────────────────────────
 // One place, done well: portrait, one thumb, opens from a link. Walk the

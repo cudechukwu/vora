@@ -1,7 +1,7 @@
 # Vora — handoff for the next session
 
 ## What this is
-**Vora** is a live, social, ambient "campus that lives between sessions": a stylized Wesleyan University you can walk around on your phone. The long-term vision is in `campus_sim_brief (1).html`. It's marked "Confidential Draft", but the user said (2026-10-01) that nothing in this project is private, so it's committed to the repo. Its core ideas:
+**Vora** is a live, social, ambient "campus that lives between sessions": a stylized Wesleyan University you can walk around on your phone. The long-term vision is in `docs/campus_sim_brief.html` (reference photos in `docs/photos/`). It's marked "Confidential Draft", but the user said (2026-10-01) that nothing in this project is private, so it's committed to the repo. Its core ideas:
 
 - **Presence over content.** The only metric that matters is whether people open it when nothing is planned.
 - **Place is identity.**
@@ -13,7 +13,7 @@ The current direction (since 2026-09-30) was inspired by "Lagos Run" (danfo.horp
 The user is a Wesleyan student, the founder and the designer. They make the product calls; you build, test, and give honest opinions. They play on an iPhone, mostly with their **right thumb**.
 
 ## How to run
-- `npm run dev` → http://localhost:5173/row.html. This is the game. `/` is the old Pixi Foss Hill greybox, which is still working but parked.
+- `npm run dev` → http://localhost:5173/. That's the game (`index.html` → `src/row/main.ts`). The old Pixi Foss Hill greybox was deleted 2026-10-02 (it's in git history before that date); `/row.html` redirects to `/` on Vercel.
 - `npm test`: Vitest unit tests (235, about 8 s).
 - Browser tests (Playwright, 58) run against a **built copy** (`vite build` into `dist-e2e/`, served by `vite preview` on port 5189), snapshotted when the run starts. So you **can keep editing source while they run**. They use the installed Google Chrome with SwiftShader WebGL, 2 workers (`-- --workers=1` when the machine is busy).
   - `npm run test:smoke`: 11 key tests tagged `@smoke`, about 3 min. Run after each feature.
@@ -30,7 +30,7 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 - The machine sometimes runs heavy background load (`routined`, `contactsd`), with load averages up to 100+. When that happens the e2e tests time out for reasons unrelated to the code. Check `uptime` before blaming the code.
 - Screenshot/visual checks: launch Playwright with `channel: 'chrome'`, args `--use-angle=swiftshader --enable-unsafe-swiftshader`, viewport 390×844, and use the URL params above.
 
-## The world (all in `src/row/`)
+## The world (all in `src/row/`, the only code in `src/`)
 You **start the game outside your house**, on the sidewalk at the end of your front path (`HOME_SPAWN` in `house/plan.ts`), looking up High Street (+z, with −z as north). The opening camera swoop starts across the street, looking back at you and the house. The tests' `open()` helper starts at `ROW_ENTRY` (the north end of the walk, just short of **Boger**) unless told `home`. Walk **+z** along the High Street side of **College Row**:
 - The **buildings are on your right (−x)**, in this order: Boger → South College (belfry) → North College (green-domed cupola) → Zelnick Pavilion (glass link) → Memorial Chapel (red-striped roof, spire) → Judd → Allbritton.
 - **Usdan is not on the row.** Per the user's Google Maps screenshot and photos, it's a big triangle *behind and west of Boger*, north of the field, with a courtyard, brick, deep dark eaves and glass clerestories on top. It's `USDAN` (a polygon) in `layout.ts`, solid via `inUsdan`. Between Usdan's east face and Boger is a **wide plaza** (`PLAZA` / `PLAZA_GAP`, contents in `plaza.ts`). It has speckled concrete slabs, trees in red stone-chip pits, granite benches and an oval table, grey outdoor tables with people at them, mum planters, bollards and a blue-lidded bin. The back path runs north into it. The Boger–South walkway passes Usdan's south side. The **burrito truck** (white, 10:30–15:30, with a line of students and a cooler) parks there: `foodtruck.ts` + `campus.ts`.
@@ -90,7 +90,7 @@ A two-storey wood frame across High Street (local coordinates: `u` from the fron
 - **Portrait only** (decided 2026-10-02): one-thumb, open-from-a-link. Landscape just works; it isn't specially laid out. Movement stays drag-anywhere (no fixed stick). No compass strip.
 
 ## Open items / next ideas
-- Git repo initialised 2026-10-01 (branch `main`). The remote is https://github.com/cudechukwu/vora. The user said nothing here is private, so the brief and photos are committed. Still ask before pushing.
+- Git repo initialised 2026-10-01 (branch `main`). The remote is https://github.com/cudechukwu/vora. The user said nothing here is private, so the brief and photos are committed. Still ask before pushing. First pushed 2026-10-02. Vercel deploys from `main` (root `./`, `vercel.json`: Vite build, `dist`, `/row.html` redirects to `/`). Live on Vercel, which deploys every push to `main`.
 - **Roadmap after the world (user, 2026-10-01):** interactive life. Showering, designing your room, money and buying things (including buying a car), making friends (real and NPC), conversations (NPC too), inviting people over, a phone with contacts, throwing a party that your contacts come to, a "Miami nights" real-world feel. Also a bigger map, so driving makes sense. Driving and biking already build speed with a mph speedometer; a fuel gauge isn't built yet.
 - The user shared a Google Maps view: **Olin Memorial Library** and the **Public Affairs Center** are south of Judd (which confirms Olin), Fayerweather and Admissions are by Usdan on Wyllys Ave, and **Foss Hill** is west of Andrus Field. Use these when the map grows.
 - Real presence is the strategic next step: a server, logins, real friends as roommates, real traces and notes. I recommended stopping world-building at some point to test with 15–20 Wes friends.

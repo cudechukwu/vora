@@ -1,6 +1,6 @@
 import { CROSSWALK_W, Crossing, WALK_MAX_Z, WALK_MIN_Z } from './layout';
 import type { XZ } from './collide';
-import { rng } from '../noise';
+import { rng } from './noise';
 
 // ─── High Street traffic (pure simulation, no three.js) ────────────────
 // Cars, trucks and bikes in four lanes. Every vehicle, every step:

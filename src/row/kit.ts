@@ -3,7 +3,7 @@ import {
   ExtrudeGeometry, InstancedMesh, Material, Matrix4, MeshBasicMaterial, MeshLambertMaterial,
   PlaneGeometry, Quaternion, RepeatWrapping, Shape, ShapeGeometry, SRGBColorSpace, Texture, Vector3,
 } from 'three';
-import { rng } from '../noise';
+import { rng } from './noise';
 
 // ─── Low-poly kit ──────────────────────────────────────────────────────
 // Everything on College Row is built from boxes, prisms and a few cones,

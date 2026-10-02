@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveMove, XZ } from '../../src/row/collide';
 import { BOUNDS, USDAN, byId, inPoly, layoutRow } from '../../src/row/layout';
-import { rng } from '../../src/noise';
+import { rng } from '../../src/row/noise';
 
 const { stops, crossings } = layoutRow();
 const boger = byId(stops, 'boger');

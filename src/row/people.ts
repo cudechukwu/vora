@@ -2,7 +2,7 @@ import {
   BoxGeometry, BufferGeometry, Color, CylinderGeometry, Float32BufferAttribute, Group, Mesh, MeshLambertMaterial, Object3D,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { rng } from '../noise';
+import { rng } from './noise';
 
 // ─── People ────────────────────────────────────────────────────────────
 // Blocky low-poly students. Same rig for you, passers-by and friends:

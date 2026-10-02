@@ -24,7 +24,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'npx vite build --outDir dist-e2e --emptyOutDir --logLevel warn && npx vite preview --outDir dist-e2e --port 5189 --strictPort',
-    url: 'http://localhost:5189/row.html',
+    url: 'http://localhost:5189/',
     reuseExistingServer: false, // always a fresh build of the code as it is right now
     timeout: 120_000,
   },

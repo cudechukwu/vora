@@ -4,7 +4,7 @@ import {
 } from '../../src/row/traffic';
 import { layoutRow } from '../../src/row/layout';
 import type { XZ } from '../../src/row/collide';
-import { rng } from '../../src/noise';
+import { rng } from '../../src/row/noise';
 
 const { crossings } = layoutRow();
 const front = (v: Vehicle) => v.z + (LANES[v.lane].dir * v.len) / 2;

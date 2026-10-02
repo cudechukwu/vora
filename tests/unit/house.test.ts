@@ -7,7 +7,7 @@ import {
 import { ENTER_AT, EXIT_AT, cameraClearance, nearDoor, portalAt } from '../../src/row/house/portal';
 import { EDGES, NODES, OUT, assignments, homecoming, listNames, placeAt, route, walkTo } from '../../src/row/house/routine';
 import { BOUNDS, FAR_WALK, layoutRow } from '../../src/row/layout';
-import { rng } from '../../src/noise';
+import { rng } from '../../src/row/noise';
 
 const { stops } = layoutRow();
 

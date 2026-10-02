@@ -23,7 +23,7 @@ async function open(page: Page, query = '', home = false) {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
-  await page.goto(`/row.html?intro=0&${query}`);
+  await page.goto(`/?intro=0&${query}`);
   await page.waitForFunction(() => (window as any).__vora?.frames > 5, null, { timeout: 30_000 });
   return errors;
 }
@@ -142,7 +142,7 @@ test('?t= freezes the clock (for screenshots)', async ({ page }) => {
 test("tapping a pinned note opens it, and it closes", async ({ page }) => {
   await open(page, 'z=0');
   const benches = await page.evaluate(() => (window as any).__vora.benches as { x: number; z: number }[]);
-  await page.goto(`/row.html?intro=0&t=15&x=0&z=${benches[3].z - 8}`);
+  await page.goto(`/?intro=0&t=15&x=0&z=${benches[3].z - 8}`);
   await page.waitForFunction(() => (window as any).__vora?.frames > 5);
   const tag = page.locator('.tag.tap', { hasText: 'priya' });
   await expect.poll(async () => Number(await tag.evaluate((el) => getComputedStyle(el).opacity)), { timeout: 10_000 }).toBeGreaterThan(0.5);
@@ -402,7 +402,7 @@ test('roommates are on the couch at night, and their name tags only show on your
   const visibleTags = () => page.evaluate(() => [...document.querySelectorAll('.tag')].filter((t) => t.textContent!.includes('roommate') && Number((t as HTMLElement).style.opacity) > 0.3).length);
   await expect.poll(visibleTags).toBeGreaterThanOrEqual(3);
   // upstairs, the people on the couch below aren't tagged through the floor
-  await page.goto(`/row.html?intro=0&t=21.5&${hw(2.5, -2.5)}&yaw=0&level=1`);
+  await page.goto(`/?intro=0&t=21.5&${hw(2.5, -2.5)}&yaw=0&level=1`);
   await page.waitForFunction(() => (window as any).__vora?.frames > 8);
   await page.waitForTimeout(500);
   expect(await visibleTags()).toBe(0);
@@ -726,17 +726,17 @@ test('reload mid-play (or iOS drops the tab) and you are back where you were, no
   await open(page, 't=12', true);
   const s = await hold(page, 'w', 4);
   await page.waitForTimeout(3500); // the game notes where you are every few seconds
-  await page.goto('/row.html?t=12');
+  await page.goto('/?t=12');
   await page.waitForFunction(() => (window as any).__vora?.frames > 5, null, { timeout: 30_000 });
   const back = await state(page);
   expect(Math.hypot(back.x - s.x, back.z - s.z)).toBeLessThan(1.5);
   // inside Usdan, too: reload and you're still inside
-  await page.goto('/row.html?t=12&intro=0&x=-58.6&z=-197&yaw=1.5708');
+  await page.goto('/?t=12&intro=0&x=-58.6&z=-197&yaw=1.5708');
   await page.waitForFunction(() => (window as any).__vora?.frames > 5, null, { timeout: 30_000 });
   await page.keyboard.press('f');
   await expect.poll(() => page.evaluate(() => (window as any).__vora.where)).toBe('usdan');
   await page.evaluate(() => (window as any).dispatchEvent(new Event('pagehide'))); // what Safari fires when it drops the page
-  await page.goto('/row.html?t=12');
+  await page.goto('/?t=12');
   await page.waitForFunction(() => (window as any).__vora?.frames > 5, null, { timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).__vora.where)).toBe('usdan');
 });

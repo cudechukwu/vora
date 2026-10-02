@@ -13,7 +13,7 @@ import {
   BACK_PATH, PLAZA, PLAZA_GAP, CROSSWALK_W, Crossing, FAR_WALK, FIELD_X, PATH_HALF, ROAD, RowStop, USDAN, WALK_MAX_Z, WALK_MIN_Z,
   inUsdan,
 } from './layout';
-import { noise2, rng } from '../noise';
+import { noise2, rng } from './noise';
 import { DRIVEWAYS, HOUSE } from './house/plan';
 
 // ─── The ground around the row ─────────────────────────────────────────

@@ -4,42 +4,218 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#13324a" />
-  <meta name="screen-orientation" content="landscape" />
-  <meta name="x5-orientation" content="landscape" />
-  <title>VORA</title>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#101418" />
+  <title>VORA · College Row</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23101418'/%3E%3Ccircle cx='8' cy='8' r='3' fill='%2300ff88'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <style>
+    :root{
+      --ink:#101418; --paper:#f6f1e6; --mute:rgba(246,241,230,.62);
+      --accent:#00ff88; --cardinal:#c8302a;
+      --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+      --glass:rgba(16,20,24,.55);
+    }
     *{margin:0;padding:0;box-sizing:border-box;}
-    html,body{height:100%;overflow:hidden;background:#0b120e;}
+    html,body{height:100%;overflow:hidden;background:var(--ink);touch-action:none;-webkit-text-size-adjust:100%;}
+    *{-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
     body{
-      font-family:'JetBrains Mono',monospace;
-      -webkit-user-select:none;user-select:none;
-      -webkit-tap-highlight-color:transparent;
+      font-family:'JetBrains Mono',monospace;color:var(--paper);
+      -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
       touch-action:none;
     }
-    #app{position:fixed;inset:0;}
-    canvas{display:block;width:100%;height:100%;image-rendering:pixelated;}
-    /* boot splash */
-    #boot{
-      position:fixed;inset:0;z-index:10;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      background:#0b120e;color:#00ff88;gap:14px;
-      transition:opacity .6s ease;
-    }
+    canvas#scene{position:fixed;inset:0;width:100vw;height:100vh;display:block;}
+    #vignette{position:fixed;inset:0;pointer-events:none;
+      background:radial-gradient(120% 85% at 50% 45%,transparent 55%,rgba(8,6,4,.45) 100%);}
+
+    /* ── HUD ── */
+    #hud{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .8s ease;}
+    #hud.show{opacity:1;}
+    .shadow{text-shadow:0 1px 2px rgba(0,0,0,.55),0 4px 18px rgba(0,0,0,.35);}
+    #place{position:absolute;left:18px;top:calc(16px + var(--safe-t));}
+    #place .name{font-family:'Fraunces',serif;font-style:italic;font-weight:600;font-size:26px;line-height:1;letter-spacing:-.02em;}
+    #place .meta{margin-top:8px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--mute);display:flex;align-items:center;gap:8px;}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:pulse 2s ease-in-out infinite;}
+    @keyframes pulse{50%{opacity:.35}}
+    #clock{position:absolute;right:14px;top:calc(128px + var(--safe-t));pointer-events:auto;cursor:pointer;
+      background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      border:1px solid rgba(246,241,230,.14);border-radius:999px;padding:9px 14px;
+      font:500 11px 'JetBrains Mono',monospace;letter-spacing:.08em;color:var(--paper);}
+    #clock small{color:var(--mute);margin-left:6px;font-size:9px;letter-spacing:.14em;}
+    #passing{position:absolute;left:50%;top:calc(96px + var(--safe-t));transform:translate(-50%,-6px);
+      opacity:0;transition:opacity .5s ease,transform .5s ease;text-align:center;white-space:nowrap;}
+    #passing.show{opacity:1;transform:translate(-50%,0);}
+    #passing .k{font-size:9px;letter-spacing:.24em;color:var(--mute);text-transform:uppercase;}
+    #passing .v{font-family:'Fraunces',serif;font-style:italic;font-size:22px;margin-top:3px;}
+    #hint{position:absolute;left:50%;bottom:calc(34px + var(--safe-b));transform:translateX(-50%);
+      font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--mute);transition:opacity .8s;}
+    #hint.gone{opacity:0;}
+
+
+    /* round translucent glass buttons with line icons: the context action, jump, the pedals */
+    .gbtn{position:fixed;z-index:3;border-radius:50%;touch-action:none;cursor:pointer;color:var(--paper);
+      background:rgba(246,241,230,.16);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+      border:1px solid rgba(246,241,230,.32);box-shadow:0 8px 24px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.18);
+      display:flex;align-items:center;justify-content:center;padding:0;
+      opacity:0;transform:translateY(10px) scale(.94);pointer-events:none;transition:opacity .25s ease,transform .2s ease,background .15s;}
+    .gbtn.show{opacity:1;transform:none;pointer-events:auto;}
+    .gbtn:active,.gbtn.down{transform:scale(.92);background:rgba(246,241,230,.32);}
+    .gbtn svg{width:46%;height:46%;pointer-events:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
+    /* context action (ride / park / get off / drive / door / sit / sleep) — right where the thumb rests */
+    #act{right:16px;bottom:calc(15% + var(--safe-b));width:60px;height:60px;}
+    #jump{right:88px;bottom:calc(10% + var(--safe-b));width:46px;height:46px;}
+    /* driving: pedals bottom-right, gas tall, brake beside it; the door button moves up out of the way */
+    #gas{right:16px;bottom:calc(3% + var(--safe-b));width:58px;height:82px;border-radius:18px;}
+    #brake{right:84px;bottom:calc(3% + var(--safe-b));width:62px;height:52px;border-radius:16px;}
+    #gas.show,#brake.show{pointer-events:auto;}
+    #mute{right:16px;top:calc(172px + var(--safe-t));width:34px;height:34px;opacity:1;transform:none;pointer-events:auto;}
+    body.driving #act{bottom:calc(3% + 94px + var(--safe-b));width:50px;height:50px;}
+
+    /* sleep: fade to black, wake up in the morning */
+    #fade{position:fixed;inset:0;z-index:8;background:#05070a;opacity:0;pointer-events:none;transition:opacity .8s ease;
+      display:flex;align-items:center;justify-content:center;color:rgba(246,241,230,.7);
+      font-family:'Fraunces',serif;font-style:italic;font-size:22px;}
+    #fade.show{opacity:1;}
+    #fade.blink{opacity:1;transition:opacity .12s ease;color:transparent;}
+
+    /* joystick */
+    #stick{position:fixed;width:112px;height:112px;margin:-56px 0 0 -56px;border-radius:50%;
+      border:1.5px solid rgba(246,241,230,.35);background:rgba(16,20,24,.18);pointer-events:none;display:none;}
+    #stick i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
+      background:rgba(246,241,230,.85);box-shadow:0 2px 10px rgba(0,0,0,.35);}
+
+    /* world-anchored labels */
+    #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden;}
+    .tag{position:absolute;left:0;top:0;transform-origin:50% 100%;white-space:nowrap;will-change:transform,opacity;}
+    .tag .b{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;
+      background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      border:1px solid rgba(246,241,230,.16);font-size:10px;letter-spacing:.04em;}
+    .tag .b em{font-style:normal;color:var(--mute);}
+    .tag.tap{pointer-events:auto;cursor:pointer;}
+    .tag .sw{width:8px;height:8px;border-radius:50%;}
+
+    /* speech bubbles over roommates */
+    .tag.say .b{background:#f6f1e6;color:#1d1a16;border-color:transparent;font-size:11px;font-weight:500;
+      box-shadow:0 4px 14px rgba(0,0,0,.3);}
+
+    /* who's home — a card when you walk in */
+    #welcome{position:fixed;left:50%;top:calc(150px + var(--safe-t));transform:translate(-50%,-8px);z-index:4;
+      background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      border:1px solid rgba(246,241,230,.16);border-radius:14px;padding:12px 18px;text-align:center;
+      opacity:0;transition:opacity .5s ease,transform .5s ease;pointer-events:none;max-width:86vw;}
+    #welcome.show{opacity:1;transform:translate(-50%,0);}
+    #welcome .t{font-family:'Fraunces',serif;font-style:italic;font-size:24px;}
+    #welcome .s{font-size:10px;letter-spacing:.1em;color:var(--mute);margin-top:6px;line-height:1.6;}
+
+    /* a quick line when something happens (you stole a car…) */
+    #toast{position:fixed;left:50%;top:calc(150px + var(--safe-t));transform:translate(-50%,-8px);z-index:4;
+      background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      border:1px solid rgba(246,241,230,.16);border-radius:999px;padding:9px 16px;white-space:nowrap;
+      font-size:11px;letter-spacing:.06em;opacity:0;transition:opacity .4s ease,transform .4s ease;pointer-events:none;}
+    #toast.show{opacity:1;transform:translate(-50%,0);}
+
+    /* the mini map (tap for the whole campus) */
+    #minimap{position:fixed;right:14px;top:calc(14px + var(--safe-t));width:104px;height:104px;padding:0;z-index:3;
+      border-radius:14px;overflow:hidden;border:1px solid rgba(246,241,230,.35);box-shadow:0 6px 18px rgba(0,0,0,.35);
+      background:#4f7a3a;cursor:pointer;opacity:0;transition:opacity .5s;}
+    #hud.show ~ #minimap{opacity:1;}
+    #minimap canvas{width:100%;height:100%;display:block;pointer-events:none;}
+    #mapfull{position:fixed;inset:0;z-index:8;background:rgba(10,13,16,.92);display:none;flex-direction:column;
+      padding:calc(14px + var(--safe-t)) 14px calc(14px + var(--safe-b));}
+    #mapfull.show{display:flex;}
+    #mapfull .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+    #mapfull .t{font-family:'Fraunces',serif;font-style:italic;font-size:24px;}
+    #mapfull .sub{font-size:9px;letter-spacing:.2em;color:var(--mute);text-transform:uppercase;margin-top:2px;}
+    #mapfull .close{background:none;border:1px solid rgba(246,241,230,.35);color:var(--paper);border-radius:999px;
+      padding:7px 14px;font:600 10px 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;}
+    #mapfull canvas{flex:1;width:100%;min-height:0;border-radius:14px;touch-action:none;}
+    #mapfull .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;min-height:48px;
+      opacity:0;transition:opacity .2s;}
+    #mapfull .bar.show{opacity:1;}
+    #mapfull .bar .n{font-family:'Fraunces',serif;font-style:italic;font-size:20px;}
+    #mapfull .go{background:var(--accent);color:#08130d;border:0;border-radius:999px;padding:12px 22px;
+      font:700 12px 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;}
+
+    /* speedometer: a real dial, while you ride or drive (bottom-left: clear of a right thumb) */
+    #speedo{position:fixed;left:12px;bottom:calc(3% + var(--safe-b));z-index:3;width:112px;height:112px;
+      opacity:0;transform:translateY(8px);transition:opacity .3s ease,transform .3s ease;pointer-events:none;}
+    #speedo.show{opacity:1;transform:none;}
+    #speedo svg{width:100%;height:100%;overflow:visible;}
+    #speedo .face{fill:rgba(16,20,24,.5);stroke:rgba(246,241,230,.22);stroke-width:1;}
+    #speedo .tick{stroke:rgba(246,241,230,.55);stroke-width:1.2;}
+    #speedo .tick.major{stroke:var(--paper);stroke-width:2;}
+    #speedo .lbl{fill:rgba(246,241,230,.75);font:600 8.5px 'JetBrains Mono',monospace;text-anchor:middle;}
+    #speedo .arc{fill:none;stroke:var(--accent);stroke-width:3;stroke-linecap:round;opacity:.85;}
+    #speedo .needle{stroke:#ff5a3c;stroke-width:2.4;stroke-linecap:round;transition:transform .08s linear;transform-origin:60px 60px;}
+    #speedo .hub{fill:var(--paper);}
+    #speedo .n{fill:var(--paper);font:700 15px 'JetBrains Mono',monospace;text-anchor:middle;font-variant-numeric:tabular-nums;}
+    #speedo .u{fill:var(--mute);font:600 6.5px 'JetBrains Mono',monospace;letter-spacing:.2em;text-anchor:middle;}
+
+    /* note card */
+    #card{position:fixed;left:16px;right:16px;bottom:calc(24px + var(--safe-b));max-width:420px;margin:0 auto;
+      background:#f6f1e6;color:#1d1a16;border-radius:14px;padding:18px 18px 16px;
+      box-shadow:0 18px 50px rgba(0,0,0,.45);transform:translateY(140%);transition:transform .45s cubic-bezier(.2,.9,.25,1);
+      pointer-events:auto;}
+    #card.show{transform:translateY(0);}
+    #card .who{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#6b6358;}
+    #card .txt{font-family:'Fraunces',serif;font-style:italic;font-size:21px;line-height:1.3;margin-top:8px;}
+    #card button{margin-top:14px;background:none;border:1px solid #1d1a16;border-radius:999px;padding:7px 14px;
+      font:500 10px 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#1d1a16;}
+
+    #boot{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:var(--ink);color:var(--accent);gap:14px;transition:opacity .7s ease;}
     #boot .logo{font-size:13px;letter-spacing:.5em;font-weight:700;}
     #boot .sub{font-size:10px;letter-spacing:.2em;color:#5a6b5e;}
     #boot.hide{opacity:0;pointer-events:none;}
   </style>
 </head>
 <body>
-  <div id="app"></div>
+  <canvas id="scene"></canvas>
+  <div id="vignette"></div>
+  <div id="labels"></div>
+  <div id="hud">
+    <div id="place" class="shadow">
+      <div class="name">College Row</div>
+      <div class="meta"><span class="dot"></span><span id="presence">— here now</span></div>
+    </div>
+    <button id="clock">--:--<small>LIVE</small></button>
+    <div id="passing" class="shadow"><div class="k">now passing</div><div class="v"></div></div>
+    <div id="hint" class="shadow">drag anywhere to walk</div>
+  </div>
+  <button id="act" class="gbtn" aria-live="polite"></button>
+  <button id="jump" class="gbtn" aria-label="Jump"></button>
+  <button id="mute" class="gbtn show" aria-label="Sound on"></button>
+  <button id="minimap" aria-label="Map"><canvas></canvas></button>
+  <div id="mapfull" role="dialog" aria-label="Campus map">
+    <div class="top"><div><div class="t">Campus</div><div class="sub">tap a place to go there</div></div><button class="close">close</button></div>
+    <canvas></canvas>
+    <div class="bar"><span class="n"></span><button class="go">Go there</button></div>
+  </div>
+  <button id="brake" class="gbtn" aria-label="Brake / reverse"></button>
+  <button id="gas" class="gbtn" aria-label="Gas"></button>
+  <div id="toast" aria-live="polite"></div>
+  <div id="speedo" aria-label="speed"></div>
+  <div id="welcome"><div class="t">home</div><div class="s"></div></div>
+  <div id="fade">zzz… morning</div>
+  <div id="stick"><i></i></div>
+  <div id="card"><div class="who"></div><div class="txt"></div><button>close</button></div>
   <div id="boot">
     <div class="logo">V O R A</div>
-    <div class="sub">SIM.LAYER.01 — WES_PILOT_α</div>
+    <div class="sub">COLLEGE ROW — PROTOTYPE</div>
   </div>
-  <script type="module" src="/src/main.ts"></script>
+  <script type="module" src="/src/row/main.ts"></script>
+<script>
+  // iOS Safari ignores user-scalable=no: stop pinch- and double-tap-zoom ourselves, so the HUD never ends up zoomed in
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+</script>
 </body>
 </html>
