@@ -308,15 +308,15 @@ test('a Ride button appears next to the rack by the start, and F gets you on a b
   await open(page, `x=-2.4&z=${SPAWN_Z + 5}`);
   const act = page.locator('#act');
   await expect(act).toHaveClass(/show/);
-  await expect(act).toContainText('Ride');
+  await expect(act).toHaveAttribute('aria-label', /Ride/);
   await page.keyboard.press('f');
   await expect.poll(async () => (await mover(page)).mode).toMatch(/bike|scooter/);
-  await expect(act).toContainText(/Park in rack|Get off/);
+  await expect(act).toHaveAttribute('aria-label', /Park in rack|Get off/);
 });
 
 test('riding is much faster than walking, and you can leave it anywhere', async ({ page }) => {
   await open(page, `x=-2.4&z=${SPAWN_Z + 3.5}`);
-  await expect(page.locator('#act')).toContainText('🚲');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Ride bike/);
   await page.locator('#act').click(); // tap the button like a thumb would
   await expect.poll(async () => (await mover(page)).mode).toBe('bike');
   await page.keyboard.down('w');
@@ -326,7 +326,7 @@ test('riding is much faster than walking, and you can leave it anywhere', async 
   const m = await mover(page);
   const bikeId = m.riding!;
   const at = await state(page);
-  await expect(page.locator('#act')).toContainText('Get off');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Get\ off/);
   await page.locator('#act').click();
   await expect.poll(async () => (await mover(page)).mode).toBe('foot');
   const bike = await page.evaluate((id) => (window as any).__vora.mob.rideables[id], bikeId);
@@ -339,7 +339,7 @@ test('get off next to a rack with space and it clicks into the rack', async ({ p
   await page.keyboard.press('f');
   await expect.poll(async () => (await mover(page)).mode).not.toBe('foot');
   const id = (await mover(page)).riding!;
-  await expect(page.locator('#act')).toContainText('Park in rack');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Park\ in\ rack/);
   await page.keyboard.press('f');
   await expect.poll(async () => (await mover(page)).mode).toBe('foot');
   const v = await page.evaluate((i) => (window as any).__vora.mob.rideables[i], id);
@@ -363,7 +363,7 @@ test('walk in the front door: you are taken into the house, its own world @smoke
   const h = await house(page);
   expect(h.indoors).toBe(true);
   expect(h.up).toBe(false); // downstairs: the upstairs is hidden so you can see the room
-  await expect(page.locator('#act')).toContainText('Go outside');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Go\ outside/);
   expect(errors).toEqual([]);
 });
 
@@ -381,10 +381,10 @@ test('walk back out the door: you land at the foot of the porch steps, facing Hi
 
 test('the door buttons: Go inside from the porch, Go outside from the hall', async ({ page }) => {
   await open(page, `t=12&${hw(-1.3, 4)}&yaw=${-Math.PI / 2}`);
-  await expect(page.locator('#act')).toContainText('Go inside');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Go\ inside/);
   await page.locator('#act').click();
   await expect.poll(async () => (await house(page)).where).toBe('in');
-  await expect(page.locator('#act')).toContainText('Go outside');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Go\ outside/);
   await page.locator('#act').click();
   await expect.poll(async () => (await house(page)).where).toBe('out');
 });
@@ -402,10 +402,10 @@ test('climb the stairs to the upstairs', async ({ page }) => {
 test('sit on the couch, then get up', async ({ page }) => {
   await open(page, `t=12&${hw(5.9, -4.7)}&yaw=0`); // midday: everyone's out, the couch is free
   await expect.poll(async () => (await house(page)).action).toMatch(/^sit-couch/);
-  await expect(page.locator('#act')).toContainText('Sit');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Sit/);
   await page.keyboard.press('f');
   await expect.poll(async () => (await house(page)).sitting).toMatch(/^couch/);
-  await expect(page.locator('#act')).toContainText('Get up');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Get\ up/);
   await page.keyboard.press('f');
   await expect.poll(async () => (await house(page)).sitting).toBeNull();
 });
@@ -469,16 +469,16 @@ const drv = (page: Page) => page.evaluate(() => {
 
 test('your car is in your driveway: Drive, go, get out @smoke', async ({ page }) => {
   const errors = await open(page, `${hw(5, -12.8 + 2.4)}&yaw=${-Math.PI / 2}`); // beside it, driver's side
-  await expect(page.locator('#act')).toContainText('Drive');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Drive/);
   await page.keyboard.press('f');
   await expect.poll(async () => (await drv(page)).driving).toBe(0);
   const start = await drv(page);
   expect(start.car!.stolen).toBe(false);
-  await expect(page.locator('#act')).toContainText('Get out');
-  // looking at the house (+x), S backs you toward High Street: out of the driveway, nose first
-  await page.keyboard.down('s');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Get\ out/);
+  // the car's parked facing the street: hold the gas (W) and it pulls out of the driveway
+  await page.keyboard.down('w');
   await page.waitForFunction((x) => (window as any).__vora.pos.x < x, start.x - 5, { timeout: 45_000 });
-  await page.keyboard.up('s');
+  await page.keyboard.up('w');
   await page.keyboard.press('f');
   await expect.poll(async () => (await drv(page)).driving).toBeNull();
   // the car stayed where you left it, and you're standing beside it
@@ -507,19 +507,18 @@ test('parked cars are solid: you walk into one and stop', async ({ page }) => {
 
 test("taking kofi's car is stealing it — and he notices when you get home", async ({ page }) => {
   await open(page, `t=21.5&${hw(5, 12.8 + 2.4)}&yaw=${-Math.PI / 2}`);
-  await expect(page.locator('#act')).toContainText("Steal kofi's car");
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Drive/);
   await page.keyboard.press('f');
   await expect.poll(async () => (await drv(page)).car?.stolen).toBe(true);
-  await expect(page.locator('#toast')).toContainText("kofi's car");
   const start = await drv(page);
-  await page.keyboard.down('s');
+  await page.keyboard.down('w');
   await page.waitForFunction((x) => (window as any).__vora.pos.x < x, start.x - 5, { timeout: 45_000 });
-  await page.keyboard.up('s');
+  await page.keyboard.up('w');
   await page.keyboard.press('f');
   await expect.poll(async () => (await drv(page)).driving).toBeNull();
   // go home (teleport to the porch, as the walk is covered elsewhere) and in
   await page.evaluate(([x, z]) => (window as any).__vora.pos.set(x, 0, z), [HX0 - 1.3, HZC + 4]);
-  await expect(page.locator('#act')).toContainText('Go inside');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Go\ inside/);
   await page.keyboard.press('f');
   await expect.poll(() => page.locator('.tag.say').allTextContents().then((t) => t.join(' ')), { timeout: 10_000 }).toMatch(/car/);
 });
@@ -533,7 +532,7 @@ test('carjack: step out in front of a car, it stops, you pull the driver out and
     const car = v.traffic.vehicles.find((x: any) => `jack-${x.id}` === v.action);
     return { color: car.color as number, n: v.traffic.vehicles.length as number };
   });
-  await expect(page.locator('#act')).toContainText('Carjack');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Drive/);
   await page.keyboard.press('f');
   await expect.poll(async () => (await drv(page)).driving).not.toBeNull();
   const jacked = await page.evaluate(() => {
@@ -545,7 +544,6 @@ test('carjack: step out in front of a car, it stops, you pull the driver out and
   expect(jacked.color).toBe(before.color);
   expect(jacked.owner).toBeNull();
   expect(jacked.fleeing).toBe(1);
-  await expect(page.locator('#toast')).toContainText('carjacked');
   // the driver yells at you
   await expect.poll(() => page.evaluate(() => [...document.querySelectorAll<HTMLElement>('.tag.say')]
     .some((el) => /car|serious|stop|washed|groceries/.test(el.textContent ?? '') && parseFloat(el.style.opacity) > 0)), { timeout: 5000 }).toBe(true);
@@ -561,7 +559,7 @@ test('drive into people on the walk: they go flying, yell, then pick themselves 
   const errors = await open(page, `yaw=${Math.PI}`);
   // your car, parked on the walk just ahead; get in and floor it down the row
   await page.evaluate(() => { const v = (window as any).__vora; const c = v.garage.cars[0]; Object.assign(c, { x: 0.6, z: v.pos.z + 4, heading: 0 }); v.pos.set(-1.3, 0, c.z); });
-  await expect(page.locator('#act')).toContainText('Drive');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Drive/);
   await page.keyboard.press('f');
   await page.keyboard.down('w');
   await page.waitForFunction(() => (window as any).__vora.knocked > 0, null, { timeout: 50_000 });
@@ -587,10 +585,12 @@ test('a car steered into a building never gets stuck in it (regression)', async 
   await page.keyboard.up('d');
   const stuckAt = await page.evaluate(() => ({ x: (window as any).__vora.pos.x, z: (window as any).__vora.pos.z }));
   expect(stuckAt.x).toBeGreaterThan(north.front + 0.8);
-  // and it drives away: left, toward High Street
+  // and it gets away: back up (brake = reverse once stopped), steering away from the wall
+  await page.keyboard.down('s');
   await page.keyboard.down('a');
-  await page.waitForFunction((x) => (window as any).__vora.pos.x > x, stuckAt.x + 3, { timeout: 40_000 });
+  await page.waitForFunction((p) => Math.hypot((window as any).__vora.pos.x - p.x, (window as any).__vora.pos.z - p.z) > 3, stuckAt, { timeout: 40_000 });
   await page.keyboard.up('a');
+  await page.keyboard.up('s');
 });
 
 test('on a bike: the speedometer shows, and your speed builds the longer you pedal', async ({ page }) => {
@@ -652,7 +652,7 @@ test('up the back path into the plaza between Usdan and Boger: people out at the
 test('into Usdan from the plaza, across to the atrium, and back out @smoke', async ({ page }) => {
   // on the plaza, facing Usdan's east doors (−x)
   const errors = await open(page, `t=13&x=-58.6&z=-197&yaw=${Math.PI / 2}`);
-  await expect(page.locator('#act')).toContainText('Go into Usdan');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', /Go\ into\ Usdan/);
   await page.keyboard.press('f');
   await expect.poll(() => page.evaluate(() => (window as any).__vora.where)).toBe('usdan');
   expect(await page.evaluate(() => (window as any).__vora.insiders)).toBeGreaterThan(15);
@@ -678,4 +678,76 @@ test('walk up the path into the glass entrance off the walkway and you are insid
   const s = await state(page);
   expect(s.z).toBeLessThan(-178); // in the lobby
   expect(errors).toEqual([]);
+});
+
+// ── buttons, pedals, jump, tyre marks ──
+
+test('the door button goes away as soon as you\'ve gone out (house and Usdan) (regression)', async ({ page }) => {
+  await open(page, `t=12&${hw(1.7, 4)}&yaw=${-Math.PI / 2}`); // in the hall, by the front door
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', 'Go outside');
+  await page.keyboard.press('f');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.where)).toBe('out');
+  await expect(page.locator('#act')).not.toHaveClass(/show/);
+  await open(page, `t=12&x=-58.6&z=-197&yaw=${Math.PI / 2}`); // in Usdan's plaza entrance
+  await page.keyboard.press('f');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.where)).toBe('usdan');
+  await expect(page.locator('#act')).toHaveAttribute('aria-label', 'Go outside');
+  await page.keyboard.press('f');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.where)).toBe('out');
+  await expect(page.locator('#act')).not.toHaveClass(/show/);
+});
+
+test('buttons are icons (no emoji): a steering wheel for any car, a door to get out', async ({ page }) => {
+  await open(page, `${hw(5, 12.8 + 2.4)}&yaw=${-Math.PI / 2}`); // by kofi's car
+  const act = page.locator('#act');
+  await expect(act).toHaveAttribute('aria-label', 'Drive');
+  expect(await act.locator('svg').count()).toBe(1);
+  expect(await act.textContent()).toBe(''); // just the icon
+  await page.keyboard.press('f');
+  await expect(act).toHaveAttribute('aria-label', 'Get out');
+  expect(await page.locator('#toast').textContent()).not.toMatch(/stole|took|carjack/);
+});
+
+test('drive with the pedal buttons @smoke: gas to go, the dial reads mph, brake to stop; pedals only show in the car', async ({ page }) => {
+  await open(page, `t=16&${hw(5, -12.8 + 2.4)}&yaw=${-Math.PI / 2}`);
+  await expect(page.locator('#gas')).not.toHaveClass(/show/);
+  await expect(page.locator('#jump')).toHaveClass(/show/);
+  await page.keyboard.press('f');
+  await expect(page.locator('#gas')).toHaveClass(/show/);
+  await expect(page.locator('#brake')).toHaveClass(/show/);
+  await expect(page.locator('#jump')).not.toHaveClass(/show/);
+  await expect(page.locator('#speedo')).toHaveClass(/show/);
+  const gas = (await page.locator('#gas').boundingBox())!;
+  await page.mouse.move(gas.x + gas.width / 2, gas.y + gas.height / 2);
+  await page.mouse.down();
+  await page.waitForFunction(() => (window as any).__vora.speedo >= 5, null, { timeout: 60_000 });
+  await page.mouse.up();
+  const brake = (await page.locator('#brake').boundingBox())!;
+  await page.mouse.move(brake.x + brake.width / 2, brake.y + brake.height / 2);
+  await page.mouse.down();
+  await page.waitForFunction(() => (window as any).__vora.speedo === 0, null, { timeout: 60_000 });
+  await page.mouse.up();
+  expect(await page.locator('#speedo .tick.major').count()).toBeGreaterThan(4); // a real dial
+  await page.keyboard.press('f');
+  await expect(page.locator('#gas')).not.toHaveClass(/show/);
+});
+
+test('jump: Space (or the button) and you leave the ground, then land', async ({ page }) => {
+  await open(page);
+  await page.keyboard.press(' ');
+  await page.waitForFunction(() => (window as any).__vora.jumpY > 0.2, null, { timeout: 20_000 });
+  await page.waitForFunction(() => (window as any).__vora.jumpY === 0, null, { timeout: 20_000 });
+  await page.locator('#jump').click();
+  await page.waitForFunction(() => (window as any).__vora.jumpY > 0.2, null, { timeout: 20_000 });
+});
+
+test('driving across grass leaves tyre marks', async ({ page }) => {
+  await open(page, `t=16&yaw=${Math.PI}`);
+  // your car, on the lawn in front of the row, pointing down it
+  await page.evaluate(() => { const v = (window as any).__vora; const c = v.garage.cars[0]; Object.assign(c, { x: -8, z: v.pos.z + 8, heading: 0 }); v.pos.set(-6.3, 0, c.z); });
+  await page.keyboard.press('f');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.driving)).toBe(0);
+  await page.keyboard.down('w');
+  await page.waitForFunction(() => (window as any).__vora.marks > 6, null, { timeout: 60_000 });
+  await page.keyboard.up('w');
 });

@@ -161,3 +161,26 @@ export function dismount(mob: Mobility, mover: Mover, p: XZ, heading: number): {
   // step off to the side (your right)
   return { parked: 'ground', standAt: { x: p.x - Math.cos(heading) * 0.9, z: p.z + Math.sin(heading) * 0.9 } };
 }
+
+// ── jumping ──
+export const JUMP_V = 6.2; // m/s straight up off the ground (peaks a little under 1 m)
+export const GRAVITY = 20;
+
+export interface Jump { y: number; vy: number }
+export const newJump = (): Jump => ({ y: 0, vy: 0 });
+export const airborne = (j: Jump) => j.y > 0 || j.vy > 0;
+
+/** Jump, if you're on the ground and on foot. Returns whether you did. */
+export function startJump(j: Jump, m: Mover): boolean {
+  if (airborne(j) || m.mode !== 'foot' || m.riding !== null) return false;
+  j.vy = JUMP_V;
+  return true;
+}
+
+/** Fly up, come down, land. */
+export function stepJump(j: Jump, dt: number): void {
+  if (!(dt > 0) || !airborne(j)) return;
+  j.vy -= GRAVITY * dt;
+  j.y += j.vy * dt;
+  if (j.y <= 0) { j.y = 0; j.vy = 0; }
+}

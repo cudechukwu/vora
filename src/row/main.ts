@@ -9,7 +9,7 @@ import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, ROW_ENTRY, USDAN, USDAN_NAME, W
 import { World } from './world';
 import { resolveMove } from './collide';
 import {
-  SPEED, actionAt, carry, createMobility, dismount, isRunning, mount, newMover, stepMover,
+  SPEED, actionAt, airborne, carry, createMobility, dismount, isRunning, mount, newJump, newMover, startJump, stepJump, stepMover,
 } from './mobility';
 import { RideView } from './rideables';
 import { HouseView } from './house/view';
@@ -19,17 +19,20 @@ import { floorY, houseExtra, levelAt } from './house/collide';
 import { BED_SPOT, FRONT_DOOR, HOME_SPAWN, Level, SEATS, Seat, insideHouse, toLocal, toWorld } from './house/plan';
 import { ENTER_AT, EXIT_AT, Where, cameraClearance, nearDoor as byTheDoor, portalAt } from './house/portal';
 import { LANES, Obstacle, createTraffic, lightAt, stepTraffic } from './traffic';
-import { CarsView, Traffic } from './vehicles';
+import { CarsView, Exhaust, TireMarks, Traffic } from './vehicles';
 import { cartBox, createCart, stepCart } from './cart';
 import { isOpen, newOrder, stepOrder } from './foodtruck';
 import { FoodTruckView, GolfCartView } from './campus';
 import {
   Car, asCar, carAt, carjack, distToCar, clearRoad, createGarage, driveMove, driven, footprint, getIn, getOut, jackable,
-  SPEC, loadMine, missing, mph, onRoad, roadBlocks, saveMine, stepCar,
+  SPEC, loadMine, missing, mph, onRoad, roadBlocks, saveMine, stepPedals,
 } from './cars';
 import { START_HOUR, advance, formatHour, nextPreset, periodOf, wakeFrom, wrapHour } from './clock';
 import { Person, discGeometry, randomLook } from './people';
 import { Knock, OUCH, hits, launch, stepKnock } from './knock';
+import { ICON, IconName } from './icons';
+import { Speedometer } from './hud';
+import { surfaceAt } from './surface';
 import { ITEMS, SITTERS, chairs } from './plaza';
 import { UsdanView } from './usdan/view';
 import {
@@ -279,6 +282,11 @@ const cart = createCart(backZ.z0, backZ.z1);
 const cartView = new GolfCartView();
 scene.add(cartView.root);
 
+// what your car leaves behind: tyre marks (always on grass, on tar when you skid) and exhaust
+const tyres = new TireMarks();
+const exhaust = new Exhaust();
+scene.add(tyres.mesh, exhaust.group);
+
 // the burrito truck by the Boger–South walkway, beside Usdan (daytime)
 const busyPeople = new Map<Person, Body>();
 const truck = new FoodTruckView(crossings[crossings.length - 1], (p) => { const b = busyPeople.get(p); return !!b && busy(b); });
@@ -359,19 +367,17 @@ labels.add('🏠 your house<em>High St · 5 roommates</em>', new Vector3(porchSi
   () => !insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v));
 const fade = document.getElementById('fade')!;
 const toastEl = document.getElementById('toast')!;
-const speedo = document.getElementById('speedo')!;
-const speedoN = speedo.querySelector('.n')!, speedoBar = speedo.querySelector<HTMLElement>('.bar i')!;
-let shownMph = -1;
+const speedo = new Speedometer(document.getElementById('speedo')!);
 /** Speedometer: shown while you're on wheels. */
 function updateSpeedo(speed: number) {
   const car = driven(garage);
   const top = car ? SPEC[car.kind].top : mover.mode === 'foot' ? 0 : SPEED[mover.mode];
-  speedo.classList.toggle('show', top > 0);
-  if (!top) return;
-  const n = Math.round(mph(speed));
-  if (n !== shownMph) { shownMph = n; speedoN.textContent = String(n); }
-  speedoBar.style.width = `${Math.min(100, (speed / top) * 100).toFixed(1)}%`;
+  speedo.set(mph(speed), top > 0 ? mph(top) : null);
 }
+// the other glass buttons: jump (on foot), and the pedals (driving)
+const jumpBtn = document.getElementById('jump')!, gasBtn = document.getElementById('gas')!, brakeBtn = document.getElementById('brake')!;
+jumpBtn.innerHTML = ICON.jump; gasBtn.innerHTML = ICON.gas; brakeBtn.innerHTML = ICON.brake;
+const jump = newJump();
 let toastTimer = 0;
 function toast(text: string, secs = 2.6) {
   toastEl.textContent = text;
@@ -382,7 +388,7 @@ function toast(text: string, secs = 2.6) {
 // whose car is whose
 for (const c of garage.cars) {
   if (!c.owner) continue;
-  const label = c.owner === 'you' ? '🚗 your car' : `${c.owner}'s car`;
+  const label = c.owner === 'you' ? 'your car' : `${c.owner}'s car`;
   labels.add(label, new Vector3(), 24, undefined, () => new Vector3(c.x, 2.2, c.z), () => garage.driving !== c.id);
 }
 
@@ -430,6 +436,7 @@ const lookAt = new Vector3();
 const fwd = new Vector3(), right = new Vector3(), move = new Vector3(), want = new Vector3();
 let snapCamera = false; // jump the camera (after going through a door) instead of gliding
 let introT = params.get('intro') === '0' ? 1 : 0; // ?intro=0 skips the opening swoop
+const introRunning = () => introT < 1;
 
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -442,7 +449,8 @@ addEventListener('resize', resize);
 resize();
 
 // ── actions ──
-interface Act { key: string; label: string; dist: number; run: () => void }
+/** Something the action button can do: an icon on the button, words for screen readers (and tests). */
+interface Act { key: string; icon: IconName; label: string; dist: number; run: () => void }
 
 function sitDown(seat: Seat) {
   sittingOn = seat;
@@ -561,10 +569,7 @@ function enterCar(c: Car) {
   pos.set(c.x, 0, c.z);
   me.face(c.heading);
   me.root.visible = false;
-  if (!wasMine) {
-    carsView.soundAlarm(c.id);
-    toast(c.owner ? `😈 you took ${c.owner}'s car` : '😈 you stole a car');
-  }
+  if (!wasMine) carsView.soundAlarm(c.id); // someone else's: its lights flash
 }
 
 function leaveCar() {
@@ -598,7 +603,6 @@ function jack(vehicleId: number) {
   f.bubble.classList.add('say');
   scene.add(p.root);
   fleers.push(f);
-  toast('👊 carjacked');
 }
 
 function updateFleers(dt: number) {
@@ -694,12 +698,12 @@ function updateBodies(dt: number) {
 
 /** What the action button does right now — the closest thing you can do. */
 function currentAction(): Act | null {
-  if (sittingOn) return { key: 'getup', label: 'Get up', dist: 0, run: standUp };
-  if (garage.driving !== null) return { key: 'getout', label: '🚪  Get out', dist: 0, run: leaveCar };
+  if (sittingOn) return { key: 'getup', icon: 'up', label: 'Get up', dist: 0, run: standUp };
+  if (garage.driving !== null) return { key: 'getout', icon: 'door', label: 'Get out', dist: 0, run: leaveCar };
   const ride = actionAt(mob, mover, pos);
   if (mover.riding !== null && ride) {
     return {
-      key: ride.kind, label: ride.kind === 'park' ? 'Park in rack' : 'Get off', dist: 0,
+      key: ride.kind, icon: ride.kind === 'park' ? 'park' : 'off', label: ride.kind === 'park' ? 'Park in rack' : 'Get off', dist: 0,
       run: () => {
         const off = dismount(mob, mover, pos, me.heading)!;
         const at = resolveMove(pos, off.standAt, stops, houseExtra(level, false));
@@ -713,19 +717,19 @@ function currentAction(): Act | null {
   if (ud) {
     const d = Math.hypot(pos.x - ud.x, pos.z - ud.z);
     options.push(where === 'out'
-      ? { key: `usdan-in-${ud.id}`, label: '🚪  Go into Usdan', dist: d, run: () => goUsdan(ud, 'enter') }
-      : { key: `usdan-out-${ud.id}`, label: '🚪  Go outside', dist: d, run: () => goUsdan(ud, 'exit') });
+      ? { key: `usdan-in-${ud.id}`, icon: 'door', label: 'Go into Usdan', dist: d, run: () => goUsdan(ud, 'enter') }
+      : { key: `usdan-out-${ud.id}`, icon: 'door', label: 'Go outside', dist: d, run: () => goUsdan(ud, 'exit') });
   }
   if (byTheDoor(where, lp.u, lp.v)) {
     const d = Math.abs(lp.u);
     options.push(where === 'out'
-      ? { key: 'enter', label: '🚪  Go inside', dist: d, run: () => goThrough('enter') }
-      : { key: 'exit', label: '🚪  Go outside', dist: d, run: () => goThrough('exit') });
+      ? { key: 'enter', icon: 'door', label: 'Go inside', dist: d, run: () => goThrough('enter') }
+      : { key: 'exit', icon: 'door', label: 'Go outside', dist: d, run: () => goThrough('exit') });
   }
   if (ride?.kind === 'ride') {
     const t = ride.target;
     options.push({
-      key: `ride-${t.kind}`, label: t.kind === 'bike' ? '🚲  Ride' : '🛴  Ride', dist: Math.hypot(t.x - pos.x, t.z - pos.z),
+      key: `ride-${t.kind}`, icon: t.kind, label: t.kind === 'bike' ? 'Ride bike' : 'Ride scooter', dist: Math.hypot(t.x - pos.x, t.z - pos.z),
       run: () => {
         mount(mob, mover, t.id);
         pos.set(t.x, 0, t.z);
@@ -737,23 +741,22 @@ function currentAction(): Act | null {
   if (where === 'out' && mover.riding === null) {
     const c = carAt(garage, pos);
     if (c) {
-      const label = c.owner === 'you' ? '🔑  Drive' : c.owner ? `😈  Steal ${c.owner}'s car` : '😈  Steal car';
-      options.push({ key: `car-${c.id}`, label, dist: distToCar(c, pos), run: () => enterCar(c) });
+      options.push({ key: `car-${c.id}`, icon: 'wheel', label: 'Drive', dist: distToCar(c, pos), run: () => enterCar(c) });
     }
     const v = jackable(traffic, pos);
-    if (v) options.push({ key: `jack-${v.id}`, label: '👊  Carjack', dist: distToCar(asCar(v), pos), run: () => jack(v.id) });
+    if (v) options.push({ key: `jack-${v.id}`, icon: 'wheel', label: 'Drive', dist: distToCar(asCar(v), pos), run: () => jack(v.id) });
   }
   const taken = roommates.seatsTaken();
   for (const seat of SEATS) {
     if (seat.level !== level || taken.has(seat.id)) continue;
     const w = toWorld(seat.u, seat.v);
     const d = Math.hypot(w.x - pos.x, w.z - pos.z);
-    if (d < 1.6) options.push({ key: `sit-${seat.id}`, label: '🛋  Sit', dist: d, run: () => sitDown(seat) });
+    if (d < 1.6) options.push({ key: `sit-${seat.id}`, icon: 'sit', label: 'Sit', dist: d, run: () => sitDown(seat) });
   }
   if (level === 1) {
     const b = toWorld(BED_SPOT.u, BED_SPOT.v);
     const d = Math.hypot(b.x - pos.x, b.z - pos.z);
-    if (d < 1.7) options.push({ key: 'sleep', label: '🛏  Sleep', dist: d, run: sleep });
+    if (d < 1.7) options.push({ key: 'sleep', icon: 'bed', label: 'Sleep', dist: d, run: sleep });
   }
   options.sort((p, q) => p.dist - q.dist);
   return options[0] ?? null;
@@ -786,9 +789,12 @@ function frame(now: number) {
   const car = driven(garage);
   let speed: number;
   if (car) {
-    // driving: the car steers toward where you push, reverses if you push behind it
+    // driving: gas + brake pedals (buttons or W/S), steer by dragging left/right (or A/D)
     const was = car.heading;
-    const r = driveMove(car, stepCar(car, dt, { x: move.x, z: move.z }), stops, collisions(), was);
+    const pedals = input.pedals;
+    const r = driveMove(car, stepPedals(car, dt, pedals), stops, collisions(), was);
+    tyres.drive(car, dt, pedals, surfaceAt(car, crossings));
+    exhaust.emit(car, dt, pedals.gas);
     if (r.hit) car.speed = 0;
     else if (r.scrape) car.speed *= Math.pow(0.4, dt); // scraping along a wall drags you down
     car.x = r.x; car.z = r.z;
@@ -813,30 +819,43 @@ function frame(now: number) {
   rig.follow(dt, me.heading, speed > 0.3, secs);
   fwd.set(-Math.sin(rig.yaw), 0, -Math.cos(rig.yaw));
   right.set(Math.cos(rig.yaw), 0, -Math.sin(rig.yaw));
+  if (input.consumeJump() && !car && !sittingOn && startJump(jump, mover)) mover.held = Math.min(mover.held, 1); // a hop doesn't start a run
+  stepJump(jump, dt);
   pos.y = floorY(level, pos.x, pos.z);
   me.root.position.copy(pos);
+  me.root.position.y += jump.y;
   if (sittingOn) me.sitIdle(dt);
   else if (car) { /* hidden in the car */ }
   else if (mover.mode === 'bike') me.ride(dt, speed);
   else if (mover.mode === 'scooter') me.scoot(dt, speed);
   else me.walk(dt, speed);
+  if (airborne(jump)) me.airPose(jump.vy);
 
   // the action button: ride / park / get off / sit / get up / sleep
   if (input.consumeAction()) {
     const a = currentAction();
     if (a) a.run();
-    actKey = ''; // relabel now
+    actKey = '\u0000'; // force a relabel next (even if there's now nothing to do — the button must hide)
   }
   carry(mob, mover, pos, me.heading);
   rideView.update(mob, mover.riding, speed, dt);
   carsView.update(garage, dt, secs);
   updateSpeedo(speed);
+  const driving = !!car;
+  document.body.classList.toggle('driving', driving);
+  gasBtn.classList.toggle('show', driving);
+  brakeBtn.classList.toggle('show', driving);
+  jumpBtn.classList.toggle('show', !driving && !sittingOn && mover.mode === 'foot' && !introRunning());
+  if (!driving) input.gasHeld = input.brakeHeld = false;
+  tyres.update(dt);
+  exhaust.update(dt);
   updateFleers(dt);
   const act = currentAction();
   const key = act ? act.key : '';
   if (key !== actKey) {
     actKey = key;
-    actBtn.textContent = act ? act.label : '';
+    actBtn.innerHTML = act ? ICON[act.icon] : '';
+    actBtn.setAttribute('aria-label', act ? act.label : '');
     actBtn.classList.toggle('show', !!act);
   }
 
@@ -1010,11 +1029,15 @@ Object.assign(window, {
     get upstairsShown() { return house.upstairs.visible; },
     get running() { return isRunning(mover); },
     get action() { return actKey; },
+    get actionLabel() { return actBtn.getAttribute('aria-label') ?? ''; },
+    get jumpY() { return jump.y; },
+    get speedo() { return speedo.reading; },
+    get marks() { return tyres.count; },
     get hour() { return hour; },
     get mode() { return periodOf(hour); },
     /** Render now and count distinct colours on a 12×12 grid — a blank/broken canvas gives ~1. */
     sample() {
-      renderer.render(scene, camera);
+      renderer.render(sceneFor(where), camera);
       const gl = renderer.getContext();
       const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight, px = new Uint8Array(4), seen = new Set<string>();
       for (let i = 0; i < 12; i++) for (let j = 0; j < 12; j++) {

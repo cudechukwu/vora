@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   Car, JACK_SPEED, LEAVE_AFTER, REACH, SPEC, carAt, carjack, clearRoad, createGarage, distToCar,
   driveMove, driven, drivewaySpot, footprint, getIn, getOut, inDriveway, jackable, laneFor, loadMine, missing,
-  mph, onRoad, roadBlocks, saveMine, stepCar,
+  mph, onRoad, roadBlocks, saveMine, stepCar, stepPedals,
 } from '../../src/row/cars';
 import { Extra, blockedAt, resolveMove } from '../../src/row/collide';
 import { FAR_WALK, ROAD, byId, layoutRow } from '../../src/row/layout';
@@ -401,5 +401,59 @@ describe('traffic add / remove', () => {
     const nv = addVehicle(t, { ...v });
     expect(t.vehicles.filter((x) => x.id === nv.id)).toHaveLength(1);
     expect(nv.speed).toBe(0);
+  });
+});
+
+describe('driving with pedals', () => {
+  const fresh = (): Car => ({ id: 9, kind: 'car', len: 4.4, color: 0, x: 0, z: 0, heading: 0, speed: 0, owner: 'you', cruise: 10, stolen: false });
+  const run = (c: Car, secs: number, p: { steer?: number; gas?: number; brake?: number }) => {
+    for (let t = 0; t < secs; t += STEP) {
+      const w = stepPedals(c, STEP, { steer: p.steer ?? 0, gas: p.gas ?? 0, brake: p.brake ?? 0 });
+      c.x = w.x; c.z = w.z;
+    }
+    return c;
+  };
+
+  it('gas: pulls away, keeps building, tops out', () => {
+    const c = fresh();
+    const s1 = run(c, 1, { gas: 1 }).speed, s4 = run(c, 3, { gas: 1 }).speed, s20 = run(c, 20, { gas: 1 }).speed;
+    expect(s1).toBeGreaterThan(4);
+    expect(s4).toBeGreaterThan(s1 + 5);
+    expect(s20).toBeCloseTo(SPEC.car.top, 1);
+    expect(c.z).toBeGreaterThan(100); // straight ahead (+z)
+    expect(c.heading).toBe(0);
+  });
+
+  it('brake: stops you, then backs you up; let go and you coast to a stop', () => {
+    const c = run(fresh(), 4, { gas: 1 });
+    run(c, 1, { brake: 1 });
+    expect(c.speed).toBeLessThan(6); // hard braking
+    run(c, 2, { brake: 1 });
+    expect(c.speed).toBeCloseTo(-SPEC.car.reverse, 1); // reversing now
+    run(c, 4, {});
+    expect(c.speed).toBe(0);
+  });
+
+  it('steering right turns you right (toward −x going +z), left turns you left', () => {
+    const r = run(fresh(), 1.2, { gas: 1, steer: 1 }), l = run(fresh(), 1.2, { gas: 1, steer: -1 });
+    expect(r.heading).toBeLessThan(-0.5);
+    expect(r.x).toBeLessThan(-1);
+    expect(l.heading).toBeGreaterThan(0.5);
+    expect(l.x).toBeGreaterThan(1);
+  });
+
+  it('can\'t turn on the spot; reversing with the wheel right swings the nose the other way', () => {
+    const c = fresh();
+    run(c, 1, { steer: 1 });
+    expect(c.heading).toBe(0);
+    run(c, 0.8, { brake: 1, steer: 1 });
+    expect(c.speed).toBeLessThan(0);
+    expect(c.heading).toBeGreaterThan(0.05);
+  });
+
+  it('a bogus frame changes nothing', () => {
+    const c = fresh();
+    expect(stepPedals(c, -1, { steer: 0, gas: 1, brake: 0 })).toEqual({ x: 0, z: 0 });
+    expect(c.speed).toBe(0);
   });
 });

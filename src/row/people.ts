@@ -266,6 +266,14 @@ export class Person {
     this.neck.rotation.y -= p.twist; // head steady while the shoulders turn
   }
 
+  /** In the air (jumping): knees tucked on the way up, legs reaching for the ground on the way down, arms up. */
+  airPose(vy: number) {
+    const up = Math.max(0, Math.min(1, vy / 6));
+    this.setLegs(0.5 + up * 0.4, 0.9 + up * 0.6, 0.2 + up * 0.5, 0.6 + up * 0.8);
+    this.setArms(-0.4 - up * 0.6, 0.4, -0.5 - up * 0.6, 0.4, 0.35);
+    this.spine.rotation.x = 0.1;
+  }
+
   /** Seated pose: on a bench (`seatY` ≈ 0.48) or on the grass (≈ 0.12). */
   sit(seatY: number) {
     this.straighten();

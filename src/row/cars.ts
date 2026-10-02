@@ -187,6 +187,41 @@ export function stepCar(c: Car, dt: number, stick: XZ): XZ {
   return { x: rear.x + f.x * (ax + c.speed * dt), z: rear.z + f.z * (ax + c.speed * dt) };
 }
 
+/** What your feet and hands are doing in the car: steer −1 (left) … +1 (right); gas and brake 0..1. */
+export interface Pedals { steer: number; gas: number; brake: number }
+
+/**
+ * One step of driving with pedals (the touch gas/brake buttons, or W/S + A/D). Gas pulls you forward,
+ * hard off the line and tapering toward top speed; the brake slows you and, once you're stopped,
+ * backs you up. Steering turns the car about its back axle, more the faster it rolls, and the
+ * other way when reversing (like a real car). Returns where the car wants to be.
+ */
+export function stepPedals(c: Car, dt: number, p: Pedals): XZ {
+  if (!(dt > 0)) return { x: c.x, z: c.z };
+  const spec = SPEC[c.kind];
+  const gas = Math.min(1, Math.max(0, p.gas)), brake = Math.min(1, Math.max(0, p.brake));
+  const steer = Math.min(1, Math.max(-1, p.steer));
+  let dv: number;
+  if (gas > 0 && brake === 0) {
+    if (c.speed < -0.2) dv = BRAKE * dt; // rolling backward: stop first
+    else dv = Math.min(spec.top * gas - c.speed, spec.accel * gas * (1 - 0.85 * Math.min(1, c.speed / spec.top) ** 2) * dt);
+    if (spec.top * gas < c.speed) dv = Math.max(spec.top * gas - c.speed, -COAST * dt); // eased off the gas
+  } else if (brake > 0) {
+    if (c.speed > 0.2) dv = -Math.min(c.speed, BRAKE * brake * dt);
+    else dv = Math.max(-spec.reverse * brake - c.speed, -spec.accel * dt); // stopped: back up
+  } else {
+    dv = -Math.sign(c.speed) * Math.min(Math.abs(c.speed), COAST * dt); // coast
+  }
+  c.speed += dv;
+  const ax = axle(c), f0 = fwd(c.heading);
+  const rear = { x: c.x - f0.x * ax, z: c.z - f0.z * ax };
+  // right (+steer) turns you toward −x when facing +z, i.e. the heading goes down; reversing flips it
+  const roll = Math.min(1, Math.abs(c.speed) / 3) * Math.sign(c.speed);
+  c.heading = wrap(c.heading - steer * spec.turn * roll * dt);
+  const f = fwd(c.heading);
+  return { x: rear.x + f.x * (ax + c.speed * dt), z: rear.z + f.z * (ax + c.speed * dt) };
+}
+
 /** Points around a car's outline (corners, middle of each end, centre) that must stay clear. */
 export function outline(c: { len: number; kind: CarKind }, x: number, z: number, h: number): XZ[] {
   const f = fwd(h), l = left(h), hl = c.len / 2 - 0.1, hw = SPEC[c.kind].halfW - 0.1;

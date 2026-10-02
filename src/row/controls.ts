@@ -7,7 +7,8 @@
 //   • or drag along the top strip of the screen (two hands / other thumb);
 //     double-tap there to snap the view back behind you.
 // Desktop: WASD / ↑↓ to walk, ←→ or Q/E to turn, drag the top strip to look,
-// F or Space for the action button (ride / park / get off).
+// F for the action button (ride / park / get off / drive / doors), Space to jump.
+// Driving: the gas + brake pedal buttons (or W / S), and drag left/right (or A / D) to steer.
 
 const RADIUS = 48; // px of drag for full speed
 const DOUBLE_TAP_MS = 320;
@@ -35,6 +36,11 @@ export class Input {
   private snap = false;
   private turnAround = false;
   private action = false;
+  private jump = false;
+  /** Pedal buttons held (driving). */
+  gasHeld = false;
+  brakeHeld = false;
+  private pedalIds = new Map<number, 'gas' | 'brake'>();
   private lookFromButton = false;
   private lookTravel = 0;
   private lookBtn = document.getElementById('look');
@@ -51,6 +57,14 @@ export class Input {
     window.addEventListener('pointerdown', (e) => {
       const t = e.target as HTMLElement;
       if (t.closest('#act')) { this.action = true; return; }
+      if (t.closest('#jump')) { this.jump = true; return; }
+      const pedal = t.closest('#gas') ? 'gas' : t.closest('#brake') ? 'brake' : null;
+      if (pedal) {
+        this.pedalIds.set(e.pointerId, pedal);
+        this.setPedal(pedal, true);
+        (t.closest('button') as HTMLElement).setPointerCapture?.(e.pointerId);
+        return;
+      }
       if (this.lookBtn && t.closest('#look')) {
         if (this.lookId !== null) return;
         this.startLook(e, true);
@@ -99,6 +113,8 @@ export class Input {
       if (dead) this.first();
     });
     const end = (e: PointerEvent) => {
+      const pedal = this.pedalIds.get(e.pointerId);
+      if (pedal) { this.pedalIds.delete(e.pointerId); this.setPedal(pedal, false); return; }
       if (e.pointerId === this.lookId) {
         this.lookId = null;
         this.lookBtn?.classList.remove('active');
@@ -116,7 +132,8 @@ export class Input {
 
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
-      if ((k === 'f' || k === ' ') && !e.repeat) { this.action = true; e.preventDefault(); }
+      if (k === 'f' && !e.repeat) { this.action = true; e.preventDefault(); }
+      if (k === ' ' && !e.repeat) { this.jump = true; e.preventDefault(); }
       this.keys.add(k);
       this.fromKeys();
     });
@@ -149,6 +166,28 @@ export class Input {
     const r = this.action;
     this.action = false;
     return r;
+  }
+
+  /** True once after the jump button (or Space) was pressed. */
+  consumeJump(): boolean {
+    const r = this.jump;
+    this.jump = false;
+    return r;
+  }
+
+  private setPedal(p: 'gas' | 'brake', down: boolean) {
+    if (p === 'gas') this.gasHeld = down; else this.brakeHeld = down;
+    document.getElementById(p)?.classList.toggle('down', down);
+  }
+
+  /** Pedals from the buttons or the keyboard (W / ↑ gas, S / ↓ brake), and steering from the stick (−1 … +1). */
+  get pedals() {
+    const k = this.keys;
+    return {
+      gas: this.gasHeld || k.has('w') || k.has('arrowup') ? 1 : 0,
+      brake: this.brakeHeld || k.has('s') || k.has('arrowdown') ? 1 : 0,
+      steer: Math.max(-1, Math.min(1, this.x * 1.25)),
+    };
   }
 
   /** True once after the look button was tapped (not dragged). */

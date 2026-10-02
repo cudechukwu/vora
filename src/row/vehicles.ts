@@ -1,12 +1,14 @@
 import {
-  AdditiveBlending, BoxGeometry, CanvasTexture, Color, CylinderGeometry, Group, Mesh, MeshBasicMaterial,
-  PlaneGeometry, Sprite, SpriteMaterial,
+  AdditiveBlending, BoxGeometry, CanvasTexture, Color, CylinderGeometry, DynamicDrawUsage, Group, InstancedMesh,
+  Mesh, MeshBasicMaterial, NormalBlending, Object3D, PlaneGeometry, Sprite, SpriteMaterial,
 } from 'three';
 import { lambert, PAL } from './kit';
 import { CROSSWALK_W, Crossing, ROAD } from './layout';
 import { Person, randomLook } from './people';
 import { LANES, Light, TrafficState, Vehicle, lightAt } from './traffic';
-import type { Car, Garage } from './cars';
+import type { Car, Garage, Pedals } from './cars';
+import { SPEC } from './cars';
+import { Surface, leavesMark } from './surface';
 
 // ─── Drawing High Street ───────────────────────────────────────────────
 // Meshes for the vehicles + traffic signals, driven by traffic.ts state.
@@ -284,5 +286,116 @@ export class CarsView {
     root.rotation.set(0, c.heading, 0);
     lit(root, driving);
     for (const w of (root.userData.wheels ?? []) as Mesh[]) w.rotation.x += (c.speed * dt) / 0.34;
+  }
+}
+
+// ── tyre marks + exhaust ──
+
+const MARKS = 1600;
+/**
+ * Dark stripes behind the back wheels: dug-in brown on grass, black rubber on tar when you skid.
+ * A ring buffer — the oldest marks get reused once there are enough.
+ */
+export class TireMarks {
+  readonly mesh: InstancedMesh;
+  private next = 0;
+  private n = 0;
+  private last = new Map<number, { x: number; z: number }>(); // per wheel: where the last mark was laid
+  private tmp = new Object3D();
+  private colors = { grass: new Color(0x3d2f1f), tar: new Color(0x111111), paving: new Color(0x2a2724) };
+
+  constructor() {
+    const geo = new PlaneGeometry(0.26, 0.62).rotateX(-Math.PI / 2);
+    this.mesh = new InstancedMesh(geo, new MeshBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false, blending: NormalBlending }), MARKS);
+    this.mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+    this.mesh.count = 0;
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 1;
+    for (let i = 0; i < MARKS; i++) this.mesh.setColorAt(i, this.colors.grass);
+  }
+
+  get count() { return this.n; }
+
+  /** Lay marks for this frame of driving. */
+  drive(c: Car, _dt: number, p: Pedals, surface: Surface) {
+    const back = c.len / 2 - 0.9, hw = SPEC[c.kind].halfW - 0.18;
+    const fx = Math.sin(c.heading), fz = Math.cos(c.heading);
+    const mark = leavesMark(surface, c.speed, p.steer, p.brake > 0 && c.speed > 0.5);
+    for (const side of [-1, 1]) {
+      const key = c.id * 2 + (side > 0 ? 1 : 0);
+      const x = c.x - fx * back + fz * hw * side, z = c.z - fz * back - fx * hw * side;
+      const prev = this.last.get(key);
+      if (!mark || !prev) { this.last.set(key, { x, z }); continue; }
+      const d = Math.hypot(x - prev.x, z - prev.z);
+      if (d < 0.55) continue;
+      this.tmp.position.set((x + prev.x) / 2, 0.045, (z + prev.z) / 2);
+      this.tmp.rotation.set(0, Math.atan2(x - prev.x, z - prev.z), 0);
+      this.tmp.scale.set(1, 1, Math.min(2, d / 0.62));
+      this.tmp.updateMatrix();
+      this.mesh.setMatrixAt(this.next, this.tmp.matrix);
+      this.mesh.setColorAt(this.next, this.colors[surface]);
+      this.next = (this.next + 1) % MARKS;
+      this.n = Math.min(MARKS, this.n + 1);
+      this.last.set(key, { x, z });
+    }
+  }
+
+  update(_dt: number) {
+    this.mesh.count = this.n;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+
+const PUFFS = 48;
+/** Exhaust: grey puffs from the tailpipe that drift up, grow and fade; more when you're on the gas. */
+export class Exhaust {
+  readonly group = new Group();
+  private puffs: { s: Sprite; age: number; vx: number; vz: number }[] = [];
+  private next = 0;
+  private acc = 0;
+
+  constructor() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d')!;
+    const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(210,210,210,.9)');
+    grd.addColorStop(1, 'rgba(210,210,210,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 64, 64);
+    const tex = new CanvasTexture(c);
+    for (let i = 0; i < PUFFS; i++) {
+      const s = new Sprite(new SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0 }));
+      s.visible = false;
+      this.group.add(s);
+      this.puffs.push({ s, age: 99, vx: 0, vz: 0 });
+    }
+  }
+
+  emit(c: Car, dt: number, gas: number) {
+    this.acc += dt * (2.5 + gas * 16); // a trickle at idle, a stream on the gas
+    const fx = Math.sin(c.heading), fz = Math.cos(c.heading), hw = SPEC[c.kind].halfW;
+    while (this.acc >= 1) {
+      this.acc -= 1;
+      const p = this.puffs[this.next];
+      this.next = (this.next + 1) % PUFFS;
+      p.age = 0;
+      p.s.position.set(c.x - fx * (c.len / 2 + 0.15) + fz * hw * 0.55, 0.35, c.z - fz * (c.len / 2 + 0.15) - fx * hw * 0.55);
+      p.vx = -fx * (0.6 + gas) + (Math.random() - 0.5) * 0.4;
+      p.vz = -fz * (0.6 + gas) + (Math.random() - 0.5) * 0.4;
+      p.s.visible = true;
+    }
+  }
+
+  update(dt: number) {
+    for (const p of this.puffs) {
+      if (p.age > 1.6) { p.s.visible = false; continue; }
+      p.age += dt;
+      const k = p.age / 1.6;
+      p.s.position.x += p.vx * dt; p.s.position.z += p.vz * dt; p.s.position.y += 0.7 * dt;
+      p.s.scale.setScalar(0.35 + k * 1.4);
+      (p.s.material as SpriteMaterial).opacity = 0.45 * (1 - k);
+    }
   }
 }
