@@ -751,3 +751,33 @@ test('driving across grass leaves tyre marks', async ({ page }) => {
   await page.waitForFunction(() => (window as any).__vora.marks > 6, null, { timeout: 60_000 });
   await page.keyboard.up('w');
 });
+
+test('reload mid-play (or iOS drops the tab) and you are back where you were, not at your house @smoke', async ({ page }) => {
+  // a first visit: you start at home; walk off a bit
+  await open(page, 't=12', true);
+  const s = await hold(page, 'w', 4);
+  await page.waitForTimeout(3500); // the game notes where you are every few seconds
+  await page.goto('/row.html?t=12');
+  await page.waitForFunction(() => (window as any).__vora?.frames > 5, null, { timeout: 30_000 });
+  const back = await state(page);
+  expect(Math.hypot(back.x - s.x, back.z - s.z)).toBeLessThan(1.5);
+  // inside Usdan, too: reload and you're still inside
+  await page.goto('/row.html?t=12&intro=0&x=-58.6&z=-197&yaw=1.5708');
+  await page.waitForFunction(() => (window as any).__vora?.frames > 5, null, { timeout: 30_000 });
+  await page.keyboard.press('f');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.where)).toBe('usdan');
+  await page.evaluate(() => (window as any).dispatchEvent(new Event('pagehide'))); // what Safari fires when it drops the page
+  await page.goto('/row.html?t=12');
+  await page.waitForFunction(() => (window as any).__vora?.frames > 5, null, { timeout: 30_000 });
+  expect(await page.evaluate(() => (window as any).__vora.where)).toBe('usdan');
+});
+
+test('in the car, just turning the wheel (no gas) creeps you forward and round', async ({ page }) => {
+  await open(page, `t=16&${hw(5, -12.8 + 2.4)}&yaw=${-Math.PI / 2}`);
+  await page.keyboard.press('f');
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.driving)).toBe(0);
+  const h0 = await page.evaluate(() => (window as any).__vora.garage.cars[0].heading);
+  await page.keyboard.down('d');
+  await page.waitForFunction((h) => Math.abs((window as any).__vora.garage.cars[0].heading - h) > 0.2, h0, { timeout: 60_000 });
+  await page.keyboard.up('d');
+});

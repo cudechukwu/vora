@@ -32,6 +32,7 @@ import { Person, discGeometry, randomLook } from './people';
 import { Knock, OUCH, hits, launch, stepKnock } from './knock';
 import { ICON, IconName } from './icons';
 import { Speedometer } from './hud';
+import { SPOT_KEY, loadSpot, saveSpot } from './save';
 import { surfaceAt } from './surface';
 import { ITEMS, SITTERS, chairs } from './plaza';
 import { UsdanView } from './usdan/view';
@@ -136,17 +137,31 @@ const insiders: Inside[] = [];
 
 // ── people ──
 const me = new Person({ skin: 0x6b3e26, hair: 0x121212, hairStyle: 'short', top: 0xc8302a, legs: 0x2b2b30, pack: 0x2b3a66 });
-// you start the day outside your house, on the sidewalk; ?x= / ?z= to start elsewhere
-const atHomeStart = !params.has('x') && !params.has('z');
-const pos = new Vector3(parseFloat(params.get('x') ?? String(HOME_SPAWN.x)), 0, parseFloat(params.get('z') ?? String(HOME_SPAWN.z)));
-let level: Level = params.get('level') === '1' ? 1 : 0; // which floor you're on (only matters in your house)
+// where you are: back where you were if the page reloaded (saved on your phone); otherwise you start the
+// day outside your house, on the sidewalk. ?x= / ?z= (screenshots, tests) override both.
+const urlSpot = params.has('x') || params.has('z');
+const resumed = urlSpot ? null : (() => {
+  let raw: string | null = null;
+  try { raw = localStorage.getItem(SPOT_KEY); } catch { /* storage unavailable */ }
+  return loadSpot(raw, Date.now(), (sp) => {
+    if (sp.where === 'in') return insideHouse(toLocal(sp.x, sp.z).u, toLocal(sp.x, sp.z).v);
+    if (sp.where === 'usdan') return insideUsdan(sp);
+    const ok = resolveMove(sp, sp, stops, houseExtra(0, false));
+    return ok.x === sp.x && ok.z === sp.z && !insideUsdan(sp);
+  });
+})();
+const atHomeStart = !urlSpot && !resumed;
+const pos = resumed ? new Vector3(resumed.x, 0, resumed.z)
+  : new Vector3(parseFloat(params.get('x') ?? String(HOME_SPAWN.x)), 0, parseFloat(params.get('z') ?? String(HOME_SPAWN.z)));
+let level: Level = resumed ? resumed.level : params.get('level') === '1' ? 1 : 0; // which floor you're on (only matters in your house)
 pos.y = floorY(level, pos.x, pos.z);
 me.root.position.copy(pos);
-me.face(HOME_SPAWN.heading); // facing +z, up High Street
+me.face(resumed ? resumed.heading : HOME_SPAWN.heading); // facing +z, up High Street
 scene.add(me.root);
 let sittingOn: Seat | null = null;
 // which world you're in: the street, or inside your house (?x/?z can start you inside)
-let where: Where = insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v) ? 'in' : insideUsdan(pos) ? 'usdan' : 'out';
+let where: Where = resumed ? resumed.where
+  : insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v) ? 'in' : insideUsdan(pos) ? 'usdan' : 'out';
 const sceneFor = (w: Where) => (w === 'in' ? homeScene : w === 'usdan' ? usdanScene : scene);
 
 // ── getting around: walk → run, bikes + scooters in racks and loose on the walk ──
@@ -164,6 +179,17 @@ const carsView = new CarsView(trafficView);
 scene.add(carsView.group);
 const saveCar = () => { try { localStorage.setItem(CAR_KEY, saveMine(garage)); } catch { /* ignore */ } };
 addEventListener('pagehide', saveCar);
+
+/** Note where you are, so a reload (or iOS dropping the tab) puts you back here. In a car, you'll be beside it. */
+function saveWhere() {
+  let x = pos.x, z = pos.z;
+  const c = driven(garage);
+  if (c) { const s = SPEC[c.kind].halfW + 0.7; x = c.x + Math.cos(c.heading) * s; z = c.z - Math.sin(c.heading) * s; }
+  if (sittingOn) { const a = toWorld(sittingOn.approach[0], sittingOn.approach[1]); x = a.x; z = a.z; }
+  try { localStorage.setItem(SPOT_KEY, saveSpot({ where, x, z, heading: me.heading, level, at: Date.now() })); } catch { /* ignore */ }
+}
+addEventListener('pagehide', () => saveWhere());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { saveWhere(); saveCar(); } });
 
 /** Drivers you've pulled out of their cars: knocked down, up again, then off down the sidewalk, yelling. */
 interface Fleer { p: Person; x: number; z: number; out: { x: number; z: number }; t: number; bubble: HTMLElement; body: Body }
@@ -428,14 +454,14 @@ function applyMood(h: number) {
 // ── input + camera ──
 const input = new Input();
 input.onFirstMove = () => setTimeout(() => hint.classList.add('gone'), 2500);
-const rig = new CameraRig(parseFloat(params.get('yaw') ?? String(Math.PI))); // π = looking +z, up High Street / down the row; ?yaw= for screenshots
+const rig = new CameraRig(params.has('yaw') ? parseFloat(params.get('yaw')!) : resumed ? resumed.heading + Math.PI : Math.PI); // π = looking +z, up High Street / down the row; ?yaw= for screenshots
 // the opening swoop: at home, from across the street looking back at you in front of your house; else from high over the row
 const camPos = atHomeStart ? new Vector3(pos.x - 24, 11, pos.z + 6) : new Vector3(pos.x + 60, 70, pos.z - 90);
 const HOUSE_LOOK = new Vector3(toWorld(3, 0).x, 4, toWorld(3, 0).z); // the front of your house
 const lookAt = new Vector3();
 const fwd = new Vector3(), right = new Vector3(), move = new Vector3(), want = new Vector3();
 let snapCamera = false; // jump the camera (after going through a door) instead of gliding
-let introT = params.get('intro') === '0' ? 1 : 0; // ?intro=0 skips the opening swoop
+let introT = params.get('intro') === '0' || resumed ? 1 : 0; // ?intro=0 (or picking up where you left off) skips the opening swoop
 const introRunning = () => introT < 1;
 
 function resize() {
@@ -773,7 +799,7 @@ function frame(now: number) {
 
   if (!frozen) hour = advance(hour, dt);
   if (Math.abs(hour - lastHour) > 0.004) { applyMood(hour); lastHour = hour; }
-  if (now - savedAt > 5000) { if (!frozen) saveHour(); saveCar(); savedAt = now; }
+  if (now - savedAt > 3000) { if (!frozen) saveHour(); saveCar(); if (!urlSpot) saveWhere(); savedAt = now; }
 
   // you
   const secs = now / 1000;

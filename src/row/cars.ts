@@ -31,6 +31,8 @@ export interface Car {
   owner: Owner;
   cruise: number; // how fast it goes when it's back in traffic
   stolen: boolean; // you've taken it without asking
+  /** how far the front wheels are turned, −1 (left) … +1 (right) — for drawing */
+  steer?: number;
 }
 
 export interface Garage { cars: Car[]; driving: number | null }
@@ -40,6 +42,8 @@ export const SPEC = {
   truck: { top: 15, reverse: 3.5, accel: 3.5, turn: 1.5, halfW: 1.2 }, // ~34 mph
 } as const;
 const BRAKE = 14; // m/s² when you pull the stick the other way
+/** With no pedal down but the wheel turned, the car creeps forward (like an automatic in drive) so you can turn. */
+export const CREEP = 2.2; // m/s
 const COAST = 4; // m/s² when you let go
 const REVERSE_ARC = 2.1; // stick more than this far (rad) from the nose = reverse
 
@@ -209,10 +213,13 @@ export function stepPedals(c: Car, dt: number, p: Pedals): XZ {
   } else if (brake > 0) {
     if (c.speed > 0.2) dv = -Math.min(c.speed, BRAKE * brake * dt);
     else dv = Math.max(-spec.reverse * brake - c.speed, -spec.accel * dt); // stopped: back up
+  } else if (Math.abs(steer) > 0.1 && c.speed >= -0.2 && c.speed < CREEP) {
+    dv = Math.min(CREEP - c.speed, 2.5 * dt); // creep forward so the wheel does something
   } else {
     dv = -Math.sign(c.speed) * Math.min(Math.abs(c.speed), COAST * dt); // coast
   }
   c.speed += dv;
+  c.steer = (c.steer ?? 0) + (steer - (c.steer ?? 0)) * Math.min(1, dt * 10); // the front wheels follow the wheel
   const ax = axle(c), f0 = fwd(c.heading);
   const rear = { x: c.x - f0.x * ax, z: c.z - f0.z * ax };
   // right (+steer) turns you toward −x when facing +z, i.e. the heading goes down; reversing flips it

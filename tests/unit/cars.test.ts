@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   Car, JACK_SPEED, LEAVE_AFTER, REACH, SPEC, carAt, carjack, clearRoad, createGarage, distToCar,
   driveMove, driven, drivewaySpot, footprint, getIn, getOut, inDriveway, jackable, laneFor, loadMine, missing,
-  mph, onRoad, roadBlocks, saveMine, stepCar, stepPedals,
+  CREEP, mph, onRoad, roadBlocks, saveMine, stepCar, stepPedals,
 } from '../../src/row/cars';
 import { Extra, blockedAt, resolveMove } from '../../src/row/collide';
 import { FAR_WALK, ROAD, byId, layoutRow } from '../../src/row/layout';
@@ -442,10 +442,24 @@ describe('driving with pedals', () => {
     expect(l.x).toBeGreaterThan(1);
   });
 
-  it('can\'t turn on the spot; reversing with the wheel right swings the nose the other way', () => {
+  it('just turning the wheel (no gas) creeps the car forward so it turns; nothing pressed, it stays put', () => {
+    const still = run(fresh(), 3, {});
+    expect(still.speed).toBe(0);
+    expect(still.z).toBe(0);
+    const c = run(fresh(), 2, { steer: 1 });
+    expect(c.speed).toBeCloseTo(CREEP, 1);
+    expect(c.heading).toBeLessThan(-0.3); // turned right
+    expect(c.steer).toBeCloseTo(1, 2); // the front wheels are turned
+    run(c, 3, {}); // let go of the wheel: rolls to a stop
+    expect(c.speed).toBe(0);
+  });
+
+  it('gas still builds speed well past the creep', () => {
+    expect(run(fresh(), 3, { steer: 0.2, gas: 1 }).speed).toBeGreaterThan(CREEP * 3);
+  });
+
+  it('reversing with the wheel right swings the nose the other way', () => {
     const c = fresh();
-    run(c, 1, { steer: 1 });
-    expect(c.heading).toBe(0);
     run(c, 0.8, { brake: 1, steer: 1 });
     expect(c.speed).toBeLessThan(0);
     expect(c.heading).toBeGreaterThan(0.05);

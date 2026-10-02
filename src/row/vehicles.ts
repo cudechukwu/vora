@@ -285,7 +285,12 @@ export class CarsView {
     root.position.set(c.x, 0, c.z);
     root.rotation.set(0, c.heading, 0);
     lit(root, driving);
-    for (const w of (root.userData.wheels ?? []) as Mesh[]) w.rotation.x += (c.speed * dt) / 0.34;
+    const wheels = (root.userData.wheels ?? []) as Mesh[];
+    const front = Math.max(...wheels.map((w) => w.position.z));
+    for (const w of wheels) {
+      w.rotation.x += (c.speed * dt) / 0.34;
+      if (w.position.z === front) { w.rotation.order = 'YXZ'; w.rotation.y = -(c.steer ?? 0) * 0.5; } // steer the front pair
+    }
   }
 }
 
