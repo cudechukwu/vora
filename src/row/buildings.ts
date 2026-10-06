@@ -5,7 +5,8 @@ import {
 import {
   BoxBank, Facing, PAL, WindowBank, WindowKind, block, brickMap, hipRoof, lambert, prism, stoneMap,
 } from './kit';
-import { BuildingId, FRONT_X, PORTICO, ROW, SOUTH_TOWER, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
+import { BuildingId, FRONT_X, PORTICO, ROW, RowStop, SOUTH_TOWER, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
+import { rearDoorZ } from './backlawn';
 import { DOORS, Door, VESTIBULE } from './usdan/plan';
 import { buildSouthEnd } from './southview';
 
@@ -16,7 +17,7 @@ import { buildSouthEnd } from './southview';
 // Positions come from layout.ts; this file only draws.
 
 type Kit = { g: Group; win: WindowBank; box: BoxBank };
-type Builder = (k: Kit, zc: number) => void;
+type Builder = (k: Kit, zc: number, s: RowStop) => void;
 
 const BUILDERS: Record<BuildingId, Builder> = {
   judd, chapel, zelnick, north: northCollege, south: southCollege, boger,
@@ -25,7 +26,7 @@ const BUILDERS: Record<BuildingId, Builder> = {
 export function buildRow(win: WindowBank, box: BoxBank) {
   const g = new Group();
   const { stops, crossings } = layoutRow();
-  for (const s of stops) BUILDERS[s.id]({ g, win, box }, s.zc);
+  for (const s of stops) BUILDERS[s.id]({ g, win, box }, s.zc, s);
   usdan({ g, win, box });
   buildSouthEnd({ g, win, box }); // the field road, the Frank Center and Olin, up on their bank
   g.traverse((o) => {
@@ -77,9 +78,10 @@ interface HallOpts {
   window: WindowKind; winW?: number; winH?: number;
   roof: 'hip' | 'gable'; roofH: number;
   skipDoor?: boolean;
+  rearDoorZ?: number; // a door in the back wall, onto the lawn and its paver walk
 }
 
-/** A rectangular hall: plinth, walls, windows on the front and ends, cornice, roof, door. */
+/** A rectangular hall: plinth, walls, windows on all four sides, cornice, roof, a front door (and maybe a back one). */
 function hall(k: Kit, o: HallOpts) {
   const { g, win, box } = k;
   const cx = FRONT_X - o.d / 2;
@@ -101,8 +103,8 @@ function hall(k: Kit, o: HallOpts) {
 
   const face = (x: number, z: number, facing: Facing, y: number) => {
     win.add(o.window, x, y, z, ww, wh, facing);
-    const out = facing === '+x' ? [0.12, 0] : facing === '-z' ? [0, -0.12] : [0, 0.12];
-    const along = facing === '+x';
+    const out = facing === '+x' ? [0.12, 0] : facing === '-x' ? [-0.12, 0] : facing === '-z' ? [0, -0.12] : [0, 0.12];
+    const along = facing === '+x' || facing === '-x';
     box.add(x + out[0], y - wh / 2 - 0.08, z + out[1], along ? 0.22 : ww + 0.3, 0.14, along ? ww + 0.3 : 0.22, PAL.trim);
     if (o.window === 'rect') {
       box.add(x + out[0], y + wh / 2 + 0.12, z + out[1], along ? 0.18 : ww + 0.24, 0.22, along ? ww + 0.24 : 0.18, PAL.trim);
@@ -112,8 +114,10 @@ function hall(k: Kit, o: HallOpts) {
   for (let f = 0; f < o.floors; f++) {
     const y = base + o.floorH * f + o.floorH * 0.52;
     for (let c = 0; c < cols; c++) {
-      if (f === 0 && c === doorCol && !o.skipDoor) continue;
-      face(FRONT_X + 0.02, o.zc + o.w / 2 - pitch * (c + 0.5), '+x', y);
+      const z = o.zc + o.w / 2 - pitch * (c + 0.5);
+      if (!(f === 0 && c === doorCol && !o.skipDoor)) face(FRONT_X + 0.02, z, '+x', y);
+      // and the back, onto the field
+      if (!(f === 0 && o.rearDoorZ !== undefined && Math.abs(z - o.rearDoorZ) < pitch * 0.6)) face(FRONT_X - o.d - 0.02, z, '-x', y);
     }
     const endCols = Math.max(2, Math.floor(o.d / 3.6));
     const ep = o.d / endCols;
@@ -134,10 +138,31 @@ function hall(k: Kit, o: HallOpts) {
     }
   }
 
+  if (o.rearDoorZ !== undefined) rearDoor(k, FRONT_X - o.d, o.rearDoorZ, base, PAL.trim);
+
   if (o.roof === 'hip') add(g, hipRoof(o.d + 0.9, o.roofH, o.w + 0.9), lambert(PAL.slate), cx, top + 0.45, o.zc);
   else gable(g, cx, top + 0.45, o.zc, o.d + 0.2, o.roofH, o.w, wallMat);
 
   return { cx, top: top + 0.45 };
+}
+
+/**
+ * A back door onto the lawn (the user's photo of North College's): a dark panelled door with a transom light, a
+ * lintel, a lantern beside it, and granite steps down to the pavers. `bx` is the back wall's x (it faces −x).
+ */
+function rearDoor(k: Kit, bx: number, z: number, base: number, trim: number, wide = false) {
+  const { g, win, box } = k;
+  const dw = wide ? 1.9 : 1.5;
+  box.add(bx - 0.06, base + 1.2, z, 0.12, 2.4, dw, 0x2a2622); // door
+  box.add(bx - 0.08, base + 1.2, z, 0.04, 2.3, 0.05, 0x1a1816); // the split between the leaves
+  win.add('rect', bx - 0.03, base + 2.75, z, dw - 0.2, 0.55, '-x'); // transom
+  box.add(bx - 0.12, base + 3.2, z, 0.24, 0.3, dw + 0.7, trim); // lintel
+  box.add(bx - 0.3, base + 2.6, z + dw / 2 + 0.55, 0.22, 0.4, 0.22, 0x1b1d1f); // lantern
+  add(g, new SphereGeometry(0.1, 6, 4), new MeshBasicMaterial({ color: 0xffe2a8 }), bx - 0.3, base + 2.55, z + dw / 2 + 0.55);
+  for (let s = 0; s < 3; s++) {
+    const t = base * (1 - s / 3);
+    box.add(bx - 0.25 - s * 0.45, t / 2, z, 0.45, t, dw + 1.2 + s * 0.3, 0xc4c2bb);
+  }
 }
 
 /** White cupola with a patina dome (North College) or a taller belfry (South College). */
@@ -198,10 +223,10 @@ function chapel(k: Kit, zRow: number) {
  * brownstone cheeks, three windows above, a white cornice and balustrade, and the white belfry with its green dome.
  * A black fire escape down one end, and a glass bridge across the gap to North College.
  */
-function southCollege(k: Kit, zc: number) {
+function southCollege(k: Kit, zc: number) { // (its back door, onto the lawn, is in the middle)
   const { g, win, box } = k;
   const w = 24, d = 16;
-  const h = hall(k, { zc, w, d, floors: 4, floorH: 3.4, wall: 'stone', color: PAL.brownstone, window: 'rect', roof: 'gable', roofH: 4, skipDoor: true });
+  const h = hall(k, { zc, w, d, floors: 4, floorH: 3.4, wall: 'stone', color: PAL.brownstone, window: 'rect', roof: 'gable', roofH: 4, skipDoor: true, rearDoorZ: zc });
   const stone = lambert(PAL.brownstone, stoneMap(), 'stone');
   const T = SOUTH_TOWER, tx = FRONT_X + T.out / 2 - 0.5, tw = T.half * 2, top = h.top + 4.2;
   add(g, block(T.out + 1, top, tw), stone, tx, 0, zc);
@@ -248,7 +273,7 @@ function southCollege(k: Kit, zc: number) {
 function northCollege(k: Kit, zc: number) {
   const { g, win, box } = k;
   const w = 60, d = 18;
-  const cx = FRONT_X - d / 2;
+  const cx = FRONT_X - d / 2, bx = FRONT_X - d; // bx: the back wall
   const ash = lambert(0x7e5a4a, stoneMap(), 'ashlar');
   const trimC = 0x6e4d40;
   const base = 1.2, main = 12, attic = 3.6;
@@ -267,8 +292,13 @@ function northCollege(k: Kit, zc: number) {
       if (r === 0 && Math.abs(z - zc) < pitch * 0.6) return; // the door
       win.add('rect', FRONT_X + 0.02, y, z, 1.25, wh, '+x');
       box.add(FRONT_X + 0.1, y - wh / 2 - 0.07, z, 0.2, 0.14, 1.5, trimC);
+      win.add('rect', bx - 0.02, y, z, 1.25, wh, '-x'); // the back, onto the field: the same sixteen bays
+      box.add(bx - 0.1, y - wh / 2 - 0.07, z, 0.2, 0.14, 1.5, trimC);
     });
   }
+  // the back: corner pilasters, and the middle door between two giant pilasters (the user's photo), up granite steps
+  for (const z of [zc - w / 2 + 0.9, zc + w / 2 - 0.9, zc - 1.9, zc + 1.9]) box.add(bx - 0.25, (base + main) / 2, z, 0.5, main - base, Math.abs(z - zc) < 3 ? 1.1 : 1.8, trimC);
+  rearDoor(k, bx, zc, base, trimC, true);
   const endBays = 5;
   for (let b = 0; b < endBays; b++) {
     const x = FRONT_X - (b + 0.5) * (d / endBays);
@@ -297,9 +327,9 @@ function northCollege(k: Kit, zc: number) {
   }
 }
 
-function judd(k: Kit, zc: number) {
+function judd(k: Kit, zc: number, s: RowStop) {
   const w = 30;
-  hall(k, { zc, w, d: 18, floors: 4, floorH: 3.8, wall: 'stone', color: 0x86604e, window: 'arch', winW: 1.1, winH: 2.3, roof: 'hip', roofH: 5.5 });
+  hall(k, { zc, w, d: 18, rearDoorZ: rearDoorZ(s), floors: 4, floorH: 3.8, wall: 'stone', color: 0x86604e, window: 'arch', winW: 1.1, winH: 2.3, roof: 'hip', roofH: 5.5 });
 }
 
 /** Zelnick Pavilion: the glass link between the chapel and North College. */
@@ -343,6 +373,11 @@ function boger(k: Kit, zc: number) {
     win.add('rect', FRONT_X + 0.02, 5.6, z, pitch - 1.1, 2.1, '+x');
     win.add('rect', FRONT_X - 0.28, 9.4, z, pitch - 0.4, 1.5, '+x'); // ribbon window
     box.add(FRONT_X + 0.25, 3.8, zm + L / 2 - i * pitch, 0.5, 7.6, 0.55, PAL.brickDeep); // piers
+    // the back, onto the plaza: the same bays
+    win.add('rect', FRONT_X - d - 0.02, 2.0, z, pitch - 1.1, 3.2, '-x');
+    win.add('rect', FRONT_X - d - 0.02, 5.6, z, pitch - 1.1, 2.1, '-x');
+    win.add('rect', FRONT_X - d - 0.02, 9.4, z, pitch - 0.4, 1.5, '-x'); // (the metal floor is flush at the back)
+    box.add(FRONT_X - d - 0.25, 3.8, zm + L / 2 - i * pitch, 0.5, 7.6, 0.55, PAL.brickDeep);
   }
   // tall end block on the South College side — the arched window you see walking up
   const zt = zc + W / 2 - 5;
@@ -350,6 +385,7 @@ function boger(k: Kit, zc: number) {
   box.add(cx + 0.5, 13.3, zt, d + 1.8, 0.6, 10.8, trimDark);
   win.add('arch', FRONT_X + 1.03, 6.8, zt, 3.2, 8.4, '+x');
   win.add('arch', cx + 0.5, 6.8, zt + 5.03, 3.4, 9, '+z');
+  win.add('arch', FRONT_X - d - 0.03, 6.8, zt, 3.2, 8.4, '-x'); // and on the back
   for (const dz of [-4.7, 4.7]) box.add(FRONT_X + 1.2, 6.5, zt + dz, 0.4, 13, 0.6, PAL.brickDeep); // pilasters
 }
 

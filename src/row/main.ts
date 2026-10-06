@@ -7,6 +7,7 @@ import { BoxBank, WindowBank, lambert } from './kit';
 import { buildRow } from './buildings';
 import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, ROW_ENTRY, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
 import { World } from './world';
+import { along, quadX } from './backlawn';
 import { FIELD_ROAD, PLAZA_SITTERS, PLAZA_TABLES, ROAD_LANES, ROAD_WALK, STAIRS, groundY, plazaChairs, southEndNear } from './southend';
 import { resolveMove } from './collide';
 import {
@@ -317,6 +318,20 @@ for (let i = 0; i < 12; i++) {
   bw.body = hittable(bw.p, null, { land: (x, z) => { bw.x = Math.min(BACK_PATH.x1 - 0.8, Math.max(BACK_PATH.x0 + 0.8, x)); bw.z = z; } });
   scene.add(bw.p.root);
   backWalkers.push(bw);
+}
+
+// and cutting across the lawn between Judd and the chapel on the X of walks, between the row's walk and the back path
+const xSegs = quadX(stops);
+interface XWalker { p: Person; seg: number; t: number; dir: 1 | -1; speed: number; side: number; body: Body }
+const xWalkers: XWalker[] = [];
+for (let i = 0; i < 4; i++) {
+  const xw: XWalker = {
+    p: new Person(randomLook(660 + i)), seg: i % 2, t: rng(i * 29 + 4), dir: i < 2 ? 1 : -1,
+    speed: 1.05 + rng(i * 31 + 2) * 0.4, side: (rng(i * 37 + 1) - 0.5) * 1.2, body: null!,
+  };
+  xw.body = hittable(xw.p, null, { land: (x, z) => { xw.t = along(xSegs[xw.seg], { x, z }).t; } });
+  scene.add(xw.p.root);
+  xWalkers.push(xw);
 }
 
 // and along the field road, past the Frank Center and Olin (keeping right: eastbound on the bank side)
@@ -1084,6 +1099,16 @@ function frame(now: number) {
     if (w.z > backZ.z1 - 2 || w.z < backZ.z0 + 2) w.dir = w.dir > 0 ? -1 : 1; // turn back at the ends
     w.p.root.position.set(w.x, 0, w.z);
     w.p.face(w.dir > 0 ? 0 : Math.PI);
+    w.p.walk(dt, w.speed);
+  }
+  for (const w of xWalkers) {
+    const sg = xSegs[w.seg], dx = sg.b.x - sg.a.x, dz = sg.b.z - sg.a.z, L = Math.hypot(dx, dz);
+    if (busy(w.body)) continue;
+    w.t += (w.dir * w.speed * dt) / L;
+    if (w.t > 1 || w.t < 0) { w.t = Math.min(1, Math.max(0, w.t)); w.dir = w.dir > 0 ? -1 : 1; } // and back again
+    const ox = (-dz / L) * w.side, oz = (dx / L) * w.side; // a little to one side of the middle
+    w.p.root.position.set(sg.a.x + dx * w.t + ox, 0, sg.a.z + dz * w.t + oz);
+    w.p.face(Math.atan2(dx * w.dir, dz * w.dir));
     w.p.walk(dt, w.speed);
   }
   roadWalkers.forEach((w, i) => {

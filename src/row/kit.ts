@@ -63,6 +63,35 @@ function masonry(kind: 'brick' | 'stone'): CanvasTexture {
   t.anisotropy = 4;
   return t;
 }
+/**
+ * Interlocking concrete pavers (the walks behind the row): warm grey units in a running bond, a few a shade
+ * lighter or darker, with sandy joints. In colour (not a tint map), one tile = `PAVER_TILE` m.
+ */
+export const PAVER_TILE = 1.6;
+export function paverMap(): CanvasTexture {
+  if (paverTex) return paverTex;
+  const S = 256, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#9d978b'; // the joints
+  g.fillRect(0, 0, S, S);
+  const unitH = S / 8, unitW = S / 4; // 20 × 40 cm at PAVER_TILE = 1.6
+  let id = 900;
+  for (let y = 0, row = 0; y < S; y += unitH, row++) {
+    const off = row % 2 ? unitW / 2 : 0;
+    for (let x = -off; x < S; x += unitW) {
+      const v = 0.92 + rng(id++) * 0.12;
+      g.fillStyle = `rgb(${Math.round(196 * v)},${Math.round(190 * v)},${Math.round(178 * v)})`;
+      g.fillRect(x + 1.5, y + 1.5, unitW - 3, unitH - 3);
+    }
+  }
+  const t = new CanvasTexture(c);
+  t.wrapS = t.wrapT = RepeatWrapping;
+  t.colorSpace = SRGBColorSpace;
+  t.anisotropy = 4;
+  return (paverTex = t);
+}
+let paverTex: CanvasTexture | null = null;
 let brickTex: CanvasTexture | null = null;
 let stoneTex: CanvasTexture | null = null;
 export const brickMap = () => (brickTex ??= masonry('brick'));
