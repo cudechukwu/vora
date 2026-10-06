@@ -13,7 +13,7 @@ export interface Box { x0: number; x1: number; z0: number; z1: number }
 export const REAR_DOORS: Partial<Record<BuildingId, { at: number; w: number }>> = {
   north: { at: 0, w: 3 },
   south: { at: 0, w: 2.6 },
-  judd: { at: -10 / 3, w: 2.6 }, // a bay off centre, so the walk lands between the teak benches on the path
+  judd: { at: -30 / 7, w: 2.6 }, // a bay off centre (it has seven), so the walk lands between the teak benches on the path
 };
 
 /** How wide the paver apron along each back wall is. */

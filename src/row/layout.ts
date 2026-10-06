@@ -157,16 +157,24 @@ export const byId = (stops: RowStop[], id: BuildingId) => stops.find((s) => s.id
 
 /** North College's portico: four giant columns this far out in front of its facade, at these offsets from its middle. */
 export const PORTICO = { out: 2.6, r: 0.55, at: [-6.3, -2.1, 2.1, 6.3] } as const;
+/** Judd's entrance porch: two pairs of columns this far out from its facade, at these offsets from its middle. */
+export const JUDD_PORCH = { out: 2.3, r: 0.26, at: [-2.0, -1.35, 1.35, 2.0] } as const;
 /** South College's tower, standing out this far from the middle of its facade, this wide either side. */
 export const SOUTH_TOWER = { out: 3.2, half: 3 } as const;
 
-/** Bits of the row that stand out past the facades (and are solid): the portico's columns, South College's tower. */
+/** Bits of the row that stand out past the facades (and are solid): the portico's columns, Judd's porch, South College's tower. */
 export function rowSolids(stops: RowStop[], pad = 0.3): { x0: number; x1: number; z0: number; z1: number }[] {
   const out: { x0: number; x1: number; z0: number; z1: number }[] = [];
-  const north = stops.find((s) => s.id === 'north'), south = stops.find((s) => s.id === 'south');
+  const north = stops.find((s) => s.id === 'north'), south = stops.find((s) => s.id === 'south'), judd = stops.find((s) => s.id === 'judd');
   if (north) {
     for (const o of PORTICO.at) {
       const x = FRONT_X + PORTICO.out, z = north.zc + o, r = PORTICO.r + pad;
+      out.push({ x0: x - r, x1: x + r, z0: z - r, z1: z + r });
+    }
+  }
+  if (judd) {
+    for (const o of JUDD_PORCH.at) {
+      const x = FRONT_X + JUDD_PORCH.out, z = judd.doorZ + o, r = JUDD_PORCH.r + pad;
       out.push({ x0: x - r, x1: x + r, z0: z - r, z1: z + r });
     }
   }

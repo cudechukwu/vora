@@ -5,7 +5,7 @@ import {
 import {
   BoxBank, Facing, PAL, WindowBank, WindowKind, block, brickMap, hipRoof, lambert, prism, stoneMap,
 } from './kit';
-import { BuildingId, FRONT_X, PORTICO, ROW, RowStop, SOUTH_TOWER, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
+import { BuildingId, FRONT_X, JUDD_PORCH, PORTICO, ROW, RowStop, SOUTH_TOWER, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
 import { rearDoorZ } from './backlawn';
 import { DOORS, Door, VESTIBULE } from './usdan/plan';
 import { buildSouthEnd } from './southview';
@@ -327,9 +327,117 @@ function northCollege(k: Kit, zc: number) {
   }
 }
 
+/** A mansard: a box whose top is pulled in by `inset` all round, sitting on y=0 (steep slate sides, a flat top). */
+function mansard(sx: number, h: number, sz: number, inset: number): BoxGeometry {
+  const geo = new BoxGeometry(sx, h, sz);
+  const pos = geo.getAttribute('position');
+  for (let i = 0; i < pos.count; i++) {
+    if (pos.getY(i) < 0) continue;
+    pos.setX(i, Math.sign(pos.getX(i)) * (sx / 2 - inset));
+    pos.setZ(i, Math.sign(pos.getZ(i)) * (sz / 2 - inset));
+  }
+  geo.computeVertexNormals();
+  return geo.translate(0, h / 2, 0);
+}
+
+/**
+ * Judd Hall (1870; the user's photos): four storeys of rusticated brownstone, quoined corners, a string course at
+ * every floor, tall windows (pedimented on the ground floor, hooded above), a slate mansard with dormers, and in the
+ * middle of the front a porch of paired columns carrying a balustraded balcony, up steps between stone cheeks.
+ * Its back door, onto the lawn, has railings down its steps.
+ */
 function judd(k: Kit, zc: number, s: RowStop) {
-  const w = 30;
-  hall(k, { zc, w, d: 18, rearDoorZ: rearDoorZ(s), floors: 4, floorH: 3.8, wall: 'stone', color: 0x86604e, window: 'arch', winW: 1.1, winH: 2.3, roof: 'hip', roofH: 5.5 });
+  const { g, win, box } = k;
+  const w = 30, d = 18, cx = FRONT_X - d / 2, bx = FRONT_X - d;
+  const stone = lambert(0x8a5846, stoneMap(), 'judd');
+  const trimC = 0x6f4536, slate = lambert(0x4a5257);
+  const base = 1.2, floorH = 3.6, floors = 4, top = base + floors * floorH;
+  add(g, block(d + 0.5, base, w + 0.5), lambert(0x6e4a3c, stoneMap(), 'stone2'), cx, 0, zc);
+  add(g, block(d, top - base, w), stone, cx, base, zc);
+  for (let f = 1; f < floors; f++) box.add(cx, base + f * floorH, zc, d + 0.3, 0.24, w + 0.3, trimC); // string courses
+  box.add(cx, top + 0.3, zc, d + 1.3, 0.6, w + 1.3, trimC); // the cornice
+  // quoins: alternating long and short blocks up every corner
+  for (const [ex, ez] of [[FRONT_X, zc + w / 2], [FRONT_X, zc - w / 2], [bx, zc + w / 2], [bx, zc - w / 2]]) {
+    const sx = Math.sign(ex - cx), sz = Math.sign(ez - zc);
+    for (let y = base + 0.3, i = 0; y < top; y += 0.6, i++) {
+      const a = i % 2 ? 1.4 : 0.8, b = i % 2 ? 0.8 : 1.4;
+      box.add(ex + sx * 0.06 - sx * a / 2, y, ez + sz * 0.06, a, 0.5, 0.12, 0x7c4f3f); // on the end
+      box.add(ex + sx * 0.06, y, ez + sz * 0.06 - sz * b / 2, 0.12, 0.5, b, 0x7c4f3f); // on the front (or back)
+    }
+  }
+  // the mansard, with dormers front and back
+  add(g, mansard(d + 0.6, 3.4, w + 0.6, 1.1), slate, cx, top + 0.6, zc);
+  box.add(cx, top + 4.05, zc, d - 1.4, 0.12, w - 1.4, 0x3a4044);
+
+  const bays = 7, pitch = w / bays, ww = 1.25, wh = 2.4;
+  const rearZ = rearDoorZ(s);
+  const pediment = (x: number, y: number, z: number, out: number) => {
+    const p = add(g, prism(ww + 0.6, 0.55, 0.22), lambert(trimC), x + out * 0.11, y, z);
+    p.rotation.y = Math.PI / 2;
+  };
+  for (let b = 0; b < bays; b++) {
+    const z = zc + w / 2 - pitch * (b + 0.5);
+    for (let f = 0; f < floors; f++) {
+      const y = base + f * floorH + floorH * 0.5;
+      for (const [x, out, face] of [[FRONT_X, 1, '+x'], [bx, -1, '-x']] as [number, number, Facing][]) {
+        if (f === 0 && (out > 0 ? Math.abs(z - s.doorZ) < 1 : Math.abs(z - rearZ) < 1)) continue; // the doors
+        win.add('rect', x + out * 0.02, y, z, ww, wh, face);
+        box.add(x + out * 0.1, y - wh / 2 - 0.08, z, 0.2, 0.16, ww + 0.35, trimC); // sill
+        box.add(x + out * 0.12, y + wh / 2 + 0.14, z, 0.24, 0.22, ww + 0.5, trimC); // hood
+        if (f === 0) pediment(x, y + wh / 2 + 0.25, z, out);
+      }
+    }
+    // dormers in the mansard
+    for (const [x, out, face] of [[FRONT_X - 0.2, 1, '+x'], [bx + 0.2, -1, '-x']] as [number, number, Facing][]) {
+      box.add(x, top + 2.0, z, 1.0, 1.9, 1.5, PAL.slate);
+      box.add(x + out * 0.2, top + 3.05, z, 1.4, 0.2, 1.8, trimC);
+      win.add('rect', x + out * 0.51, top + 1.95, z, 0.95, 1.3, face);
+    }
+  }
+  const endBays = 4;
+  for (let b = 0; b < endBays; b++) {
+    const x = FRONT_X - (b + 0.5) * (d / endBays);
+    for (let f = 0; f < floors; f++) {
+      const y = base + f * floorH + floorH * 0.5;
+      for (const [z, face, out] of [[zc + w / 2, '+z', 1], [zc - w / 2, '-z', -1]] as [number, Facing, number][]) {
+        win.add('rect', x, y, z + out * 0.02, ww, wh, face);
+        box.add(x, y - wh / 2 - 0.08, z + out * 0.1, ww + 0.35, 0.16, 0.2, trimC);
+        box.add(x, y + wh / 2 + 0.14, z + out * 0.12, ww + 0.5, 0.22, 0.24, trimC);
+      }
+    }
+  }
+
+  // the porch: paired columns, an entablature, a balcony with a balustrade, a door, steps between stone cheeks
+  const P = JUDD_PORCH, px = FRONT_X + P.out, dz = s.doorZ, colH = floorH - 0.5;
+  for (const o of P.at) {
+    add(g, new CylinderGeometry(P.r * 0.85, P.r, colH, 10).translate(0, colH / 2, 0), lambert(0x8f604d), px, base, dz + o);
+    box.add(px, base + 0.12, dz + o, P.r * 2.6, 0.24, P.r * 2.6, trimC);
+    box.add(px, base + colH - 0.1, dz + o, P.r * 2.6, 0.2, P.r * 2.6, trimC);
+  }
+  const span = P.at[P.at.length - 1] - P.at[0] + 1.2, ey = base + colH;
+  box.add(FRONT_X + P.out / 2 + 0.3, ey + 0.3, dz, P.out + 0.8, 0.6, span, trimC); // entablature = the balcony's floor
+  for (const [x0, x1, z0, z1] of [[px + 0.45, px + 0.45, dz - span / 2, dz + span / 2], [FRONT_X, px + 0.45, dz - span / 2, dz - span / 2], [FRONT_X, px + 0.45, dz + span / 2, dz + span / 2]]) {
+    const len = Math.hypot(x1 - x0, z1 - z0), along = x1 === x0 ? 'z' : 'x';
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    box.add(mx, ey + 1.55, mz, along === 'x' ? len : 0.22, 0.14, along === 'z' ? len : 0.22, trimC); // rail
+    for (let t = 0.2; t < len - 0.1; t += 0.32) { // balusters
+      box.add(along === 'x' ? x0 + t : mx, ey + 1.05, along === 'z' ? z0 + t : mz, 0.14, 0.85, 0.14, 0x86604f);
+    }
+  }
+  box.add(FRONT_X + 0.06, base + 1.4, dz, 0.12, 2.8, 1.8, 0x2a2622); // door
+  win.add('rect', FRONT_X + 0.03, base + 3.0, dz, 1.6, 0.4, '+x'); // transom
+  for (let st = 0; st < 4; st++) {
+    const t = base * (1 - st / 4);
+    box.add(px + 0.55 + st * 0.45, t / 2, dz, 0.45 + 0.001, t, 2.4, 0xb9aea4);
+  }
+  for (const o of [-1.55, 1.55]) box.add(px + 1.0, base / 2 + 0.1, dz + o, 2.2, base + 0.2, 0.45, 0x6e4a3c); // cheeks
+
+  // the back door, with railings down its steps
+  rearDoor(k, bx, rearZ, base, trimC);
+  for (const o of [-1.25, 1.25]) {
+    box.add(bx - 0.9, base + 0.4, rearZ + o, 1.6, 0.05, 0.05, 0x2b2e30);
+    for (const x of [bx - 0.2, bx - 1.6]) box.add(x, (base + 0.4) / 2 + 0.2, rearZ + o, 0.05, base + 0.4, 0.05, 0x2b2e30);
+  }
 }
 
 /** Zelnick Pavilion: the glass link between the chapel and North College. */
