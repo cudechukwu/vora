@@ -3,7 +3,7 @@ import {
   MeshPhongMaterial, Path, PlaneGeometry, SRGBColorSpace, Shape, ShapeGeometry, SphereGeometry, TorusGeometry,
 } from 'three';
 import {
-  BoxBank, Facing, PAL, WindowBank, WindowKind, block, brickMap, hipRoof, lambert, prism, stoneMap,
+  BoxBank, Facing, PAL, WindowBank, WindowKind, block, brickMap, hipRoof, lambert, prism, seeGlass, stoneMap,
 } from './kit';
 import { BuildingId, CHAPEL_PORCH, FRONT_X, JUDD_PORCH, PORTICO, RowStop, SOUTH_TOWER, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
 import { rearDoorZ } from './backlawn';
@@ -544,11 +544,7 @@ function judd(k: Kit, zc: number, s: RowStop) {
   }
 }
 
-/** See-through glass (Zelnick's): you look through it to the inside and out the far side. Casts no shadow. */
-let glassMat: MeshPhongMaterial | null = null;
-const glass = () => (glassMat ??= new MeshPhongMaterial({
-  color: 0xa9c3cf, specular: 0xffffff, shininess: 90, transparent: true, opacity: 0.3, depthWrite: false, side: DoubleSide,
-}));
+const glass = seeGlass;
 
 /** A vertical glass wall from (x0, z0) to (x1, z1), y0 up h, with steel mullions every `step` m and a transom rail. */
 function glassWall(k: Kit, x0: number, z0: number, x1: number, z1: number, y0: number, h: number, step = 1.8) {

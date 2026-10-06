@@ -1,6 +1,6 @@
 import {
-  BoxGeometry, BufferGeometry, CanvasTexture, Color, ConeGeometry, DynamicDrawUsage,
-  ExtrudeGeometry, InstancedMesh, Material, Matrix4, MeshBasicMaterial, MeshLambertMaterial,
+  BoxGeometry, BufferGeometry, CanvasTexture, Color, ConeGeometry, DoubleSide, DynamicDrawUsage,
+  ExtrudeGeometry, InstancedMesh, Material, Matrix4, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial,
   PlaneGeometry, Quaternion, RepeatWrapping, Shape, ShapeGeometry, SRGBColorSpace, Texture, Vector3,
 } from 'three';
 import { rng } from './noise';
@@ -92,6 +92,13 @@ export function paverMap(): CanvasTexture {
   return (paverTex = t);
 }
 let paverTex: CanvasTexture | null = null;
+
+/** See-through glass (Zelnick's, the Frank Center's): you look through it to what's behind. Casts no shadow. */
+let seeGlassMat: MeshPhongMaterial | null = null;
+export const seeGlass = () => (seeGlassMat ??= new MeshPhongMaterial({
+  color: 0xa9c3cf, specular: 0xffffff, shininess: 90, transparent: true, opacity: 0.3, depthWrite: false, side: DoubleSide,
+}));
+
 let brickTex: CanvasTexture | null = null;
 let stoneTex: CanvasTexture | null = null;
 export const brickMap = () => (brickTex ??= masonry('brick'));

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALLBRITTON, BERM, FIELD_ROAD, FRANK_ADD, FRANK_LINK, LINK_DOOR, OLIN_LINK, PAVILION, PLAZA_F, STAIRS_E, FRANK, FRANK_DOOR, LANDING, OLIN, OLIN_POLY, STAIRS, TERRACE_Y, groundY, inSouthEnd, offRoadForCars,
-  southEndNear, southObstacles,
+  southEndNear, southObstacles, MAIN_ENTRY, ALLB_WELLS, ALLBRITTON_DOOR, LINK_DOOR_S, LINK_WALK,
 } from '../../src/row/southend';
 import { BACK_PATH, FIELD_X, byId, inPoly, layoutRow } from '../../src/row/layout';
 import { Extra, blockedAt, resolveMove } from '../../src/row/collide';
@@ -165,5 +165,57 @@ describe('the Frank Center and Olin, up on their bank', () => {
       expect(s.z).toBeGreaterThan(FIELD_ROAD.z0);
       expect(s.z).toBeLessThan(FIELD_ROAD.z1);
     }
+  });
+});
+
+describe("the Frank Center addition's main entry", () => {
+  it('faces the back path across from Judd (on its east face), not the plaza', () => {
+    expect(MAIN_ENTRY.x).toBe(FRANK_ADD.x1);
+    expect(MAIN_ENTRY.z).toBeGreaterThan(FRANK_ADD.z0 + MAIN_ENTRY.half);
+    expect(MAIN_ENTRY.z).toBeLessThan(FRANK_ADD.z1 - MAIN_ENTRY.half);
+    const judd = byId(stops, 'judd');
+    expect(MAIN_ENTRY.z).toBeGreaterThan(judd.z1);
+    expect(MAIN_ENTRY.z).toBeLessThan(judd.z0 + 3); // (by its south end)
+    expect(BACK_PATH.x0 - (MAIN_ENTRY.x + MAIN_ENTRY.out)).toBeGreaterThan(1); // room to walk up to it
+  });
+
+  it('you can walk off the back path straight up to its doors', () => {
+    let p = { x: (BACK_PATH.x0 + BACK_PATH.x1) / 2, z: MAIN_ENTRY.z };
+    for (let i = 0; i < 200; i++) p = resolveMove(p, { x: p.x - 0.15, z: p.z }, stops, all);
+    expect(p.x).toBeLessThan(MAIN_ENTRY.x + MAIN_ENTRY.out + 0.8);
+    expect(p.x).toBeGreaterThan(MAIN_ENTRY.x + MAIN_ENTRY.out); // and no further: the bay is solid
+  });
+});
+
+describe('the forecourt at the top of the stairs, and Allbritton\'s basement entrances', () => {
+  it("the connector's south doors: a paver walk up on the bank from the top of the east stairs to them", () => {
+    expect(LINK_DOOR_S.z).toBe(FRANK_LINK.z1);
+    expect(LINK_DOOR_S.x).toBeGreaterThan(FRANK_LINK.x0 + 1.5);
+    expect(LINK_DOOR_S.x).toBeLessThan(FRANK_LINK.x1 - 1.5);
+    for (const z of [LINK_WALK.z0 + 0.5, (LINK_WALK.z0 + LINK_WALK.z1) / 2, LINK_WALK.z1]) expect(groundY(LINK_DOOR_S.x, z)).toBe(TERRACE_Y); // level, up top
+    // from the top of the east stairs, along the walk, right up to the doors
+    let p: { x: number; z: number } = { x: STAIRS_E.x0 - 1, z: FRANK_DOOR.z };
+    for (let i = 0; i < 80; i++) p = resolveMove(p, { x: Math.max(LINK_DOOR_S.x, p.x - 0.1), z: p.z }, stops, all);
+    for (let i = 0; i < 200; i++) p = resolveMove(p, { x: p.x, z: p.z - 0.1 }, stops, all);
+    expect(p.z).toBeLessThan(LINK_DOOR_S.z + 1); // (your radius from the glass)
+    expect(p.z).toBeGreaterThan(LINK_DOOR_S.z); // the glass is solid
+  });
+
+  it('two wells, either side of the front steps, against the facade; you cannot walk into them', () => {
+    expect(ALLB_WELLS).toHaveLength(2);
+    const [a, b] = ALLB_WELLS;
+    expect(a.x1).toBeLessThan(ALLBRITTON_DOOR.x - 2);
+    expect(b.x0).toBeGreaterThan(ALLBRITTON_DOOR.x + 2);
+    for (const w of ALLB_WELLS) {
+      expect(w.z1).toBe(ALLBRITTON.z0);
+      const mid = { x: (w.x0 + w.x1) / 2, z: w.z0 - 2 };
+      let p = { ...mid };
+      for (let i = 0; i < 60; i++) p = resolveMove(p, { x: p.x, z: p.z + 0.1 }, stops, all);
+      expect(p.z).toBeLessThan(w.z0);
+    }
+    // and the way to the front door between them stays open
+    let p = { x: ALLBRITTON_DOOR.x, z: ALLBRITTON.z0 - 6 };
+    for (let i = 0; i < 80; i++) p = resolveMove(p, { x: p.x, z: p.z + 0.1 }, stops, all);
+    expect(p.z).toBeGreaterThan(ALLBRITTON.z0 - 1);
   });
 });

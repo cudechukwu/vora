@@ -14,7 +14,9 @@
     "test:e2e": "playwright test",
     "check": "tsc --noEmit && vitest run && playwright test",
     "test:smoke": "playwright test --grep @smoke",
-    "check:quick": "tsc --noEmit && vitest run && playwright test --grep @smoke"
+    "check:quick": "tsc --noEmit && vitest run && playwright test --grep @smoke",
+    "test:changed": "node scripts/e2e-changed.mjs",
+    "check:changed": "tsc --noEmit && vitest run && node scripts/e2e-changed.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"

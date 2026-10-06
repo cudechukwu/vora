@@ -47,7 +47,7 @@ describe('High Street traffic', () => {
   it('never lets two vehicles in a lane overlap (20 minutes)', () => {
     const s = createTraffic(crossings);
     run(s, 1200, (st) => assertNoOverlap(st));
-  });
+  }, 60_000); // ~4 s normally; the laptop under heavy background load can take 25+
 
   it('never drives backwards or faster than cruise', () => {
     const s = createTraffic(crossings);

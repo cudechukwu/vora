@@ -8,7 +8,7 @@ import { buildRow } from './buildings';
 import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, ROW_ENTRY, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
 import { World } from './world';
 import { along, quadX } from './backlawn';
-import { FIELD_ROAD, PLAZA_SITTERS, PLAZA_TABLES, ROAD_LANES, ROAD_WALK, STAIRS, groundY, plazaChairs, southEndNear } from './southend';
+import { CLASS_TAKEN, FIELD_ROAD, FRANK_ROOMS, GRAND_STAIR, LOUNGE_SEATS, PLAZA_SITTERS, TERRACE_Y, classroom, PLAZA_TABLES, ROAD_LANES, ROAD_WALK, STAIRS, groundY, plazaChairs, southEndNear } from './southend';
 import { resolveMove } from './collide';
 import {
   SPEED, actionAt, airborne, carry, createMobility, dismount, isRunning, mount, newJump, newMover, startJump, stepJump, stepMover,
@@ -62,9 +62,12 @@ const params = new URLSearchParams(location.search);
 
 // ── renderer / scene ──
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
-const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
+// ?lite=1 (the browser tests use it): no shadows, no antialiasing, 1× pixels. The game plays the same, it just draws far
+// less, which matters on SwiftShader (software WebGL), where a loaded laptop can manage only a few frames a second.
+const lite = params.has('lite');
+const renderer = new WebGLRenderer({ canvas, antialias: !lite, powerPreference: 'high-performance' });
+renderer.setPixelRatio(lite ? 1 : Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = !lite;
 renderer.shadowMap.type = PCFSoftShadowMap;
 renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -277,6 +280,33 @@ for (const [x, z, h, k] of [[STAIRS.x0 + 0.8, 6.9, Math.PI, 0], [STAIRS.x0 + 1.5
   const p = new Person(randomLook(720 + k));
   sitAt(p, x, z, h, 0.06);
   p.root.position.y = groundY(x, z);
+}
+// inside the Frank Center, seen through its glass: a class in session behind the windows across from Judd, people on
+// the grand stair behind the entry, and the lounge in the glass connector
+const indoors = (p: Person, x: number, y: number, z: number, heading: number) => {
+  p.root.position.set(x, y, z);
+  p.face(heading);
+  scene.add(p.root);
+};
+{
+  const cls = classroom();
+  CLASS_TAKEN.forEach((i, k) => {
+    const s = cls.seats[i];
+    if (!s) return;
+    const person = new Person(randomLook(800 + k));
+    sitAt(person, s.x, s.z, s.heading, 0.46);
+    person.root.position.y = s.y;
+  });
+  indoors(new Person(randomLook(830)), cls.teacher.x, FRANK_ROOMS.floor, cls.teacher.z, cls.teacher.heading);
+  const G = GRAND_STAIR, stepY = (z: number) => FRANK_ROOMS.floor + G.rise * Math.min(1, Math.max(0, (G.zBottom - z) / (G.zBottom - G.zTop)));
+  for (const [z, k] of [[35.6, 0], [34.2, 1], [33.4, 2]] as const) indoors(new Person(randomLook(840 + k)), (G.x0 + G.x1) / 2, stepY(z), z, Math.PI);
+  indoors(new Person(randomLook(845)), FRANK_ROOMS.x1 - 2.5, FRANK_ROOMS.floor, 36, -Math.PI / 2); // just inside, heading in
+  LOUNGE_SEATS.forEach((p, k) => {
+    const person = new Person(randomLook(790 + k));
+    sitAt(person, p.x, p.z, p.heading, p.chair === 'stool' ? 0.72 : 0.44);
+    person.root.position.y = p.y;
+  });
+  indoors(new Person(randomLook(850)), -78.6, TERRACE_Y, 21.4, Math.PI * 0.8); // standing, chatting
 }
 // and out at the tables on the plaza by the Frank Center's main entry
 PLAZA_SITTERS.forEach(([t, c], k) => {

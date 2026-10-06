@@ -1,13 +1,13 @@
 import {
   BoxGeometry, BufferGeometry, CanvasTexture, Color, CylinderGeometry, Float32BufferAttribute, Group, IcosahedronGeometry,
-  Material, Mesh, MeshLambertMaterial, PlaneGeometry, RepeatWrapping, SRGBColorSpace,
+  Material, Mesh, MeshBasicMaterial, MeshLambertMaterial, PlaneGeometry, RepeatWrapping, SRGBColorSpace, Vector3,
 } from 'three';
-import { BoxBank, Facing, WindowBank, block, brickMap, hipRoof, lambert, prism, stoneMap } from './kit';
+import { BoxBank, Facing, WindowBank, block, brickMap, hipRoof, lambert, prism, seeGlass, stoneMap } from './kit';
 import { BACK_PATH } from './layout';
 import { noise2, rng } from './noise';
 import {
-  ALLBRITTON, ALLBRITTON_DOOR, BERM, BOLLARDS, CHEEK, FIELD_ROAD, FLAGPOLE, FRANK, FRANK_ADD, FRANK_DOOR, FRANK_LINK, LANDING,
-  LINK_DOOR, MAIN_ENTRY, MULCH, OLIN, OLIN_LINK, PAVILION, PLAZA_BENCHES, PLAZA_BIN, PLAZA_F, PLAZA_TABLES, SIGN, STAIRS,
+  ALLB_FORECOURT, ALLB_WELLS, ALLBRITTON, ALLBRITTON_DOOR, BERM, BOLLARDS, CHEEK, FIELD_ROAD, FLAGPOLE, FRANK, FRANK_ADD, FRANK_DOOR, FRANK_LINK, LANDING,
+  CLASS_TAKEN, FRANK_ROOMS, FRANK_WINDOWS, GRAND_STAIR, LINK_DOOR, LOUNGE, LOUNGE_SEATS, LOUNGE_TABLES, LINK_DOOR_S, LINK_WALK, MAIN_ENTRY, MULCH, classroom, OLIN, OLIN_LINK, PAVILION, PLAZA_BENCHES, PLAZA_BIN, PLAZA_F, PLAZA_TABLES, SIGN, STAIRS,
   STAIRS_E, SYCAMORE, SYCAMORE2, TERRACE_Y, UTILITY_BOX, groundY, plazaChairs,
 } from './southend';
 
@@ -140,6 +140,7 @@ function bank({ g, box }: Kit) {
     const bz = onSlope ? FRANK_LINK.z1 + 1 + rng(i + 980) * (FRANK.z1 - FRANK_LINK.z1) : 4 + rng(i + 980) * 6;
     if (Math.abs(bz - FRANK_DOOR.z) < 3.2 && onSlope) continue; // not on the east stairs
     if (!onSlope && Math.hypot(bx - SYCAMORE.x, bz - SYCAMORE.z) < 1.6) continue;
+    if (bx > LINK_WALK.x0 - 0.5 && bx < LINK_WALK.x1 + 0.5 && bz > LINK_WALK.z0 && bz < LINK_WALK.z1 + 1.5) continue; // nor on the walk to the south doors
     box.add(bx, groundY(bx, bz) + 0.22, bz, 0.5, 0.45, 0.5, i % 3 ? 0x9a9a5c : 0x5f7d3a, rng(i) * 3);
   }
 }
@@ -163,16 +164,21 @@ function flight({ g, box }: Kit, f: Flight, up: '+z' | '-x') {
       for (const z of [f.z0 - CHEEK / 2, f.z1 + CHEEK / 2]) box.add(f.x1 - (i + 0.5) * tread, (h + 0.35) / 2, z, tread, h + 0.35, CHEEK, 0xb4b2ab);
     }
   }
-  const slope = Math.atan2(TERRACE_Y, run), len = Math.hypot(run, TERRACE_Y) + 0.6;
   const sides = alongZ ? [f.x0 - CHEEK / 2, f.x1 + CHEEK / 2] : [f.z0 - CHEEK / 2, f.z1 + CHEEK / 2];
   for (const s of sides) {
-    const rail = mesh(g, new BoxGeometry(0.06, 0.06, len), lambert(IRON), alongZ ? s : cx, TERRACE_Y / 2 + 1.3, alongZ ? cz : s);
-    if (alongZ) rail.rotation.x = -slope;
-    else rail.rotation.set(-slope, Math.PI / 2, 0, 'YXZ'); // runs along x, high end at −x
+    // the handrail: from just past the bottom step to just past the top, 1.3 m over the cheek wall all the way, so it
+    // follows the flight whichever way it climbs (+z for the north stairs, −x for the east ones)
+    const at = (t: number) => { // t: metres up the run from the bottom
+      const x = alongZ ? s : f.x1 - t, z = alongZ ? f.z0 + t : s;
+      return new Vector3(x, (TERRACE_Y * Math.min(1, Math.max(0, t / run))) + 1.3, z);
+    };
+    const lo = at(0.15), hi = at(run - 0.15);
+    const rail = mesh(g, new BoxGeometry(0.06, 0.06, lo.distanceTo(hi)), lambert(IRON), (lo.x + hi.x) / 2, (lo.y + hi.y) / 2, (lo.z + hi.z) / 2);
+    rail.lookAt(hi);
     for (let k = 0; k <= 3; k++) {
       const t = 0.3 + (k / 3) * (run - 0.6);
       const px = alongZ ? s : f.x1 - t, pz = alongZ ? f.z0 + t : s;
-      const y = (alongZ ? groundY(cx, pz) : groundY(px, cz)) + 0.35;
+      const y = at(t).y - 1.3 + 0.35; // the cheek's top here
       box.add(px, y + 0.48, pz, 0.05, 0.95, 0.05, IRON);
     }
   }
@@ -190,6 +196,7 @@ function stairs(k: Kit) {
   };
   pavers(LANDING.x0, LANDING.x1, LANDING.z0, LANDING.z1, 0.035);
   pavers(STAIRS.x0 - 0.5, STAIRS.x1 + 0.5, STAIRS.z1, FRANK_LINK.z0, TERRACE_Y + 0.03); // up to the glass connector's doors
+  pavers(LINK_WALK.x0, LINK_WALK.x1, LINK_WALK.z0, LINK_WALK.z1 + 1, TERRACE_Y + 0.031); // from the east stairs' top to its south doors
   pavers(FRANK.x1, STAIRS_E.x0, STAIRS_E.z0 - 0.5, STAIRS_E.z1 + 0.5, TERRACE_Y + 0.03); // up to the medallion door
   flight(k, STAIRS, '+z');
   flight(k, STAIRS_E, '-x');
@@ -315,16 +322,21 @@ function frankHistoric({ g, win, box }: Kit) {
 }
 
 /** The tall glass connector between the old block and the addition; its doors face the stairs up from the field road. */
-function frankLink({ g, win, box }: Kit) {
+function frankLink({ g, box }: Kit) {
   const { x0, x1, z0, z1, h } = FRANK_LINK;
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-  mesh(g, block(x1 - x0 - 0.3, h, z1 - z0 - 0.3), lambert(0x27323b), cx, 0, cz); // the dark inside, seen through the glass
+  lounge(g); // the lounge inside, seen through the glass
+  mesh(g, block(x1 - x0, TERRACE_Y, z1 - z0), lambert(0xb8b2a8), cx, 0, cz); // its floor stands on the bank
+  box.add(cx, LOUNGE.ceil + (h - LOUNGE.ceil) / 2, cz, x1 - x0 - 0.2, h - LOUNGE.ceil, z1 - z0 - 0.2, 0xc9cbcc); // above the ceiling
   box.add(cx, h + 0.25, cz, x1 - x0 + 0.6, 0.5, z1 - z0 + 0.6, 0xf1efe8); // white roof edge
   const panes = 4, pw = (x1 - x0) / panes;
-  for (const [z, f] of [[z0 - 0.05, '-z'], [z1 + 0.05, '+z']] as const) {
+  for (const z of [z0 - 0.05, z1 + 0.05]) {
     for (let i = 0; i < panes; i++) {
       const x = x0 + (i + 0.5) * pw;
-      win.add('rect', x, (TERRACE_Y + h) / 2, z, pw - 0.12, h - TERRACE_Y - 0.4, f);
+      const glass = new Mesh(new PlaneGeometry(pw - 0.12, h - TERRACE_Y - 0.4), seeGlass());
+      glass.position.set(x, (TERRACE_Y + h) / 2, z);
+      glass.userData.glass = true;
+      g.add(glass);
       box.add(x0 + i * pw, (TERRACE_Y + h) / 2, z, 0.1, h - TERRACE_Y, 0.1, 0xd9dcdc); // mullions
     }
     box.add(cx, TERRACE_Y + 5.6, z, x1 - x0, 0.12, 0.12, 0xd9dcdc); // transom
@@ -334,46 +346,221 @@ function frankLink({ g, win, box }: Kit) {
   for (const ox of [-1, 0, 1]) box.add(dx + ox, TERRACE_Y + 1.25, z0 - 0.1, 0.08, 2.5, 0.08, 0x2b2f33);
   box.add(dx, TERRACE_Y + 2.55, z0 - 0.1, 2.1, 0.1, 0.1, 0x2b2f33);
   box.add(dx, TERRACE_Y + 3.0, z0 - 0.8, 3.4, 0.16, 1.6, 0xf1efe8);
+  // and its other doors, in the south face, at the end of the paver walk from the east stairs
+  const ds = LINK_DOOR_S.x, sz = z1 + 0.1;
+  for (const ox of [-1, 0, 1]) box.add(ds + ox, TERRACE_Y + 1.25, sz, 0.08, 2.5, 0.08, 0x2b2f33);
+  box.add(ds, TERRACE_Y + 2.55, sz, 2.1, 0.1, 0.1, 0x2b2f33);
+  for (const ox of [-0.25, 0.25]) box.add(ds + ox, TERRACE_Y + 1.2, sz + 0.06, 0.04, 0.45, 0.04, 0xd0d4d6); // pulls
+  box.add(ds, TERRACE_Y + 3.0, z1 + 0.8, 3.0, 0.16, 1.6, 0xf1efe8); // canopy
 }
 
 /**
  * The new addition at the foot of the bank: two tall storeys of brick under a deep white edge, a top floor set back with
- * a band of windows and its own white edge, tall cast-stone-framed windows, and the glass main entry onto the plaza.
+ * a band of windows and its own white edge, tall cast-stone-framed see-through windows, and the glass main entry.
  */
 function frankAddition({ g, win, box }: Kit) {
   const { x0, x1, z0, z1, h } = FRANK_ADD;
   const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
   const brick = lambert(0x9c4a38, brickMap(), 'frankAdd');
   const low = 8.4, back = 1.6; // the top floor steps back this much on the plaza and path sides
-  mesh(g, block(w, low, d), brick, cx, 0, cz);
+  const F = FRANK_ROOMS, E = MAIN_ENTRY, wall = 0.4;
+  // the two tall storeys, hollowed at the front (by the back path) for the classroom and the lobby: the block behind it, the ends beside
+  // it, and the slab over it
+  mesh(g, block(F.x0 - x0, low, d), brick, (x0 + F.x0) / 2, 0, cz);
+  mesh(g, block(x1 - F.x0, low, F.z0 - z0), brick, (F.x0 + x1) / 2, 0, (z0 + F.z0) / 2);
+  mesh(g, block(x1 - F.x0, low, z1 - F.z1), brick, (F.x0 + x1) / 2, 0, (F.z1 + z1) / 2);
+  mesh(g, block(x1 - F.x0, low - F.ceil, F.z1 - F.z0), brick, (F.x0 + x1) / 2, F.ceil, (F.z0 + F.z1) / 2);
   box.add(cx, low + 0.25, cz, w + 1.2, 0.5, d + 1.2, 0xf1efe8); // deep white edge
-  box.add(cx, 0.3, cz, w + 0.15, 0.6, d + 0.15, CREAM); // stone base
+  box.add(cx, 0.3, cz, w + 0.15, 0.6, d + 0.15, CREAM); // stone base (the rooms' floor stands on it)
   const ux1 = x1 - back, uz1 = z1 - back;
   mesh(g, block(ux1 - x0, h - low - 0.5, uz1 - z0), brick, (x0 + ux1) / 2, low + 0.5, (z0 + uz1) / 2);
   box.add((x0 + ux1) / 2, h + 0.2, (z0 + uz1) / 2, ux1 - x0 + 1, 0.4, uz1 - z0 + 1, 0xf1efe8);
   // the top floor's band of windows
   for (let z = z0 + 1.6; z < uz1 - 0.8; z += 2.2) win.add('rect', ux1 + 0.03, low + 2.3, z, 1.6, 1.5, '+x');
   for (let x = x0 + 1.6; x < ux1 - 0.8; x += 2.2) { win.add('rect', x, low + 2.3, uz1 + 0.03, 1.6, 1.5, '+z'); win.add('rect', x, low + 2.3, z0 - 0.03, 1.6, 1.5, '-z'); }
-  // tall windows in cast-stone frames
-  const tall = (x: number, z: number, f: Facing) => {
-    const e = f === '+x' ? 1 : 0, n = f === '-z' ? -1 : f === '+z' ? 1 : 0;
-    const along = e !== 0;
-    box.add(x + e * 0.12, 3.9, z + n * 0.12, along ? 0.24 : 3.2, 7.0, along ? 3.2 : 0.24, CREAM);
-    for (const o of [-0.7, 0.7]) win.add('rect', x + e * 0.26 + (along ? 0 : o), 3.9, z + n * 0.26 + (along ? o : 0), 1.15, 6.3, f);
+  // the front wall: brick piers between real openings (the tall windows, and the entry bay up to the ceiling)
+  const openings = [
+    ...FRANK_WINDOWS.map((z) => ({ z0: z - 1.3, z1: z + 1.3, y0: 0.75, y1: 7.05 })),
+    { z0: E.z - E.half + 0.15, z1: E.z + E.half - 0.15, y0: F.floor, y1: F.ceil },
+  ].sort((a, b) => a.z0 - b.z0);
+  const fw = (za: number, zb: number, ya: number, yb: number) => {
+    if (zb - za > 0.01 && yb - ya > 0.01) mesh(g, block(wall, yb - ya, zb - za), brick, x1 - wall / 2, ya, (za + zb) / 2);
   };
-  for (const z of [z0 + 5, cz, z1 - 5]) tall(x1, z, '+x');
-  tall(cx, z0, '-z');
-  tall(x1 - 3, z1, '+z');
-  // the main entry onto the plaza: a tall glass bay in a stone frame, glass doors, "FRANK CENTER" over them
-  const ex = MAIN_ENTRY.x;
-  box.add(ex, 4.2, z1 + 0.14, 4.0, 8.0, 0.28, CREAM);
-  win.add('rect', ex, 5.4, z1 + 0.3, 3.2, 4.6, '+z');
-  win.add('rect', ex, 1.5, z1 + 0.3, 3.0, 2.8, '+z');
-  for (const ox of [-1.5, 0, 1.5]) box.add(ex + ox, 1.5, z1 + 0.34, 0.08, 2.9, 0.06, 0x2b2f33);
-  box.add(ex, 3.05, z1 + 0.9, 4.6, 0.14, 1.4, CREAM); // canopy
+  let zPrev = F.z0;
+  for (const o of openings) {
+    fw(zPrev, o.z0, 0, F.ceil); // the pier before it
+    fw(o.z0, o.z1, 0, o.y0); // under it
+    fw(o.z0, o.z1, o.y1, F.ceil); // over it
+    zPrev = o.z1;
+  }
+  fw(zPrev, F.z1, 0, F.ceil);
+  // the tall windows: a cast-stone frame round real glass, a mullion, a transom
+  const pane = (x: number, y: number, z: number, pw: number, ph: number, f: Facing) => {
+    const m = new Mesh(new PlaneGeometry(pw, ph), seeGlass());
+    m.position.set(x, y, z);
+    m.rotation.y = f === '+x' ? Math.PI / 2 : f === '-x' ? -Math.PI / 2 : f === '-z' ? Math.PI : 0;
+    m.userData.glass = true;
+    g.add(m);
+  };
+  for (const z of FRANK_WINDOWS) {
+    pane(x1 + 0.02, 3.9, z, 2.6, 6.3, '+x');
+    for (const o of [-1.45, 1.45]) box.add(x1 + 0.12, 3.9, z + o, 0.3, 7.0, 0.3, CREAM); // jambs
+    for (const y of [0.68, 7.12]) box.add(x1 + 0.12, y, z, 0.3, 0.16, 3.2, CREAM); // sill and head
+    box.add(x1 + 0.06, 3.9, z, 0.1, 6.3, 0.1, 0x8f9496); // mullion
+    box.add(x1 + 0.06, 3.9, z, 0.1, 0.12, 2.6, 0x8f9496); // transom
+  }
+  // the other tall windows (the plaza and field sides) are dark glass: nothing to see in there
+  const darkTall = (x: number, z: number, f: Facing) => {
+    const n = f === '+z' ? 1 : -1;
+    win.add('rect', x, 3.9, z + n * 0.26, 2.6, 6.3, f);
+    box.add(x, 3.9, z + n * 0.12, 3.2, 7.0, 0.24, CREAM);
+    box.add(x, 3.9, z + n * 0.34, 0.1, 6.3, 0.12, 0x8f9496);
+  };
+  darkTall(cx, z0, '-z');
+  darkTall(x1 - 3, z1, '+z');
+  darkTall(E.x - 7.5, z1, '+z');
+  frankRooms(g);
+
+  // the main entry, onto the back path across from Judd (the user's photo): a tall glass bay standing out from the
+  // east face in a cast-stone frame, glass doors at its foot under a canopy, "FRANK CENTER" on the canopy's edge
+  const bx = x1 + E.out, ez = E.z, bw = E.half * 2;
+  box.add(x1 + E.out / 2, 4.2, ez - E.half, E.out, 8.4, 0.3, CREAM); // the frame's sides…
+  box.add(x1 + E.out / 2, 4.2, ez + E.half, E.out, 8.4, 0.3, CREAM);
+  box.add(x1 + E.out / 2, 8.25, ez, E.out + 0.2, 0.5, bw + 0.5, CREAM); // …and head
+  box.add(x1 + E.out / 2, 0.15, ez, E.out, 0.3, bw, 0xc9c5bd); // floor
+  pane(bx - 0.05, 4.1, ez, bw - 0.3, 8.0, '+x'); // all glass: you see straight in to the grand stair
+  for (const side of [-1, 1]) pane(x1 + E.out / 2, 4.1, ez + side * (E.half - 0.15), E.out - 0.1, 8.0, side > 0 ? '+z' : '-z');
+  for (const o of [-1.4, -0.7, 0, 0.7, 1.4]) box.add(bx + 0.02, 4.2, ez + o, 0.08, 7.8, 0.08, 0x8f9496); // mullions
+  box.add(bx + 0.02, 2.8, ez, 0.12, 0.14, bw, 0x8f9496); // the transom over the doors
+  for (const o of [-0.35, 0.35]) box.add(bx + 0.08, 1.2, ez + o, 0.04, 0.5, 0.04, 0xd0d4d6); // door pulls
+  box.add(bx + 0.7, 3.1, ez, 1.6, 0.16, bw + 0.6, CREAM); // canopy
   const sign = new Mesh(new PlaneGeometry(3.0, 0.38), new MeshLambertMaterial({ map: signTexture('FRANK CENTER') }));
-  sign.position.set(ex, 3.35, z1 + 1.61);
+  sign.position.set(bx + 1.51, 3.35, ez);
+  sign.rotation.y = Math.PI / 2;
   g.add(sign);
+  flat(g, bx, BACK_PATH.x0 + 0.05, ez - 1.6, ez + 1.6, 0.025, lambert(0xc9c5bd)); // a paved walk across the bed to the path
+}
+
+/**
+ * The rooms behind the addition's east glass (the architects' photos), unlit (they're lit rooms) and in one batch: the
+ * classroom behind the windows across from Judd, and the lobby with its grand stair behind the entry bay.
+ */
+function frankRooms(g: Group) {
+  const R = FRANK_ROOMS, k = new BoxBank();
+  const x0 = R.x0, x1 = R.x1 - 0.4, y0 = R.floor, y1 = R.ceil, cx = (x0 + x1) / 2;
+  // ── the classroom ──
+  const cz0 = R.z0, cz1 = R.split, clen = cz1 - cz0;
+  k.add(cx, y0 + 0.01, (cz0 + cz1) / 2, x1 - x0, 0.02, clen, 0x8a8580); // carpet
+  k.add(cx, 4.6, (cz0 + cz1) / 2, x1 - x0, 0.04, clen, 0xeeeeec); // its own ceiling, lower than the lobby's
+  for (const dx of [-1.6, 0, 1.6]) k.add(cx + dx, 4.57, (cz0 + cz1) / 2 + 1, 0.12, 0.03, clen - 5, 0xffffff); // light strips
+  k.add(x0 + 0.03, 2.6, (cz0 + cz1) / 2, 0.06, 4.0, clen, 0x6f6a1f); // the olive acoustic wall at the back
+  k.add(cx, 2.6, cz0 + 0.03, x1 - x0, 4.0, 0.06, 0xeeeeea); // the north wall…
+  for (const dx of [-1.55, 1.55]) { // …with its two big whiteboards, scrawled on
+    k.add(cx + dx, 2.1, cz0 + 0.08, 2.9, 2.0, 0.04, 0xfafbfa);
+    k.add(cx + dx, 1.05, cz0 + 0.12, 2.9, 0.06, 0.12, 0xb6b9bb);
+    for (const yy of [2.5, 2.2, 1.9]) k.add(cx + dx - 0.3, yy, cz0 + 0.11, 1.6, 0.03, 0.01, 0x6a85a8);
+  }
+  k.add(x0 + 0.12, 3.6, cz0 + 4.5, 0.1, 0.9, 2.6, 0x1f2326); // two big screens on the back wall
+  k.add(x0 + 0.12, 3.6, cz0 + 7.3, 0.1, 0.9, 2.6, 0x1f2326);
+  k.add(cx, 4.4, cz0 + 4, 0.4, 0.2, 0.3, 0xe9e9e6); // the projector
+  k.add(cx + 1.2, y0 + 0.5, cz0 + 1.3, 0.8, 1.0, 0.6, 0x9a9da0); // the lectern
+  const cls = classroom();
+  for (const d of cls.desks) { // curved desks (pale wood) on their tiers, chairs behind
+    const along = d.rot + Math.PI / 2;
+    k.add(d.x, d.y - 0.02, d.z + 0.3, 1.4, 0.04, 1.4, 0x8a8580); // the tier's step
+    k.add(d.x, d.y + 0.74, d.z, 1.3, 0.05, 0.42, 0xd8b98a, along - Math.PI / 2);
+    k.add(d.x, d.y + 0.37, d.z, 1.2, 0.72, 0.06, 0x9fa3a6, along - Math.PI / 2);
+  }
+  cls.seats.forEach((s, i) => {
+    if (CLASS_TAKEN.includes(i)) return; // (people sit in those)
+    k.add(s.x, s.y + 0.46, s.z, 0.46, 0.06, 0.46, 0x2c2f33, s.heading);
+    k.add(s.x - Math.sin(s.heading) * 0.22, s.y + 0.78, s.z - Math.cos(s.heading) * 0.22, 0.46, 0.6, 0.06, 0x2c2f33, s.heading);
+  });
+  k.add(cx, 2.3, cz1 - 0.03, x1 - x0, 4.6, 0.06, 0xeeeeea); // the wall between the classroom and the lobby
+  k.add(cx, 6.1, cz1 - 0.03, x1 - x0, 3.0, 0.06, 0xe8e3d6);
+
+  // ── the lobby and its grand stair ──
+  const lz0 = R.split, lz1 = R.z1, G = GRAND_STAIR, cream = 0xe8e3d6;
+  k.add(cx, y0 + 0.01, (lz0 + lz1) / 2, x1 - x0, 0.02, lz1 - lz0, 0x6f6c69); // dark carpet
+  k.add(x0 + 0.03, (y0 + y1) / 2, (lz0 + lz1) / 2, 0.06, y1 - y0, lz1 - lz0, cream); // the back wall
+  k.add(cx, (y0 + y1) / 2, lz1 - 0.03, x1 - x0, y1 - y0, 0.06, cream); // the south wall…
+  k.add(cx + 0.5, 5.2, lz1 - 0.07, 1.6, 3.4, 0.04, 0xbfd3e0); // …and its tall window
+  k.add(cx, y1 - 0.02, (lz0 + lz1) / 2, x1 - x0, 0.04, lz1 - lz0, 0xf1efe8); // the high ceiling
+  for (const z of [lz0 + 1.5, lz0 + 3.5, lz0 + 5.5]) for (const dx of [-1.5, 1]) k.add(cx + dx, y1 - 0.05, z, 0.3, 0.03, 0.3, 0xfff6d8); // downlights
+  // the stair: steps rising toward the landing, wood cladding under it, a steel railing on its open side
+  const run = G.zBottom - G.zTop, tread = run / G.steps, rise = G.rise / G.steps, sw = G.x1 - G.x0, sxm = (G.x0 + G.x1) / 2;
+  for (let i = 0; i < G.steps; i++) {
+    const z = G.zBottom - (i + 0.5) * tread, top = y0 + (i + 1) * rise;
+    k.add(sxm, top - 0.06, z, sw, 0.12, tread + 0.02, 0x8f8c88); // tread
+    k.add(sxm, (y0 + top) / 2 - 0.06, z, sw - 0.04, top - y0 - 0.12, tread, 0xc89c68); // the wood-clad mass under it
+  }
+  for (let i = 0; i <= G.steps; i += 2) {
+    const z = G.zBottom - i * tread, top = y0 + i * rise;
+    k.add(G.x1 - 0.05, top + 0.5, z, 0.04, 1.0, 0.04, 0xb9bec2); // balusters
+  }
+  const rl = Math.hypot(run, G.rise);
+  // the landing across the room, its white band with FRANK CENTER, a glass rail on top
+  const ly = y0 + G.rise, L = G.landing;
+  k.add(cx, ly - 0.25, (L.z0 + L.z1) / 2, x1 - x0, 0.5, L.z1 - L.z0, 0xdedbd2);
+  k.add(cx, ly - 0.6, L.z1 + 0.02, x1 - x0, 0.9, 0.06, 0xd9d6cf);
+  k.add(cx, ly + 0.55, L.z1 - 0.05, x1 - x0, 1.0, 0.04, 0x9fb3bd);
+  k.add(cx, ly + 1.05, L.z1 - 0.05, x1 - x0, 0.05, 0.08, 0xb9bec2);
+  k.add(cx - 1, y0 + 0.24, G.zBottom - 0.2, 1.6, 0.48, 0.5, 0xc49a68); // the wood bench at the stair's foot
+  const m = k.build(new MeshBasicMaterial({ color: 0xffffff }));
+  m.castShadow = false;
+  m.receiveShadow = false;
+  m.userData.glass = true;
+  g.add(m);
+  // the stair rail, sloped with the flight
+  const rail = new Mesh(new BoxGeometry(0.06, 0.06, rl), new MeshBasicMaterial({ color: 0xb9bec2 }));
+  rail.position.set(G.x1 - 0.05, y0 + G.rise / 2 + 1.0, (G.zBottom + G.zTop) / 2);
+  rail.rotation.x = Math.atan2(G.rise, run);
+  rail.userData.glass = true;
+  g.add(rail);
+  const sign = new Mesh(new PlaneGeometry(2.2, 0.32), new MeshBasicMaterial({ map: signTexture('FRANK CENTER') }));
+  sign.position.set(cx + 0.6, ly - 0.6, L.z1 + 0.06);
+  g.add(sign);
+}
+
+/**
+ * The lounge in the glass connector (the architects' Forum photos): carpet, a ceiling of round lights, grey steel
+ * columns against the brick of the buildings either side, lounge chairs round a low table, a white bench, a long table.
+ */
+function lounge(g: Group) {
+  const L = LOUNGE, k = new BoxBank(), y0 = L.floor, y1 = L.ceil, cx = (L.x0 + L.x1) / 2, cz = (L.z0 + L.z1) / 2;
+  k.add(cx, y0 + 0.01, cz, L.x1 - L.x0, 0.02, L.z1 - L.z0, 0x7a7671); // carpet
+  k.add(cx, y1, cz, L.x1 - L.x0, 0.06, L.z1 - L.z0, 0xc9cbcc); // the tiled ceiling…
+  for (let x = L.x0 + 1.5; x < L.x1 - 1; x += 3) for (let z = L.z0 + 1.5; z < L.z1 - 1; z += 2.8) k.add(x, y1 - 0.04, z, 0.4, 0.03, 0.4, 0xfffbe8); // …and its lights
+  for (let z = L.z0 + 1; z < L.z1; z += 4) for (const x of [L.x0 + 0.25, L.x1 - 0.25]) k.add(x, (y0 + y1) / 2, z, 0.4, y1 - y0, 0.4, 0x5d6266); // steel columns
+  const chair = (x: number, z: number, heading: number, kind: 'lounge' | 'bench' | 'stool', n: number) => {
+    const s = Math.sin(heading), c = Math.cos(heading);
+    if (kind === 'lounge') {
+      const col = n % 2 ? 0x3d5f8a : 0xa9c3d2;
+      k.add(x, y0 + 0.22, z, 0.8, 0.44, 0.8, col, heading);
+      k.add(x - s * 0.36, y0 + 0.62, z - c * 0.36, 0.8, 0.8, 0.14, col, heading);
+    } else if (kind === 'bench') {
+      k.add(x, y0 + 0.22, z, 2.4, 0.44, 0.9, 0xeceae3);
+      k.add(x, y0 + 0.05, z, 2.3, 0.1, 0.85, 0xb48b5c);
+    } else {
+      k.add(x, y0 + 0.36, z, 0.1, 0.72, 0.1, 0x2f3236);
+      k.add(x, y0 + 0.74, z, 0.42, 0.06, 0.42, 0x2f3236);
+    }
+  };
+  LOUNGE_SEATS.forEach((p, n) => chair(p.x, p.z, p.heading, p.chair, n));
+  chair(-82, 17.8, 0, 'lounge', 1); // an empty one
+  for (const t of LOUNGE_TABLES.round) {
+    k.add(t.x, y0 + 0.24, t.z, 0.08, 0.48, 0.08, 0x8d8f91);
+    k.add(t.x, y0 + 0.5, t.z, 0.8, 0.05, 0.8, 0xd8c19a);
+  }
+  const T = LOUNGE_TABLES.long;
+  k.add(T.x, y0 + 0.74, T.z, 1.0, 0.06, T.len, 0xeeece6);
+  for (const dz of [-T.len / 2 + 0.2, T.len / 2 - 0.2]) k.add(T.x, y0 + 0.37, T.z + dz, 0.8, 0.74, 0.08, 0x8d8f91);
+  k.add(L.x1 - 0.8, y0 + 0.24, cz - 2, 0.55, 0.48, 4, 0xc49a68); // a long wood window seat along the addition's wall
+  const m = k.build(new MeshBasicMaterial({ color: 0xffffff }));
+  m.castShadow = false;
+  m.receiveShadow = false;
+  m.userData.glass = true;
+  g.add(m);
 }
 
 /** The tar plaza at the foot of the bank: round wooden tables and chairs, teak benches, a green utility box, a bin. */
@@ -513,4 +700,49 @@ function allbritton({ g, win, box }: Kit) {
   win.add('arch', dx, 2.2, z0 - 0.42, 2.2, 3.6, '-z');
   box.add(dx, 1.4, z0 - 0.45, 1.8, 2.8, 0.05, 0x2a2420);
   for (let s = 0; s < 3; s++) box.add(dx, 0.1 + s * 0.15, z0 - 1.6 + s * 0.4, 5 - s * 0.6, 0.15 + s * 0.15, 1.2, 0xc9c2b2);
+  // the square concrete slabs out front
+  const F = ALLB_FORECOURT, slabs = slabTexture();
+  slabs.repeat.set((F.x1 - F.x0) / 1.5, (F.z1 - F.z0) / 1.5);
+  flat(g, F.x0, F.x1, F.z0, F.z1, 0.032, new MeshLambertMaterial({ map: slabs }));
+  // the rusticated granite base the basement doors are cut into
+  box.add(cx, 0.6, z0 - 0.06, w, 1.2, 0.14, 0x8f8c86);
+  // the two basement entrances: a sunken well, stairs down along the facade, a door below ground, wall and railing
+  const steel = 0x8f9496;
+  for (const W of ALLB_WELLS) {
+    const wx = (W.x0 + W.x1) / 2, wz = (W.z0 + W.z1) / 2, len = W.x1 - W.x0, dir = Math.sign(W.inner - W.outer);
+    flat(g, W.x0, W.x1, W.z0, W.z1, 0.04, new MeshBasicMaterial({ color: 0x24221f })); // the shadowed hole
+    const n = 7;
+    // (the ground is one flat sheet, so the well can't really be cut into it: the treads are drawn at ground level,
+    // each a shade darker than the last, so the flight reads as going down into the dark toward the door)
+    const lit = new Color(0xb4afa6), dark = new Color(0x3a3734);
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n, x = W.outer + dir * len * 0.75 * t;
+      box.add(x, 0.05, wz, (len * 0.75) / n - 0.06, 0.02, W.z1 - W.z0 - 0.2, lit.clone().lerp(dark, i / (n - 1)).getHex());
+    }
+    const doorX = W.inner - dir * 0.6; // at the bottom, in the wall
+    box.add(doorX, -0.05, z0 - 0.08, 1.2, 2.2, 0.08, 0x1d1f21);
+    box.add(doorX, 0.55, z0 - 0.12, 1.0, 0.7, 0.04, 0xffe6b0); // its lit glass
+    box.add(W.outer - dir * 0.0, 0.3, wz, 0.3, 0.6, W.z1 - W.z0, 0xb8b2a8); // low wall at the top end…
+    box.add(wx, 0.3, W.z0 - 0.15, len + 0.3, 0.6, 0.3, 0xb8b2a8); // …and along the front
+    box.add(wx, 1.15, W.z0 - 0.15, len, 0.05, 0.05, steel); // railing
+    for (let x = W.x0 + 0.1; x <= W.x1; x += 1.1) box.add(x, 0.85, W.z0 - 0.15, 0.05, 0.6, 0.05, steel);
+  }
+}
+
+let slabTex: CanvasTexture | null = null;
+/** Big square concrete slabs with dark joints (Allbritton's forecourt). One tile = one slab. */
+function slabTexture(): CanvasTexture {
+  if (!slabTex) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const x = c.getContext('2d')!;
+    x.fillStyle = '#c8bfb1'; x.fillRect(0, 0, 64, 64);
+    x.fillStyle = '#a39a8c'; x.fillRect(0, 0, 64, 2); x.fillRect(0, 0, 2, 64);
+    slabTex = new CanvasTexture(c);
+    slabTex.wrapS = slabTex.wrapT = RepeatWrapping;
+    slabTex.colorSpace = SRGBColorSpace;
+  }
+  const t = slabTex.clone();
+  t.needsUpdate = true;
+  return t;
 }

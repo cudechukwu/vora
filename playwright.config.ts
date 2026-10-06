@@ -7,8 +7,13 @@ import { defineConfig } from '@playwright/test';
 // live dev server: the build is snapshotted when a run starts, so source can keep changing while
 // tests run in the background, and a static server is lighter than the dev server.
 //
-//   npm run test:smoke             ~8 key tests (tagged @smoke), a couple of minutes
+// One file per area (tests/e2e/<area>.spec.ts: basics, mobility, house, cars, campus, hud, sound, map); shared helpers
+// in tests/e2e/helpers.ts. Pages open with ?lite=1 (no shadows, no antialiasing) so they draw faster.
+//
+//   npm run test:changed           just the areas your uncommitted changes touch (scripts/e2e-changed.mjs)
+//   npm run test:smoke             the key test from each area (tagged @smoke), a few minutes
 //   npm run test:e2e               everything
+//   npm run test:e2e -- tests/e2e/cars.spec.ts   one area
 //   npm run test:e2e -- -g carjack just the tests whose names match
 export default defineConfig({
   testDir: 'tests/e2e',

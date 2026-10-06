@@ -47,8 +47,67 @@ export const FRANK_ADD = { x0: -74, x1: -61, z0: 13, z1: 40, h: 12.5 } as const;
 export const LINK_DOOR = { x: -82, z: FRANK_LINK.z0 } as const;
 /** The historic block's door under the medallion, on its east side, up the east stairs from the plaza. */
 export const FRANK_DOOR = { x: FRANK.x1, z: 44 } as const;
-/** The addition's main entry ("FRANK CENTER"), on its south side, onto the plaza. */
-export const MAIN_ENTRY = { x: -67.5, z: FRANK_ADD.z1 } as const;
+/**
+ * The addition's main entry ("FRANK CENTER"): a tall glass bay standing out from its east face, onto the back path
+ * across from Judd, at the south end (the user's photo, 2026-10-06). `out` is how far it stands out, `half` its half-width.
+ */
+export const MAIN_ENTRY = { x: FRANK_ADD.x1, z: FRANK_ADD.z1 - 5, out: 1.2, half: 2.1 } as const;
+
+/**
+ * Inside the addition's east end, seen through its glass from the back path (the architects' photos, 2026-10-06):
+ * behind the two tall windows across from Judd, a **classroom** (curved tiered desks facing a wall of whiteboards);
+ * behind the glass entry bay, the **lobby** with its grand stair up to a landing. `split` is the wall between them.
+ * Inside the addition (still solid to you): these are to look at. `floor` stands on the stone base.
+ */
+export const FRANK_ROOMS = { x0: FRANK_ADD.x1 - 6.5, x1: FRANK_ADD.x1, z0: FRANK_ADD.z0 + 1.5, split: 31, z1: FRANK_ADD.z1 - 1.5, floor: 0.6, ceil: 7.6 } as const;
+/** The classroom's tall windows on the east face (z of each). */
+export const FRANK_WINDOWS = [FRANK_ADD.z0 + 5, FRANK_ADD.z0 + 13.5] as const;
+
+export interface Seat { x: number; z: number; y: number; heading: number }
+/**
+ * The classroom: whiteboards on its north wall, and rows of curved desks round it, each a step higher (the photo's
+ * tiers). Returns each desk segment (centre, along-angle) and the chair behind it, facing the boards.
+ */
+export function classroom() {
+  const R = FRANK_ROOMS, cx = (R.x0 + R.x1) / 2, board = { x: cx, z: R.z0 + 0.2 };
+  const C = { x: cx, z: R.z0 - 2.2 }; // the arcs' centre, behind the boards, so the rows curve gently
+  const desks: { x: number; z: number; y: number; rot: number }[] = [];
+  const seats: Seat[] = [];
+  for (let row = 0; row < 5; row++) {
+    const r = 6.2 + row * 1.9, y = R.floor + row * 0.22;
+    for (let a = -0.42; a <= 0.4201; a += 0.14) {
+      const x = C.x + r * Math.sin(a), z = C.z + r * Math.cos(a);
+      if (x < R.x0 + 0.6 || x > R.x1 - 1.0) continue;
+      desks.push({ x, z, y, rot: a });
+      const sx = C.x + (r + 0.6) * Math.sin(a), sz = C.z + (r + 0.6) * Math.cos(a);
+      seats.push({ x: sx, z: sz, y, heading: Math.atan2(C.x - sx, C.z - sz) }); // facing the boards
+    }
+  }
+  return { board, desks, seats, teacher: { x: cx - 1.4, z: R.z0 + 1.1, heading: 0 } };
+}
+/** Which of the classroom's chairs have someone in them. */
+export const CLASS_TAKEN = [0, 2, 3, 6, 9, 11, 14, 17, 19, 22];
+
+/** The lobby's grand stair: up along its back wall toward the split, to a landing across the room. */
+export const GRAND_STAIR = (() => {
+  const R = FRANK_ROOMS;
+  return { x0: R.x0 + 0.1, x1: R.x0 + 1.7, zBottom: R.z1 - 0.8, zTop: R.split + 2, steps: 16, rise: 3.6, landing: { z0: R.split, z1: R.split + 2 } };
+})();
+
+/**
+ * The lounge in the glass connector, seen through its glass from the top of the stairs and from the walk to its south
+ * doors (the architects' Forum photos): lounge chairs round low tables, a white bench, a long table with stools.
+ */
+export const LOUNGE = { x0: FRANK_LINK.x0, x1: FRANK_LINK.x1, z0: FRANK_LINK.z0, z1: FRANK_LINK.z1, floor: TERRACE_Y, ceil: TERRACE_Y + 7 } as const;
+export const LOUNGE_SEATS: (Seat & { chair: 'lounge' | 'bench' | 'stool' })[] = [
+  { x: -83.5, z: 19.2, y: TERRACE_Y, heading: Math.PI / 2, chair: 'lounge' },
+  { x: -82, z: 20.6, y: TERRACE_Y, heading: Math.PI, chair: 'lounge' },
+  { x: -80.6, z: 19.2, y: TERRACE_Y, heading: -Math.PI / 2, chair: 'lounge' },
+  { x: -79.6, z: 23.5, y: TERRACE_Y, heading: 0, chair: 'bench' },
+  { x: -77.6, z: 24.3, y: TERRACE_Y, heading: -Math.PI / 2, chair: 'stool' },
+  { x: -76, z: 25.2, y: TERRACE_Y, heading: Math.PI / 2, chair: 'stool' },
+];
+export const LOUNGE_TABLES = { round: [{ x: -82, z: 19.2 }], long: { x: -76.8, z: 24.8, len: 3.4 } } as const;
 
 /** Tan brick pavers at the foot of the stairs, off the road. */
 export const LANDING = { x0: LINK_DOOR.x - 7, x1: LINK_DOOR.x + 7, z0: FIELD_ROAD.z1, z1: 4.8 } as const;
@@ -95,6 +154,23 @@ export const OLIN_POLY: XZ[] = (() => {
 /** Allbritton Center: off the row, at the south end of the back path, which runs straight to its front door. */
 export const ALLBRITTON = { x0: -69, x1: -39, z0: 66, z1: 90, h: 16, name: 'Allbritton Center' } as const;
 export const ALLBRITTON_DOOR = { x: (BACK_PATH.x0 + BACK_PATH.x1) / 2, z: ALLBRITTON.z0 } as const;
+/**
+ * Allbritton's two basement entrances (the user's street views): either side of the front steps, a sunken well with a
+ * flight of stairs down along the facade to a door below ground, a low granite wall round it and a metal railing.
+ * Each runs from `outer` (street level) down to `inner` (the door). Solid: you can't walk into the hole.
+ */
+export const ALLB_WELLS = [-1, 1].map((side) => {
+  const inner = ALLBRITTON_DOOR.x + side * 3.4, outer = ALLBRITTON_DOOR.x + side * 7.8;
+  return { side, x0: Math.min(inner, outer), x1: Math.max(inner, outer), z0: ALLBRITTON.z0 - 1.7, z1: ALLBRITTON.z0, inner, outer, depth: 1.6 };
+});
+/** The square concrete slabs in front of Allbritton, between the back path's end and its door. */
+export const ALLB_FORECOURT = { x0: ALLBRITTON.x0 + 3, x1: ALLBRITTON.x1 - 3, z0: ALLBRITTON.z0 - 7, z1: ALLBRITTON.z0 } as const;
+/**
+ * The connector's other entrance (the user, 2026-10-06): glass doors in its south face, up on the bank, reached by a walk
+ * of interlocking pavers from the top of the east stairs (where they turn for the medallion door) north to the doors.
+ */
+export const LINK_DOOR_S = { x: -80.5, z: FRANK_LINK.z1 } as const;
+export const LINK_WALK = { x0: LINK_DOOR_S.x - 1.4, x1: LINK_DOOR_S.x + 1.4, z0: FRANK_LINK.z1, z1: FRANK_DOOR.z - 2.5 } as const;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const inRect = (p: XZ, b: Rect, pad = 0) => p.x > b.x0 - pad && p.x < b.x1 + pad && p.z > b.z0 - pad && p.z < b.z1 + pad;
@@ -162,6 +238,8 @@ export function southObstacles(pad = 0.3): Box[] {
     b(SIGN.x, SIGN.z, 0.1, 0.1),
     b(SYCAMORE.x, SYCAMORE.z, 0.75, 0.75), b(SYCAMORE2.x, SYCAMORE2.z, 0.7, 0.7),
     b(FLAGPOLE.x, FLAGPOLE.z, 0.08, 0.08),
+    b(MAIN_ENTRY.x + MAIN_ENTRY.out / 2, MAIN_ENTRY.z, MAIN_ENTRY.out / 2, MAIN_ENTRY.half), // the entry bay
+    ...ALLB_WELLS.map((w) => b((w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2, (w.x1 - w.x0) / 2 + 0.2, (w.z1 - w.z0) / 2 + 0.2)), // Allbritton's basement wells
     ...PLAZA_TABLES.map((t) => b(t.x, t.z, 0.6, 0.6)),
     ...PLAZA_BENCHES.map((t) => b(t.x, t.z, 0.3, 0.9)),
     b(UTILITY_BOX.x, UTILITY_BOX.z, 0.8, 0.6), b(PLAZA_BIN.x, PLAZA_BIN.z, 0.35, 0.35),
