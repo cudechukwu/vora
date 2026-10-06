@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  APRON, BACK_TREES, QUAD_X, REAR_DOORS, along, aprons, onQuadX, onRearPaving, quadX, quadXAt, rearDoorZ, rearWalkAt, rearWalks,
+  APRON, BACK_TREES, QUAD_X, REAR_DOORS, along, aprons, juddChapelWalk, onQuadX, onRearPaving, quadX, quadXAt, rearDoorZ, rearWalkAt,
+  rearWalks,
 } from '../../src/row/backlawn';
 import { BACK_PATH, byId, layoutRow } from '../../src/row/layout';
 import { PATH_ITEMS, pathObstacles } from '../../src/row/plaza';
@@ -85,8 +86,8 @@ describe('the lawn behind the row', () => {
   });
 });
 
-describe('the X of walks between Judd and the chapel', () => {
-  const judd = byId(stops, 'judd'), chapel = byId(stops, 'chapel');
+describe('the X of walks between South College and North College', () => {
+  const south = byId(stops, 'south'), north = byId(stops, 'north');
   const segs = quadX(stops);
   const pt = (sg: (typeof segs)[0], t: number) => ({ x: sg.a.x + (sg.b.x - sg.a.x) * t, z: sg.a.z + (sg.b.z - sg.a.z) * t });
 
@@ -95,14 +96,14 @@ describe('the X of walks between Judd and the chapel', () => {
     for (const sg of segs) {
       expect(sg.a.x).toBeCloseTo(-2.6); // the row's walk
       expect(sg.b.x).toBe(BACK_PATH.x1); // the back path
-      for (const p of [sg.a, sg.b]) expect(p.z < judd.z1 && p.z > chapel.z0).toBe(true);
-      expect(Math.abs(sg.b.z - sg.a.z)).toBeGreaterThan(25); // properly diagonal
+      for (const p of [sg.a, sg.b]) expect(p.z < south.z1 && p.z > north.z0).toBe(true);
+      expect(Math.abs(sg.b.z - sg.a.z)).toBeGreaterThan(18); // properly diagonal
     }
     const mid = pt(segs[0], 0.5);
     expect(along(segs[1], mid).d).toBeLessThan(0.01); // they cross at their middles
   });
 
-  it('never runs into Judd, the chapel, or anything solid along the way', () => {
+  it('never runs into South College, North College, or anything solid along the way', () => {
     const solids = [...pathObstacles(), ...World.lampSpots().map((l) => ({ x0: l.x - 0.45, x1: l.x + 0.45, z0: l.z - 0.45, z1: l.z + 0.45 }))];
     for (const sg of segs) {
       for (let t = 0; t <= 1; t += 0.01) {
@@ -137,5 +138,25 @@ describe('the X of walks between Judd and the chapel', () => {
     for (const sg of segs) expect(quadXAt(sg.b.z, stops)).toBe(true);
     expect(quadXAt(-60, stops)).toBe(false);
     for (const t of BACK_TREES) expect(onQuadX(t, stops, 1.5)).toBe(false);
+  });
+});
+
+describe('the walk between Judd and the chapel', () => {
+  const judd = byId(stops, 'judd'), chapel = byId(stops, 'chapel'), w = juddChapelWalk(stops);
+
+  it('runs straight through the middle of the gap, from the College Row walk to the back path', () => {
+    expect(w.a.z).toBe(w.b.z);
+    expect(w.a.z).toBeCloseTo((judd.z1 + chapel.z0) / 2);
+    expect(w.a.x).toBeCloseTo(-2.6);
+    expect(w.b.x).toBe(BACK_PATH.x1);
+    expect(judd.z1 - chapel.z0).toBeGreaterThan(w.w + 3); // with room either side
+  });
+
+  it('you can walk it end to end, it is paving, and the curb opens where it meets the path', () => {
+    let p = { ...w.a };
+    for (let i = 0; i < 400; i++) p = resolveMove(p, { x: Math.max(w.b.x, p.x - 0.2), z: w.a.z }, stops, { solids: pathObstacles() });
+    expect(p.x).toBeCloseTo(w.b.x, 1);
+    expect(surfaceAt({ x: -20, z: w.a.z }, crossings)).toBe('paving');
+    expect(quadXAt(w.a.z, stops)).toBe(true);
   });
 });

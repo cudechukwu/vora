@@ -51,10 +51,10 @@ export interface Spec {
 }
 
 export const ROW: Spec[] = [
-  { id: 'judd', name: 'Judd Hall', w: 30, gap: 36, depth: 18.4 },
-  { id: 'chapel', name: 'Memorial Chapel', w: 22, gap: 0, door: 3.2, depth: 32.4 },
-  { id: 'zelnick', name: 'Zelnick Pavilion', w: 14, gap: 0, depth: 32.4 }, // the glass link: solid back to the chapel's depth
-  { id: 'south', name: 'South College', w: 24, gap: 8, depth: 16.4 }, // (a glass bridge over the gap to North College)
+  { id: 'judd', name: 'Judd Hall', w: 30, gap: 10, depth: 18.4 }, // (a straight walk runs through the gap to the back path)
+  { id: 'chapel', name: 'Memorial Chapel', w: 22, gap: 0, door: 3.2, depth: 18.4 }, // its back in line with Judd's
+  { id: 'zelnick', name: 'Zelnick Pavilion', w: 22, gap: 0, bulge: -3, depth: 25 }, // glass, set back 3 m behind a forecourt; through to a back entrance
+  { id: 'south', name: 'South College', w: 24, gap: 26, depth: 16.4 }, // (the lawn with the X of walks, to North College)
   { id: 'north', name: 'North College', w: 60, gap: 20, crossing: 5, depth: 18.4 },
   { id: 'boger', name: 'Boger Hall', w: 44, gap: 10, door: -5, depth: 18.4 },
 ];
@@ -159,10 +159,12 @@ export const byId = (stops: RowStop[], id: BuildingId) => stops.find((s) => s.id
 export const PORTICO = { out: 2.6, r: 0.55, at: [-6.3, -2.1, 2.1, 6.3] } as const;
 /** Judd's entrance porch: two pairs of columns this far out from its facade, at these offsets from its middle. */
 export const JUDD_PORCH = { out: 2.3, r: 0.26, at: [-2.0, -1.35, 1.35, 2.0] } as const;
+/** Memorial Chapel's entrance porch on High Street: this far out from the facade, this wide either side of its door. */
+export const CHAPEL_PORCH = { out: 3.4, half: 2.5 } as const;
 /** South College's tower, standing out this far from the middle of its facade, this wide either side. */
 export const SOUTH_TOWER = { out: 3.2, half: 3 } as const;
 
-/** Bits of the row that stand out past the facades (and are solid): the portico's columns, Judd's porch, South College's tower. */
+/** Bits of the row that stand out past the facades (and are solid): the portico's columns, Judd's and the chapel's porches, South College's tower. */
 export function rowSolids(stops: RowStop[], pad = 0.3): { x0: number; x1: number; z0: number; z1: number }[] {
   const out: { x0: number; x1: number; z0: number; z1: number }[] = [];
   const north = stops.find((s) => s.id === 'north'), south = stops.find((s) => s.id === 'south'), judd = stops.find((s) => s.id === 'judd');
@@ -177,6 +179,12 @@ export function rowSolids(stops: RowStop[], pad = 0.3): { x0: number; x1: number
       const x = FRONT_X + JUDD_PORCH.out, z = judd.doorZ + o, r = JUDD_PORCH.r + pad;
       out.push({ x0: x - r, x1: x + r, z0: z - r, z1: z + r });
     }
+  }
+  const chapel = stops.find((s) => s.id === 'chapel');
+  if (chapel) {
+    out.push({ x0: FRONT_X - 1, x1: FRONT_X + CHAPEL_PORCH.out + pad, z0: chapel.doorZ - CHAPEL_PORCH.half - pad, z1: chapel.doorZ + CHAPEL_PORCH.half + pad });
+    const bx = FRONT_X - 18; // the granite seat wall along its back
+    out.push({ x0: bx - 1.9 - pad, x1: bx - 1.3 + pad, z0: chapel.doorZ - 7 - pad, z1: chapel.doorZ + 7 + pad });
   }
   if (south) out.push({ x0: FRONT_X - 1, x1: FRONT_X + SOUTH_TOWER.out + pad, z0: south.zc - SOUTH_TOWER.half - pad, z1: south.zc + SOUTH_TOWER.half + pad });
   return out;

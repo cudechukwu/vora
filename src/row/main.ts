@@ -320,7 +320,7 @@ for (let i = 0; i < 12; i++) {
   backWalkers.push(bw);
 }
 
-// and cutting across the lawn between Judd and the chapel on the X of walks, between the row's walk and the back path
+// and cutting across the lawn between South and North College on the X of walks, between the row's walk and the back path
 const xSegs = quadX(stops);
 interface XWalker { p: Person; seg: number; t: number; dir: 1 | -1; speed: number; side: number; body: Body }
 const xWalkers: XWalker[] = [];

@@ -52,22 +52,23 @@ export const rearWalkAt = (z: number, stops: RowStop[], pad = 0.3) =>
 export const BACK_TREES: { x: number; z: number; s: number }[] = [
   { x: -42.5, z: -137, s: 0.8 },
   { x: -42, z: -122.5, s: 0.75 },
-  { x: -42.5, z: -87.5, s: 0.7 },
+  { x: -42.5, z: -67.5, s: 0.7 },
   { x: -42.5, z: 25.5, s: 0.75 },
 ];
 
-// ── The X between Judd and the chapel ──
-// The open lawn between Judd and Memorial Chapel (the user's street-view shots, 2026-10-06) is crossed by two concrete
-// walks in an X: corner to corner, from the College Row walk out front to the back path (the way up to Usdan).
+// ── The X between South College and North College; the walk between Judd and the chapel ──
+// The open lawn between South College and North College (the user, 2026-10-06) is crossed by two concrete walks in an
+// X: corner to corner, from the College Row walk out front to the back path (the way up to Usdan). Between Judd and
+// the chapel, a narrower gap, one straight walk does the same (the user's street-view shot).
 
 export interface Seg { a: XZ; b: XZ; w: number }
-/** Where the X's walks stand clear of Judd's and the chapel's ends (m), and how wide they are. */
+/** Where the X's walks stand clear of South College's and North College's ends (m), and how wide they are. */
 export const QUAD_X = { inset: 2.5, w: 2.6 } as const;
 const FRONT_WALK_X = -2.6; // the College Row walk's lawn-side edge (PATH_HALF)
 
 export function quadX(stops: RowStop[]): Seg[] {
-  const judd = stops.find((s) => s.id === 'judd')!, chapel = stops.find((s) => s.id === 'chapel')!;
-  const zS = judd.z1 - QUAD_X.inset, zN = chapel.z0 + QUAD_X.inset;
+  const south = stops.find((s) => s.id === 'south')!, north = stops.find((s) => s.id === 'north')!;
+  const zS = south.z1 - QUAD_X.inset, zN = north.z0 + QUAD_X.inset;
   return [
     { a: { x: FRONT_WALK_X, z: zS }, b: { x: BACK_PATH.x1, z: zN }, w: QUAD_X.w },
     { a: { x: FRONT_WALK_X, z: zN }, b: { x: BACK_PATH.x1, z: zS }, w: QUAD_X.w },
@@ -81,7 +82,17 @@ export function along(s: Seg, p: XZ): { t: number; d: number } {
   return { t, d: Math.hypot(p.x - (s.a.x + dx * t), p.z - (s.a.z + dz * t)) };
 }
 
-export const onQuadX = (p: XZ, stops: RowStop[], pad = 0) => quadX(stops).some((s) => along(s, p).d <= s.w / 2 + pad);
+/** The straight walk through the gap between Judd and the chapel, from the College Row walk to the back path. */
+export function juddChapelWalk(stops: RowStop[]): Seg {
+  const judd = stops.find((s) => s.id === 'judd')!, chapel = stops.find((s) => s.id === 'chapel')!;
+  const z = (judd.z1 + chapel.z0) / 2;
+  return { a: { x: FRONT_WALK_X, z }, b: { x: BACK_PATH.x1, z }, w: 3.6 }; // wide (the user's street view), grass either side
+}
 
-/** Where the X meets the back path (z), so the curb and hosta bed (x ≈ −50.2…−48.1) stop there too. */
+/** All the concrete lawn walks: the X, and the walk between Judd and the chapel. */
+export const lawnWalks = (stops: RowStop[]): Seg[] => [...quadX(stops), juddChapelWalk(stops)];
+
+export const onQuadX = (p: XZ, stops: RowStop[], pad = 0) => lawnWalks(stops).some((s) => along(s, p).d <= s.w / 2 + pad);
+
+/** Where a lawn walk meets the back path (z), so the curb and hosta bed (x ≈ −50.2…−48.1) stop there too. */
 export const quadXAt = (z: number, stops: RowStop[]) => [-50.3, -49.2, -48.1].some((x) => onQuadX({ x, z }, stops, 0.3));

@@ -1,4 +1,5 @@
 import type { Box, XZ } from './collide';
+import { zelnickY } from './zelnick';
 import { BACK_PATH, distToPoly, inPoly } from './layout';
 
 // ─── The south end of Andrus Field (pure data) ─────────────────────────
@@ -105,13 +106,13 @@ export function bankY(x: number, z: number): number {
   return TERRACE_Y * t * t * (3 - 2 * t);
 }
 
-/** Height of the ground outside at (x, z): 0 almost everywhere, up the bank, up the stairs. */
+/** Height of the ground outside at (x, z): 0 almost everywhere, up the bank, up the stairs, up Zelnick's ramp. */
 export function groundY(x: number, z: number): number {
   const p = { x, z };
   if (inRect(p, LANDING)) return 0;
   if (inRect(p, STAIRS)) return TERRACE_Y * clamp01((z - STAIRS.z0) / (STAIRS.z1 - STAIRS.z0));
   if (inRect(p, STAIRS_E)) return TERRACE_Y * clamp01((STAIRS_E.x1 - x) / (STAIRS_E.x1 - STAIRS_E.x0));
-  return bankY(x, z);
+  return bankY(x, z) || zelnickY(x, z); // (and up the steps and ramp at Zelnick's back entrance)
 }
 
 /** Too steep or high for a car: anywhere up the bank (or on the stairs). */

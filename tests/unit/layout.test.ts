@@ -60,8 +60,11 @@ describe('College Row layout', () => {
     }
   });
 
-  it('keeps every facade flush along the walk', () => {
-    for (const s of stops) expect(s.front).toBe(stops[0].front);
+  it('keeps every facade flush along the walk (but Zelnick, set back behind its forecourt between the chapel and South College)', () => {
+    for (const s of stops) if (s.id !== 'zelnick') expect(s.front).toBe(stops[0].front);
+    const z = byId(stops, 'zelnick');
+    expect(stops[0].front - z.front).toBeGreaterThan(2);
+    expect(stops[0].front - z.front).toBeLessThan(5);
   });
 
   it('walk runs past both ends of the row', () => {

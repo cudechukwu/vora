@@ -4,7 +4,8 @@ import {
   Quaternion, RepeatWrapping, SRGBColorSpace, Sprite, SpriteMaterial, Vector3, BoxGeometry, Float32BufferAttribute,
 } from 'three';
 import { BoxBank, PAL, PAVER_TILE, lambert, paverMap, prism } from './kit';
-import { BACK_TREES, aprons, onQuadX, quadX, quadXAt, rearWalkAt, rearWalks } from './backlawn';
+import { zelnickSolids } from './zelnick';
+import { BACK_TREES, aprons, lawnWalks, onQuadX, quadXAt, rearWalkAt, rearWalks } from './backlawn';
 import type { Box } from './collide';
 import { vestibuleSolids } from './usdan/plan';
 import {
@@ -59,7 +60,7 @@ export class World {
     this.benchesAlongLawn(box);
     this.plaza(box);
     this.pathSide(box, stops);
-    this.obstacles.push(...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, this.fz), ...vestibuleSolids(), ...southObstacles(), ...rowSolids(stops));
+    this.obstacles.push(...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, this.fz), ...vestibuleSolids(), ...southObstacles(), ...rowSolids(stops), ...zelnickSolids());
   }
 
   private ground() {
@@ -425,14 +426,15 @@ export class World {
       lay(w, 0.034);
       for (const z of [w.z0 + 0.1, w.z1 - 0.1]) box.add((w.x0 + w.x1) / 2, 0.036, z, w.x1 - w.x0, 0.02, 0.2, edge);
     }
-    // the X of concrete walks across the lawn between Judd and the chapel (run on a metre at each end, under the
+    // the X of concrete walks across the lawn between South and North College, and the walk between Judd and the
+    // chapel (each run on a metre at each end, under the
     // College Row walk and the back path's tar, so the cut ends never show)
     const concrete = lambert(0xc8c4ba);
-    quadX(stops).forEach((sg, i) => {
+    lawnWalks(stops).forEach((sg, i) => {
       const dx = sg.b.x - sg.a.x, dz = sg.b.z - sg.a.z, L = Math.hypot(dx, dz);
       const m = new Mesh(new PlaneGeometry(sg.w, L + 2), concrete);
       m.rotation.set(-Math.PI / 2, 0, Math.atan2(dx, dz)); // the plane's length (its y) along the walk
-      m.position.set((sg.a.x + sg.b.x) / 2, 0.023 + i * 0.002, (sg.a.z + sg.b.z) / 2);
+      m.position.set((sg.a.x + sg.b.x) / 2, 0.022 + i * 0.002, (sg.a.z + sg.b.z) / 2);
       m.receiveShadow = true;
       this.group.add(m);
     });
@@ -520,7 +522,7 @@ export class World {
     for (const [x, z, s] of [[-18, 50, 1.6], [-28, 56, 1.8], [-14, 62, 1.5], [-30, 47, 1.3]]) list.push({ x, z, s, id: id++ });
     for (const [x, z, s] of [[-101, 40, 1.9], [-101, 58, 1.7], [-66, 56, 1.4], [-158, 30, 1.6], [-158, 50, 1.8]]) list.push({ x, z, s, id: id++ });
 
-    const clear = (t: T) => inUsdan(t, 3) || inPlaza(t) || inSouthEnd(t, 3) || onQuadX(t, stops, 1.6)
+    const clear = (t: T) => inUsdan(t, 3) || inPlaza(t) || inSouthEnd(t, 3) || onQuadX(t, stops, 1.6) || zelnickSolids(2).some((b) => t.x > b.x0 && t.x < b.x1 && t.z > b.z0 && t.z < b.z1)
       || (t.z > FIELD_ROAD.z0 - 1.5 && t.z < FIELD_ROAD.z1 + 1.5 && t.x < FIELD_ROAD.x1 + 8) // not in the road
       || (bankY(t.x, t.z) > 0.02 && bankY(t.x, t.z) < 1.98); // nor on the slope of the bank
     for (let i = list.length - 1; i >= 0; i--) if (clear(list[i])) list.splice(i, 1); // not in Usdan, on the plaza, or in the way

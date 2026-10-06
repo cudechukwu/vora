@@ -1,14 +1,15 @@
 import {
-  BoxGeometry, CanvasTexture, ConeGeometry, CylinderGeometry, DoubleSide, ExtrudeGeometry, Group, Material, Mesh, MeshBasicMaterial,
-  MeshPhongMaterial, Path, PlaneGeometry, SRGBColorSpace, Shape, SphereGeometry,
+  BoxGeometry, BufferGeometry, CanvasTexture, ConeGeometry, CylinderGeometry, DoubleSide, ExtrudeGeometry, Group, Material, Mesh, MeshBasicMaterial,
+  MeshPhongMaterial, Path, PlaneGeometry, SRGBColorSpace, Shape, ShapeGeometry, SphereGeometry, TorusGeometry,
 } from 'three';
 import {
   BoxBank, Facing, PAL, WindowBank, WindowKind, block, brickMap, hipRoof, lambert, prism, stoneMap,
 } from './kit';
-import { BuildingId, FRONT_X, JUDD_PORCH, PORTICO, ROW, RowStop, SOUTH_TOWER, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
+import { BuildingId, CHAPEL_PORCH, FRONT_X, JUDD_PORCH, PORTICO, RowStop, SOUTH_TOWER, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
 import { rearDoorZ } from './backlawn';
 import { DOORS, Door, VESTIBULE } from './usdan/plan';
 import { buildSouthEnd } from './southview';
+import { FORECOURT, REAR_ENTRY, ZEL, ZEL_BENCH, ZEL_LAMP, ZEL_PARTS } from './zelnick';
 
 // ─── College Row buildings ─────────────────────────────────────────────
 // Stylized, never literal (brief R/05): each building keeps the one or two
@@ -20,7 +21,7 @@ type Kit = { g: Group; win: WindowBank; box: BoxBank };
 type Builder = (k: Kit, zc: number, s: RowStop) => void;
 
 const BUILDERS: Record<BuildingId, Builder> = {
-  judd, chapel, zelnick, north: northCollege, south: southCollege, boger,
+  judd, chapel, zelnick: (k) => zelnick(k), north: northCollege, south: southCollege, boger,
 };
 
 export function buildRow(win: WindowBank, box: BoxBank) {
@@ -30,14 +31,14 @@ export function buildRow(win: WindowBank, box: BoxBank) {
   usdan({ g, win, box });
   buildSouthEnd({ g, win, box }); // the field road, the Frank Center and Olin, up on their bank
   g.traverse((o) => {
-    if ((o as Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; }
+    if ((o as Mesh).isMesh) { o.castShadow = !o.userData.glass; o.receiveShadow = !o.userData.glass; }
   });
   return { group: g, stops, crossings };
 }
 
 // ── shared pieces ──────────────────────────────────────────────────────
 
-function add(g: Group, geo: BoxGeometry | ConeGeometry | CylinderGeometry | SphereGeometry | ReturnType<typeof prism>,
+function add(g: Group, geo: BufferGeometry,
   mat: Material, x: number, y: number, z: number) {
   const m = new Mesh(geo, mat);
   m.position.set(x, y, z);
@@ -190,15 +191,27 @@ function cupola(k: Kit, x: number, y: number, z: number, belfry: boolean) {
 function chapel(k: Kit, zRow: number) {
   const { g, win, box } = k;
   const zc = zRow + 3.2; // nave at the Judd end, tower on the Zelnick (−z) end
-  const W = 16, D = 32, H = 10;
+  const W = 16, D = 18, H = 10; // (its back lines up with Judd's, short of Zelnick's back pavilion)
   const cx = FRONT_X - D / 2;
   const stone = lambert(PAL.brownstone, stoneMap(), 'stone');
   add(g, block(D, H, W), stone, cx, 0, zc);
   gable(g, cx, H, zc, W, 8, D, stone, true, 0x9a3a2e);
-  // great west window on the gable end + a door under it
-  win.add('gothic', FRONT_X + 0.03, 9.5, zc, 4.6, 7.2, '+x');
-  box.add(FRONT_X + 0.08, 1.7, zc, 0.14, 3.4, 2.4, 0x2b1d17);
-  for (let x = FRONT_X - 8.5; x > FRONT_X - D + 2; x -= 4.2) {
+  chapelFront(k, zc, W);
+  // the back, onto the field (the user's photo): a blank wall with blind pointed arches, a granite seat wall below
+  const bx = FRONT_X - D, dressed = lambert(0x8c6352);
+  for (const o of [-4.6, 0, 4.6]) {
+    const arch = new Mesh(pointedArch(3.6, 7.5), dressed);
+    arch.position.set(bx - 0.03, 1.4, zc + o);
+    arch.rotation.y = -Math.PI / 2;
+    g.add(arch);
+    const inner = new Mesh(pointedArch(3.2, 7.1), lambert(0x7a5243, stoneMap(), 'stone'));
+    inner.position.set(bx - 0.05, 1.4, zc + o);
+    inner.rotation.y = -Math.PI / 2;
+    g.add(inner);
+  }
+  box.add(bx - 0.3, 0.6, zc, 0.6, 1.2, W + 0.6, 0x6e4a3c); // a plinth
+  box.add(bx - 1.6, 0.25, zc, 0.6, 0.5, W - 2, 0xb8b2a8); // the granite seat wall
+  for (let x = FRONT_X - 4.6; x > FRONT_X - D + 2; x -= 4.2) {
     win.add('gothic', x, 5.4, zc + W / 2 + 0.03, 1.5, 4.8, '+z');
     win.add('gothic', x, 5.4, zc - W / 2 - 0.03, 1.5, 4.8, '-z');
     box.add(x + 2.1, 4, zc + W / 2 + 0.4, 0.9, 8, 0.8, PAL.brownstone); // buttresses
@@ -217,11 +230,109 @@ function chapel(k: Kit, zRow: number) {
   spire.rotation.y = Math.PI / 4;
 }
 
+/** A pointed (gothic) arch outline, w wide and h tall, its base at y=0, in the XY plane. */
+function pointedArch(w: number, h: number): ShapeGeometry {
+  const s = new Shape(), r = w * 0.95, spring = h - Math.sqrt(r * r - (r - w / 2) ** 2);
+  s.moveTo(-w / 2, 0);
+  s.lineTo(-w / 2, spring);
+  s.absarc(-w / 2 + r, spring, r, Math.PI, Math.PI - Math.acos((r - w / 2) / r) + 0.0001, true);
+  s.absarc(w / 2 - r, spring, r, Math.acos((r - w / 2) / r), 0, true);
+  s.lineTo(w / 2, 0);
+  s.closePath();
+  return new ShapeGeometry(s, 10);
+}
+
+/** A flat shape on a +x facing wall at (x, y, z) (its base at y). */
+function onFrontWall(g: Group, geo: BufferGeometry, mat: Material, x: number, y: number, z: number) {
+  const m = new Mesh(geo, mat);
+  m.position.set(x, y, z);
+  m.rotation.y = Math.PI / 2;
+  g.add(m);
+  return m;
+}
+
+/**
+ * Memorial Chapel's High Street front (the user's street-view shots): the steep brownstone gable with its great
+ * pointed window (stone mullions, a rose in the head) over a string course; in front of it, a gabled porch with a deep
+ * pointed arch on clustered columns, up steps with railings; at the foot of the tower a smaller pointed door with a
+ * lantern, slit windows up the tower, and MEMORIAL CHAPEL cut into a stone by the corner.
+ */
+function chapelFront(k: Kit, zc: number, W: number) {
+  const { g, win, box } = k;
+  const stone = lambert(PAL.brownstone, stoneMap(), 'stone'), dressed = 0x8c6352, dark = new MeshBasicMaterial({ color: 0x1c1512 });
+  const fx = FRONT_X;
+  // the great window: a stone surround, the glass, two mullions, the rose in its head
+  onFrontWall(g, pointedArch(5.4, 8.2), lambert(dressed), fx + 0.04, 6.8, zc);
+  win.add('gothic', fx + 0.07, 10.8, zc, 4.4, 7.4, '+x');
+  for (const o of [-0.75, 0.75]) box.add(fx + 0.12, 9.9, zc + o, 0.14, 5.6, 0.18, dressed);
+  const rose = add(g, new TorusGeometry(0.85, 0.11, 4, 16), lambert(dressed), fx + 0.13, 13.1, zc);
+  rose.rotation.y = Math.PI / 2;
+  box.add(fx + 0.1, 6.2, zc, 0.22, 0.3, W, dressed); // string course
+  for (const o of [-W / 2 + 0.4, W / 2 - 0.4]) box.add(fx + 0.35, 6, zc + o, 0.7, 12, 0.8, dressed); // corner buttresses
+
+  // the porch: a gabled stone porch out front, its pointed arch on clustered columns, a dark vestibule inside
+  const P = CHAPEL_PORCH, px = fx + P.out / 2, pw = P.half * 2, ph = 4.6;
+  add(g, block(P.out, ph, pw), stone, px, 0, zc);
+  const pg = add(g, prism(pw + 0.3, 2.6, P.out + 0.4), lambert(PAL.slate), px, ph, zc);
+  pg.rotation.y = Math.PI / 2;
+  const coping = add(g, prism(pw + 0.6, 2.75, 0.5), lambert(dressed), fx + P.out + 0.05, ph - 0.05, zc); // the gable's stone edge
+  coping.rotation.y = Math.PI / 2;
+  onFrontWall(g, pointedArch(3.1, 4.3), lambert(dressed), fx + P.out + 0.02, 0.9, zc);
+  onFrontWall(g, pointedArch(2.5, 3.9), dark, fx + P.out + 0.04, 0.9, zc);
+  for (const side of [-1, 1]) for (const o of [1.35, 1.6]) {
+    add(g, new CylinderGeometry(0.11, 0.11, 2.6, 6).translate(0, 1.3, 0), lambert(0x6e4a3c), fx + P.out + 0.18, 0.9, zc + side * o);
+  }
+  // steps up to it, between low stone cheeks, with railings
+  for (let st = 0; st < 5; st++) {
+    const t = 0.9 * (1 - st / 5);
+    box.add(fx + P.out + 0.3 + st * 0.4, t / 2, zc, 0.4 + 0.001, t, pw + 0.4, 0xa9988a);
+  }
+  for (const side of [-1, 1]) {
+    box.add(fx + P.out + 1.0, 0.55, zc + side * (P.half + 0.35), 2.0, 1.1, 0.4, dressed);
+    const z = zc + side * (P.half - 0.3), x0 = fx + P.out + 2.3, x1 = fx + P.out + 0.2;
+    const r = add(g, new BoxGeometry(0.05, 0.05, Math.hypot(x1 - x0, 0.9)), lambert(0x2b2e30), (x0 + x1) / 2, 0.45 + 0.9, z);
+    r.lookAt(x1, 1.8, z);
+    for (const x of [x0, x1]) box.add(x, x === x0 ? 0.45 : 1.35, z, 0.05, 0.9, 0.05, 0x2b2e30);
+  }
+
+  // the tower's foot: a smaller pointed door with a lantern, slit windows above, the name stone
+  const tz = zc - W / 2 - 3.2;
+  onFrontWall(g, pointedArch(1.9, 3.2), lambert(dressed), fx + 0.03, 0.5, tz + 0.6);
+  onFrontWall(g, pointedArch(1.4, 2.85), new MeshBasicMaterial({ color: 0x2a1d16 }), fx + 0.05, 0.5, tz + 0.6);
+  for (let st = 0; st < 3; st++) box.add(fx + 0.25 + st * 0.35, (0.5 * (1 - st / 3)) / 2, tz + 0.6, 0.35, 0.5 * (1 - st / 3), 2.2, 0xa9988a);
+  box.add(fx + 0.2, 3.3, tz + 1.9, 0.22, 0.4, 0.22, 0x1b1d1f); // lantern
+  add(g, new SphereGeometry(0.09, 6, 4), new MeshBasicMaterial({ color: 0xffe2a8 }), fx + 0.2, 3.25, tz + 1.9);
+  for (const [y, o] of [[6, -1.6], [8.4, -1.2], [10.8, -1.6]]) win.add('gothic', fx + 0.03, y, tz + o, 0.45, 1.3, '+x');
+  for (const o of [-1.0, 1.0]) win.add('gothic', fx + 0.03, 14.6, tz + o, 0.9, 3.6, '+x'); // the tall pair higher up
+  const name = new Mesh(new PlaneGeometry(1.5, 0.45), new MeshBasicMaterial({ map: chapelStone() }));
+  name.position.set(fx + 0.04, 1.2, tz - 2.2);
+  name.rotation.y = Math.PI / 2;
+  g.add(name);
+}
+
+let chapelStoneTex: CanvasTexture | null = null;
+/** MEMORIAL CHAPEL, cut into a brownstone block. */
+function chapelStone(): CanvasTexture {
+  if (chapelStoneTex) return chapelStoneTex;
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 80;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#7a5243'; x.fillRect(0, 0, 256, 80);
+  x.fillStyle = '#4e3329';
+  x.font = 'bold 26px Georgia, serif';
+  x.textAlign = 'center';
+  x.fillText('MEMORIAL', 128, 34);
+  x.fillText('CHAPEL', 128, 64);
+  chapelStoneTex = new CanvasTexture(c);
+  chapelStoneTex.colorSpace = SRGBColorSpace;
+  return chapelStoneTex;
+}
+
 /**
  * South College (the user's photos): the old brownstone one, four storeys of rubble stone under a slate gable, with a
  * square tower standing out from the middle of its front: an arched door with a fanlight up granite steps between
  * brownstone cheeks, three windows above, a white cornice and balustrade, and the white belfry with its green dome.
- * A black fire escape down one end, and a glass bridge across the gap to North College.
+ * A black fire escape down one end.
  */
 function southCollege(k: Kit, zc: number) { // (its back door, onto the lawn, is in the middle)
   const { g, win, box } = k;
@@ -256,13 +367,6 @@ function southCollege(k: Kit, zc: number) { // (its back door, onto the lawn, is
     flightM.rotation.y = Math.PI / 2;
   }
   for (const x of [FRONT_X - 5.6, FRONT_X - 2.4]) box.add(x, 6.4, ez + 0.9, 0.08, 12.8, 0.08, 0x1b1d1f);
-  // the glass bridge over the gap to North College (you can walk under it)
-  const z0 = zc - w / 2, gap = ROW.find((s) => s.id === 'south')!.gap, bz = z0 - gap / 2, bx = FRONT_X - 9;
-  add(g, block(9, 3.6, gap + 0.2), lambert(0x2a333a), bx, 3.6, bz);
-  box.add(bx, 7.35, bz, 9.6, 0.3, gap + 0.4, 0x1d2226);
-  box.add(bx, 3.5, bz, 9.6, 0.25, gap + 0.4, 0x1d2226);
-  for (let i = 0; i < 4; i++) win.add('rect', FRONT_X - 4.47, 5.4, bz - gap / 2 + (i + 0.5) * (gap / 4), gap / 4 - 0.15, 3.3, '+x');
-  for (const z of [bz - gap / 2 + 0.3, bz + gap / 2 - 0.3]) box.add(FRONT_X - 4.6, 1.75, z, 0.25, 3.5, 0.25, 0x1d2226);
 }
 
 /**
@@ -440,24 +544,124 @@ function judd(k: Kit, zc: number, s: RowStop) {
   }
 }
 
-/** Zelnick Pavilion: the glass link between the chapel and North College. */
-function zelnick(k: Kit, zc: number) {
-  const { g, win, box } = k;
-  const w = 14, d = 12, H = 5.6;
-  const x0 = FRONT_X - 3; // set back from the row
-  const cx = x0 - d / 2;
-  add(g, block(d, H, w), lambert(0x2f3d46), cx, 0, zc);
-  const n = 5;
-  for (let i = 0; i < n; i++) {
-    win.add('rect', x0 + 0.03, H / 2, zc - w / 2 + (i + 0.5) * (w / n), w / n - 0.15, H - 0.5, '+x');
-    box.add(x0 + 0.08, H / 2, zc - w / 2 + i * (w / n), 0.12, H, 0.12, 0x9a9486); // mullions
+/** See-through glass (Zelnick's): you look through it to the inside and out the far side. Casts no shadow. */
+let glassMat: MeshPhongMaterial | null = null;
+const glass = () => (glassMat ??= new MeshPhongMaterial({
+  color: 0xa9c3cf, specular: 0xffffff, shininess: 90, transparent: true, opacity: 0.3, depthWrite: false, side: DoubleSide,
+}));
+
+/** A vertical glass wall from (x0, z0) to (x1, z1), y0 up h, with steel mullions every `step` m and a transom rail. */
+function glassWall(k: Kit, x0: number, z0: number, x1: number, z1: number, y0: number, h: number, step = 1.8) {
+  const len = Math.hypot(x1 - x0, z1 - z0), alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
+  const m = new Mesh(new PlaneGeometry(len, h), glass());
+  m.position.set((x0 + x1) / 2, y0 + h / 2, (z0 + z1) / 2);
+  m.rotation.y = alongX ? 0 : Math.PI / 2;
+  m.userData.glass = true;
+  k.g.add(m);
+  const steel = 0x6f757a, n = Math.max(1, Math.round(len / step));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
+    k.box.add(x, y0 + h / 2, z, 0.1, h, 0.1, steel);
   }
-  // the thin, flared roof that overhangs the front
-  const roof = new Mesh(new BoxGeometry(d + 4.5, 0.3, w + 1.4), lambert(0xd8d0c0));
-  roof.position.set(cx + 2.2, H + 0.35, zc);
-  roof.rotation.z = 0.07;
+  for (const y of [y0 + 0.05, y0 + 2.6, y0 + h - 0.05]) {
+    k.box.add((x0 + x1) / 2, y, (z0 + z1) / 2, alongX ? len : 0.08, 0.08, alongX ? 0.08 : len, steel);
+  }
+}
+
+/** A glass box: four glass walls, a floor, and a flat roof slab overhanging by `over` (with a wood soffit under it). */
+function glassBox(k: Kit, r: { x0: number; x1: number; z0: number; z1: number }, y0: number, h: number,
+  over: { x0: number; x1: number; z0: number; z1: number }, skip: ('x0' | 'x1' | 'z0' | 'z1')[] = [], flare = 0) {
+  const { g, box } = k;
+  box.add((r.x0 + r.x1) / 2, y0 - 0.02, (r.z0 + r.z1) / 2, r.x1 - r.x0, 0.06, r.z1 - r.z0, 0xd8d4cc); // floor
+  if (!skip.includes('x1')) glassWall(k, r.x1, r.z0, r.x1, r.z1, y0, h);
+  if (!skip.includes('x0')) glassWall(k, r.x0, r.z0, r.x0, r.z1, y0, h);
+  if (!skip.includes('z0')) glassWall(k, r.x0, r.z0, r.x1, r.z0, y0, h);
+  if (!skip.includes('z1')) glassWall(k, r.x0, r.z1, r.x1, r.z1, y0, h);
+  const rx0 = r.x0 - over.x0, rx1 = r.x1 + over.x1, rz0 = r.z0 - over.z0, rz1 = r.z1 + over.z1;
+  const roof = new Mesh(new BoxGeometry(rx1 - rx0, 0.3, rz1 - rz0), lambert(0xcfc9bc));
+  roof.position.set((rx0 + rx1) / 2, y0 + h + 0.25, (rz0 + rz1) / 2);
+  roof.rotation.z = flare; // a slight lift toward the front edge
   g.add(roof);
-  box.add(x0 + 2.2, 0.5, zc + w / 2 - 1, 4.4, 1, 0.5, 0xb8b2a4); // low granite wall
+  box.add((r.x0 + r.x1) / 2, y0 + h + 0.06, (r.z0 + r.z1) / 2, r.x1 - r.x0 + 0.2, 0.08, r.z1 - r.z0 + 0.2, 0xb98d5c); // wood soffit
+}
+
+/**
+ * Zelnick Pavilion (zelnick.ts has the plan): between the chapel and South College. From High Street, a tall
+ * see-through glass box under a thin flared roof, set back behind a granite forecourt, with low glass links to its
+ * neighbours; through it, a glass link to the back pavilion on the field side, with a stone pier, a glass stair tower,
+ * and the back entrance up a landing — steps off its side, a ramp down along the wall, metal railings.
+ */
+function zelnick(k: Kit) {
+  const { g, box } = k;
+  const P = ZEL_PARTS, granite = 0xb8b2a8, steel = 0x5c6266;
+  // the front pavilion and its flared roof (overhanging the forecourt), arched timber ribs inside
+  glassBox(k, P.front, 0, P.front.h, { x0: 0.6, x1: 3.2, z0: 1, z1: 1 }, [], 0.05);
+  const rib = lambert(0xb48552);
+  for (const f of [0.25, 0.5, 0.75]) {
+    const x = P.front.x0 + (P.front.x1 - P.front.x0) * f, half = (P.front.z1 - P.front.z0) / 2;
+    const arch = add(g, new TorusGeometry(half - 0.3, 0.1, 4, 16, Math.PI), rib, x, 0, P.front.z0 + half);
+    arch.rotation.y = Math.PI / 2;
+    arch.scale.set(1, (P.front.h - 0.4) / (half - 0.3), 1);
+  }
+  // the double doors, steel-framed, in the middle of the front
+  for (const o of [-0.9, 0.9]) box.add(P.front.x1 + 0.04, 1.2, ZEL.zc + o, 0.06, 2.4, 1.7, 0x9aa3a8);
+  box.add(P.front.x1 + 0.06, 1.2, ZEL.zc, 0.1, 2.5, 0.1, steel);
+  box.add(P.front.x1 + 0.06, 2.45, ZEL.zc, 0.1, 0.1, 3.6, steel);
+  for (const o of [-0.4, 0.4, -1.4, 1.4]) box.add(P.front.x1 + 0.09, 1.1, ZEL.zc + o, 0.05, 0.05, 0.4, 0xd0d4d6); // pulls
+  // inside: a couple of long wood benches
+  for (const o of [-4, 4]) box.add(P.front.x0 + 5.5, 0.45, ZEL.zc + o, 4, 0.1, 0.5, 0x9a7a55);
+  // the low glass links either side, to the chapel and to South College
+  glassBox(k, { x0: P.links.x0, x1: P.links.x1, z0: P.front.z1, z1: ZEL.z0 }, 0, P.links.h, { x0: 0.2, x1: 0.5, z0: 0, z1: 0 }, ['z0', 'z1']);
+  glassBox(k, { x0: P.links.x0, x1: P.links.x1, z0: ZEL.z1, z1: P.front.z0 }, 0, P.links.h, { x0: 0.2, x1: 0.5, z0: 0, z1: 0 }, ['z0', 'z1']);
+  // through to the back: the lower glass link, then the back pavilion with its deep roof toward the field
+  glassBox(k, P.middle, 0.45, P.middle.h, { x0: 0, x1: 0, z0: 0.4, z1: 0.4 }, ['x0', 'x1']);
+  add(g, block(P.middle.x1 - P.rear.x0, 0.45, P.rear.z1 - P.rear.z0), lambert(granite), (P.rear.x0 + P.middle.x1) / 2, 0, (P.rear.z0 + P.rear.z1) / 2); // the raised floor's granite base
+  glassBox(k, P.rear, 0.45, P.rear.h, { x0: 2.6, x1: 0.3, z0: 0.8, z1: 0.8 }, [], -0.04);
+  // the stone pier (grey panels) and the glass stair tower at the South College end
+  add(g, block(P.pier.x1 - P.pier.x0, P.pier.h, P.pier.z1 - P.pier.z0), lambert(0xa9aeb2, stoneMap(), 'panel'), (P.pier.x0 + P.pier.x1) / 2, 0, (P.pier.z0 + P.pier.z1) / 2);
+  glassBox(k, P.stairTower, 0, P.stairTower.h, { x0: 0.2, x1: 0, z0: 0.2, z1: 0.2 }, ['x1']);
+  for (let i = 0; i < 6; i++) box.add(P.stairTower.x0 + 1.5, 0.6 + i * 1.2, P.stairTower.z0 + 0.6 + (i % 2) * 0.8, 2.2, 0.12, 1.0, 0x8a8f93); // the stairs inside
+
+  // the back entrance: door, landing, steps off its side, the ramp down along the wall, railings
+  const R = REAR_ENTRY, bx = ZEL.back;
+  for (const o of [-0.85, 0.85]) box.add(bx - 0.04, R.H + 1.2, R.doorZ + o, 0.06, 2.4, 1.6, 0x9aa3a8);
+  box.add(bx - 0.06, R.H + 2.45, R.doorZ, 0.1, 0.1, 3.4, steel);
+  const L = R.landing;
+  box.add((L.x0 + L.x1) / 2, R.H / 2, (L.z0 + L.z1) / 2, L.x1 - L.x0, R.H, L.z1 - L.z0, granite);
+  const S = R.steps;
+  for (let i = 0; i < S.n; i++) {
+    const h = (R.H * (i + 1)) / (S.n + 1), w = (S.x1 - S.x0) / S.n;
+    box.add(S.x0 + w * (i + 0.5), h / 2, (S.z0 + S.z1) / 2, w + 0.001, h, S.z1 - S.z0, 0xc4c2bb);
+  }
+  const Rm = R.ramp, len = Rm.z1 - Rm.z0, slope = Math.atan2(R.H, len);
+  const ramp = add(g, new BoxGeometry(Rm.x1 - Rm.x0, 0.12, Math.hypot(len, R.H)), lambert(0xc4c2bb), (Rm.x0 + Rm.x1) / 2, R.H / 2 - 0.04, (Rm.z0 + Rm.z1) / 2);
+  ramp.rotation.x = slope; // high end at the landing (−z)
+  const wall = add(g, new BoxGeometry(0.3, 0.5, Math.hypot(len, R.H)), lambert(granite), Rm.x0 - 0.05, R.H / 2 + 0.1, (Rm.z0 + Rm.z1) / 2);
+  wall.rotation.x = slope;
+  // railings: rails at 0.9 m above the walking surface, posts every metre or so
+  const rail = (x0: number, z0: number, y0: number, x1: number, z1: number, y1: number) => {
+    const dx = x1 - x0, dz = z1 - z0, dy = y1 - y0, l = Math.hypot(dx, dz, dy);
+    for (const top of [0.9, 0.45]) {
+      const m = add(g, new BoxGeometry(0.05, 0.05, l), lambert(0x4a4d50), (x0 + x1) / 2, (y0 + y1) / 2 + top, (z0 + z1) / 2);
+      m.lookAt(x1, y1 + top, z1);
+    }
+    const n = Math.max(1, Math.round(Math.hypot(dx, dz) / 1.2));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      box.add(x0 + dx * t, y0 + dy * t + 0.45, z0 + dz * t, 0.05, 0.9, 0.05, 0x4a4d50);
+    }
+  };
+  rail(Rm.x0 - 0.05, Rm.z1, 0.1, Rm.x0 - 0.05, Rm.z0, R.H); // down the ramp's open side
+  rail(S.x0, L.z0, 0.1, L.x1, L.z0, R.H); // along the steps and landing's far edge
+  rail(S.x0, L.z1 - 0.1, 0.1, S.x1, L.z1 - 0.1, R.H - 0.15); // a handrail up the steps' near edge
+
+  // out front: the granite forecourt with its low side walls, the bench on the lawn, the disc-headed lamp
+  const F = FORECOURT;
+  box.add((F.x0 + F.x1) / 2, 0.02, (F.z0 + F.z1) / 2, F.x1 - F.x0 + 0.6, 0.06, F.z1 - F.z0, 0xc9c5bd);
+  for (const z of [F.z0 - 0.2, F.z1 + 0.2]) box.add((F.x0 + F.x1) / 2, 0.3, z, F.x1 - F.x0, 0.6, 0.4, granite);
+  for (const b of ZEL_BENCH) box.add((b.x0 + b.x1) / 2, 0.22, (b.z0 + b.z1) / 2, b.x1 - b.x0, 0.45, b.z1 - b.z0, granite);
+  box.add(ZEL_LAMP.x, 2.2, ZEL_LAMP.z, 0.12, 4.4, 0.12, 0x9a9fa3);
+  add(g, new CylinderGeometry(0.55, 0.45, 0.12, 12), lambert(0xd6d8d8), ZEL_LAMP.x, 4.45, ZEL_LAMP.z);
 }
 
 /** Boger Hall: two storeys of brick, a grey metal top floor, a tall end block with an arched window. */
