@@ -1,6 +1,7 @@
 import { BACK_PATH, FAR_WALK, FIELD_X, PATH_HALF, PLAZA, PLAZA_GAP, ROAD, RowStop, USDAN, XZ } from './layout';
 import { DRIVEWAYS, HOUSE, toWorld } from './house/plan';
 import { PLACES, Place, View, fitAll, placeAt, toMap } from './map';
+import { ALLBRITTON, BERM, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_LINK, OLIN_LINK, OLIN_POLY, PAVILION, PLAZA_F } from './southend';
 
 // ─── Drawing the map ───────────────────────────────────────────────────
 // One flat, quiet drawing of campus (grass, roads, paths, buildings), used
@@ -28,17 +29,22 @@ export function drawCampus(g: CanvasRenderingContext2D, v: View, stops: RowStop[
   g.fillStyle = COL.grass;
   g.fillRect(0, 0, v.w, v.h);
   // Andrus Field + the football pitch
-  rect(FIELD_X - 150, FIELD_X, -175, 120, COL.field);
+  rect(FIELD_X - 150, FIELD_X, -175, FIELD_ROAD.z0, COL.field);
+  rect(BERM.x0 + 2, BERM.x1 - 2, BERM.z0 + 2, BERM.z1 - 2, '#5a8a40'); // the bank by the Frank Center and Olin
   rect(FIELD_X - 56, FIELD_X - 7, fieldZ - 55, fieldZ + 55, '#6aa046');
   // roads and paths
   rect(ROAD.x0, ROAD.x1, -500, 300, COL.tar);
-  rect(BACK_PATH.x0, BACK_PATH.x1, -175, 120, COL.tar);
+  rect(BACK_PATH.x0, BACK_PATH.x1, -175, ALLBRITTON.z0, COL.tar);
+  rect(FIELD_ROAD.x0, FIELD_ROAD.x1, FIELD_ROAD.z0, FIELD_ROAD.z1, COL.tar);
   rect(-PATH_HALF, PATH_HALF, -500, 300, COL.path);
   rect(FAR_WALK.x0, FAR_WALK.x1, -500, 300, COL.path);
   for (const b of [PLAZA, PLAZA_GAP]) rect(b.x0, b.x1, b.z0, b.z1, COL.plaza);
   // buildings on the row, Usdan, your house + driveways
   for (const s of stops) rect(s.back, s.front, s.z1, s.z0, COL.building);
   poly(USDAN, COL.usdan);
+  rect(PLAZA_F.x0, PLAZA_F.x1, PLAZA_F.z0, PLAZA_F.z1, COL.tar);
+  for (const b of [FRANK, FRANK_LINK, FRANK_ADD, OLIN_LINK, PAVILION, ALLBRITTON]) rect(b.x0, b.x1, b.z0, b.z1, COL.building);
+  poly(OLIN_POLY, COL.usdan);
   for (const d of DRIVEWAYS) { const a = toWorld(d.u0, d.v0), b = toWorld(d.u1, d.v1); rect(a.x, b.x, a.z, b.z, COL.path); }
   rect(HOUSE.x0, HOUSE.x0 + HOUSE.depth, HOUSE.zc - HOUSE.width / 2, HOUSE.zc + HOUSE.width / 2, COL.house);
 }

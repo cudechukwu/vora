@@ -1,4 +1,5 @@
 import { BOUNDS, RowStop, inUsdan } from './layout';
+import { inSouthEnd } from './southend';
 
 // ─── Where you can walk ────────────────────────────────────────────────
 // Buildings on the row are solid slabs from their facade to their back wall.
@@ -27,13 +28,16 @@ function inside(stops: RowStop[], x: number, z: number): RowStop | undefined {
   return stops.find((s) => z <= s.z0 + 0.5 && z >= s.z1 - 0.5 && x < s.front + PAD && x > s.back - PAD);
 }
 
+/** In one of the buildings that aren't on the row? */
+const offRow = (p: XZ) => inUsdan(p, PAD) || inSouthEnd(p, PAD);
+
 function rowMove(prev: XZ, want: XZ, stops: RowStop[], xMax: number): XZ {
   let x = Math.min(xMax, Math.max(BOUNDS.xMin, want.x));
   let z = Math.min(BOUNDS.zMax, Math.max(BOUNDS.zMin, want.z));
-  // Usdan (not on the row, a big triangle behind it): slide along its walls
-  if (inUsdan({ x, z }, PAD) && !inUsdan(prev, PAD)) {
-    if (!inUsdan({ x, z: prev.z }, PAD)) z = prev.z;
-    else if (!inUsdan({ x: prev.x, z }, PAD)) x = prev.x;
+  // Usdan (a big triangle behind the row) and the Frank Center + Olin (past the field): slide along their walls
+  if (offRow({ x, z }) && !offRow(prev)) {
+    if (!offRow({ x, z: prev.z })) z = prev.z;
+    else if (!offRow({ x: prev.x, z })) x = prev.x;
     else return { x: prev.x, z: prev.z };
   }
   const hit = inside(stops, x, z);
@@ -74,7 +78,7 @@ export function blockedAt(p: XZ, stops: RowStop[], extra?: Extra): boolean {
   const lots = extra?.lots ?? [];
   if (p.x < BOUNDS.xMin || p.z < BOUNDS.zMin || p.z > BOUNDS.zMax) return true;
   if (p.x > BOUNDS.xMax && !lots.some((l) => inBox(p, l))) return true;
-  if (inside(stops, p.x, p.z) || inUsdan(p, PAD)) return true;
+  if (inside(stops, p.x, p.z) || offRow(p)) return true;
   if (!extra) return false;
   return (extra.solids ?? []).some((b) => inBox(p, b)) || (!!extra.walkable && !extra.walkable.some((b) => inBox(p, b)));
 }

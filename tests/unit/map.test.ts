@@ -4,11 +4,11 @@ import { layoutRow, inUsdan } from '../../src/row/layout';
 import { resolveMove } from '../../src/row/collide';
 import { houseExtra } from '../../src/row/house/collide';
 import { insideHouse, toLocal } from '../../src/row/house/plan';
-import { plazaObstacles, pathObstacles, fenceObstacles } from '../../src/row/plaza';
-import { FIELD_X, byId } from '../../src/row/layout';
+import { FOOTBALL, plazaObstacles, pathObstacles, fenceObstacles } from '../../src/row/plaza';
+import { FIELD_X } from '../../src/row/layout';
 
 const { stops } = layoutRow();
-const solids = [...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, byId(stops, 'chapel').doorZ)];
+const solids = [...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, FOOTBALL.z)];
 
 describe('the campus map', () => {
   it('has your house, Usdan, the row and the field, each once', () => {

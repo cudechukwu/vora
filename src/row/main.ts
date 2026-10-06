@@ -7,6 +7,7 @@ import { BoxBank, WindowBank, lambert } from './kit';
 import { buildRow } from './buildings';
 import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, ROW_ENTRY, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
 import { World } from './world';
+import { FIELD_ROAD, PLAZA_SITTERS, PLAZA_TABLES, ROAD_LANES, ROAD_WALK, STAIRS, groundY, plazaChairs, southEndNear } from './southend';
 import { resolveMove } from './collide';
 import {
   SPEED, actionAt, airborne, carry, createMobility, dismount, isRunning, mount, newJump, newMover, startJump, stepJump, stepMover,
@@ -270,6 +271,17 @@ SITTERS.forEach(([t, c], i) => {
   const at = chairs(ITEMS[t])[c];
   sitAt(new Person(randomLook(760 + i * 3)), at.x, at.z, at.heading, 0.46);
 });
+// up by the Frank Center: two on the stairs, three on the grass at the top of the bank
+for (const [x, z, h, k] of [[STAIRS.x0 + 0.8, 6.9, Math.PI, 0], [STAIRS.x0 + 1.5, 7.3, Math.PI - 0.3, 1]] as const) {
+  const p = new Person(randomLook(720 + k));
+  sitAt(p, x, z, h, 0.06);
+  p.root.position.y = groundY(x, z);
+}
+// and out at the tables on the plaza by the Frank Center's main entry
+PLAZA_SITTERS.forEach(([t, c], k) => {
+  const at = plazaChairs(PLAZA_TABLES[t])[c];
+  sitAt(new Person(randomLook(730 + k)), at.x, at.z, at.heading, 0.46);
+});
 // hangs on the grass
 const circles: [number, number, number][] = [
   [-7, S('Judd').doorZ + 8, 3], [-7, S('South').doorZ - 6, 3], [-7, S('Boger').z0 - 12, 3], [5.5, S('North').doorZ, 3],
@@ -305,6 +317,21 @@ for (let i = 0; i < 12; i++) {
   bw.body = hittable(bw.p, null, { land: (x, z) => { bw.x = Math.min(BACK_PATH.x1 - 0.8, Math.max(BACK_PATH.x0 + 0.8, x)); bw.z = z; } });
   scene.add(bw.p.root);
   backWalkers.push(bw);
+}
+
+// and along the field road, past the Frank Center and Olin (keeping right: eastbound on the bank side)
+interface RoadWalker { p: Person; x: number; z: number; dir: 1 | -1; speed: number; body: Body }
+const roadLane = (dir: 1 | -1, i: number) => ROAD_LANES[dir > 0 ? 1 : 0] + (rng(i * 5 + 3) - 0.5) * 0.6;
+const roadWalkers: RoadWalker[] = [];
+for (let i = 0; i < 6; i++) {
+  const dir = i % 2 ? 1 : -1;
+  const rw: RoadWalker = {
+    p: new Person(randomLook(680 + i)), dir, z: roadLane(dir, i), speed: 1.0 + rng(i * 23 + 1) * 0.5, body: null!,
+    x: ROAD_WALK.x0 + 4 + rng(i * 19 + 7) * (ROAD_WALK.x1 - ROAD_WALK.x0 - 8),
+  };
+  rw.body = hittable(rw.p, null, { land: (x, z) => { rw.x = x; rw.z = Math.min(FIELD_ROAD.z1 - 0.6, Math.max(FIELD_ROAD.z0 + 0.6, z)); } });
+  scene.add(rw.p.root);
+  roadWalkers.push(rw);
 }
 
 // Physical Plant's golf cart, up and down the back path
@@ -912,7 +939,7 @@ function frame(now: number) {
   stepJump(jump, dt);
   if (wasAirborne && !airborne(jump)) sound.play('land', 0.7);
   wasAirborne = airborne(jump);
-  pos.y = floorY(level, pos.x, pos.z);
+  pos.y = floorY(level, pos.x, pos.z) + (where === 'out' ? groundY(pos.x, pos.z) : 0); // (up the bank and stairs by Olin)
   me.root.position.copy(pos);
   me.root.position.y += jump.y;
   if (sittingOn) me.sitIdle(dt);
@@ -1059,6 +1086,14 @@ function frame(now: number) {
     w.p.face(w.dir > 0 ? 0 : Math.PI);
     w.p.walk(dt, w.speed);
   }
+  roadWalkers.forEach((w, i) => {
+    if (busy(w.body)) return;
+    w.x += w.dir * w.speed * dt;
+    if (w.x > ROAD_WALK.x1 || w.x < ROAD_WALK.x0) { w.dir = w.dir > 0 ? -1 : 1; w.z = roadLane(w.dir, i); }
+    w.p.root.position.set(w.x, 0, w.z);
+    w.p.face(w.dir > 0 ? Math.PI / 2 : -Math.PI / 2);
+    w.p.walk(dt, w.speed);
+  });
   const drivenCar = driven(garage);
   stepCart(cart, dt, drivenCar ? [drivenCar] : [pos]);
   cartView.update(cart, dt);
@@ -1116,8 +1151,9 @@ function frame(now: number) {
   const byUsdan = inPoly(pos, USDAN) || distToPoly(pos, USDAN) < 9;
   const stop = pos.x < 8 && !byUsdan ? stops.find((s) => pos.z <= s.z0 + 2 && pos.z >= s.z1 - 2) : undefined;
   const atHome = local.u > -8 && local.u < 18 && Math.abs(local.v) < 12; // (includes the sidewalk out front)
-  const onField = pos.x < FIELD_X && !byUsdan;
-  const here = indoors ? null : byUsdan ? USDAN_NAME : onField ? 'Andrus Field' : stop?.name ?? (atHome ? 'your house' : null); // (inside, the welcome card says it)
+  const onField = pos.x < FIELD_X && pos.z < FIELD_ROAD.z0 && !byUsdan;
+  const south = southEndNear(pos);
+  const here = indoors ? null : byUsdan ? USDAN_NAME : south ?? (onField ? 'Andrus Field' : stop?.name ?? (atHome ? 'your house' : null)); // (inside, the welcome card says it)
   if (here) { passingName.textContent = here; passing.classList.add('show'); }
   else passing.classList.remove('show');
 

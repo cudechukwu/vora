@@ -1,3 +1,4 @@
+import { ALLBRITTON, FIELD_ROAD } from '../../src/row/southend';
 import { describe, expect, it } from 'vitest';
 import {
   BACK_PATH, FAR_WALK, FIELD_X, PATH_HALF, ROAD, ROW, ROW_END_Z, ROW_ENTRY, USDAN, USDAN_COURT, WALK_MAX_Z, WALK_MIN_Z,
@@ -12,15 +13,15 @@ const { stops, crossings } = layoutRow();
 describe('College Row layout', () => {
   it('has every building once', () => {
     expect(stops.map((s) => s.id).sort()).toEqual(
-      ['allbritton', 'boger', 'chapel', 'judd', 'north', 'south', 'zelnick'],
+      ['boger', 'chapel', 'judd', 'north', 'south', 'zelnick'],
     );
   });
 
   it('meets the buildings in the agreed order when walking +z from Boger', () => {
     const walking = [...stops].sort((a, b) => a.zc - b.zc).map((s) => s.name);
     expect(walking).toEqual([
-      'Boger Hall', 'South College', 'North College',
-      'Zelnick Pavilion', 'Memorial Chapel', 'Judd Hall', 'Allbritton Center',
+      'Boger Hall', 'North College', 'South College', // (per the user's Google Maps view: North College is the long one by Boger)
+      'Zelnick Pavilion', 'Memorial Chapel', 'Judd Hall', // Judd is the last on the row; Allbritton's at the end of the back path
     ]);
   });
 
@@ -31,17 +32,19 @@ describe('College Row layout', () => {
     }
   });
 
-  it('joins the chapel, Zelnick and North College with no gap (Zelnick is the link)', () => {
+  it('joins the chapel, Zelnick and South College with no gap (Zelnick is the link)', () => {
     expect(byId(stops, 'chapel').z1).toBe(byId(stops, 'zelnick').z0);
-    expect(byId(stops, 'zelnick').z1).toBe(byId(stops, 'north').z0);
+    expect(byId(stops, 'zelnick').z1).toBe(byId(stops, 'south').z0);
   });
 
-  it('puts the two walkways in gaps: Allbritton–Judd and South–Boger', () => {
+  it('puts the two walkways in gaps: just south of Judd (open lawn, no building past it), and North College–Boger', () => {
     expect(crossings).toHaveLength(2);
     const between = (a: string, b: string) => (c: { z: number; w: number }) =>
       c.z + c.w / 2 < byId(stops, a as never).z1 && c.z - c.w / 2 > byId(stops, b as never).z0;
-    expect(crossings.some(between('allbritton', 'judd'))).toBe(true);
-    expect(crossings.some(between('south', 'boger'))).toBe(true);
+    const judd = byId(stops, 'judd');
+    expect(crossings[0].z - crossings[0].w / 2).toBeGreaterThan(judd.z0);
+    expect(Math.max(...stops.map((s) => s.z0))).toBe(judd.z0);
+    expect(crossings.some(between('north', 'boger'))).toBe(true);
     for (const c of crossings) {
       for (const s of stops) {
         const overlaps = c.z + c.w / 2 > s.z1 && c.z - c.w / 2 < s.z0;
@@ -109,11 +112,13 @@ describe('behind the row', () => {
     expect(BACK_PATH.x1 - BACK_PATH.x0).toBeGreaterThan(5);
   });
 
-  it('you can walk the back path from the Boger–South walkway to the end of the row', () => {
+  it('you can walk the back path from the Boger–South walkway, past Judd and the field road, to Allbritton at its end', () => {
     const x = (BACK_PATH.x0 + BACK_PATH.x1) / 2;
     let p = { x, z: byUsdan.z };
-    for (let i = 0; i < 2000 && p.z < 40; i++) p = resolveMove(p, { x, z: p.z + 0.3 }, stops);
-    expect(p.z).toBeGreaterThanOrEqual(40);
+    for (let i = 0; i < 2000; i++) p = resolveMove(p, { x, z: p.z + 0.3 }, stops);
+    expect(p.z).toBeGreaterThan(FIELD_ROAD.z1 + 20); // well past the road…
+    expect(p.z).toBeLessThan(ALLBRITTON.z0); // …to Allbritton's front wall
+    expect(p.z).toBeGreaterThan(ALLBRITTON.z0 - 1.5);
     expect(south.back).toBeGreaterThan(x);
   });
 

@@ -11,10 +11,11 @@ import {
 } from './plaza';
 import {
   BACK_PATH, PLAZA, PLAZA_GAP, CROSSWALK_W, Crossing, FAR_WALK, FIELD_X, PATH_HALF, ROAD, RowStop, USDAN, WALK_MAX_Z, WALK_MIN_Z,
-  inUsdan,
+  inUsdan, rowSolids,
 } from './layout';
 import { noise2, rng } from './noise';
 import { DRIVEWAYS, HOUSE } from './house/plan';
+import { ALLBRITTON, BERM, FIELD_ROAD, bankY, groundY, inSouthEnd, southObstacles } from './southend';
 
 // ─── The ground around the row ─────────────────────────────────────────
 // Lawn in front of the buildings, the walk, a tree line along the field
@@ -45,9 +46,8 @@ export class World {
   readonly lampLights: PointLight[] = [0, 1, 2, 3].map(() => new PointLight(0xffd59a, 0, 18, 1.4));
 
   constructor(stops: RowStop[], private crossings: Crossing[], box: BoxBank) {
-    const chapel = stops.find((s) => s.name === 'Memorial Chapel');
     this.ground();
-    this.fz = chapel ? chapel.doorZ : -60;
+    this.fz = FOOTBALL.z;
     this.field(this.fz, box);
     this.walks(stops);
     this.street(box);
@@ -57,7 +57,7 @@ export class World {
     this.benchesAlongLawn(box);
     this.plaza(box);
     this.pathSide(box);
-    this.obstacles.push(...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, this.fz), ...vestibuleSolids());
+    this.obstacles.push(...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, this.fz), ...vestibuleSolids(), ...southObstacles(), ...rowSolids(stops));
   }
 
   private ground() {
@@ -89,7 +89,7 @@ export class World {
     tex.wrapS = tex.wrapT = RepeatWrapping;
     tex.colorSpace = SRGBColorSpace;
     const zN = USDAN.reduce((m, p) => Math.max(m, p.z), -Infinity) + 3; // the field starts just south of Usdan
-    const len = WALK_MIN_Z + 20 - zN, wid = 150;
+    const len = FIELD_ROAD.z0 - zN, wid = 150; // down to the road along its south end
     tex.repeat.set(1, len / 10);
     const f = new Mesh(new PlaneGeometry(wid, len), new MeshLambertMaterial({ map: tex }));
     f.rotation.x = -Math.PI / 2;
@@ -283,18 +283,23 @@ export class World {
   /** Along the back path: granite curbs, hosta beds, and up by Judd the benches, bins and a hydrant. */
   private pathSide(box: BoxBank) {
     const { z0, z1 } = World.backPathZ(this.crossings);
-    // where walkways cross the path, the curbs and beds stop
-    const open = (z: number) => this.crossings.some((c) => Math.abs(c.z - z) < c.w / 2 + 0.3);
-    const runs: [number, number][] = [];
-    let start: number | null = null;
-    for (let z = z0; z <= z1; z += 0.5) {
-      if (!open(z) && start === null) start = z;
-      if ((open(z) || z + 0.5 > z1) && start !== null) { runs.push([start, z]); start = null; }
-    }
+    // where walkways cross the path, the curbs and beds stop (and on the field side, where the field road goes off west)
+    const walkway = (z: number) => this.crossings.some((c) => Math.abs(c.z - z) < c.w / 2 + 0.3);
+    const road = (z: number) => z > FIELD_ROAD.z0 - 0.3 && z < FIELD_ROAD.z1 + 0.3;
+    const spans = (open: (z: number) => boolean) => {
+      const runs: [number, number][] = [];
+      let start: number | null = null;
+      for (let z = z0; z <= z1; z += 0.5) {
+        if (!open(z) && start === null) start = z;
+        if ((open(z) || z + 0.5 > z1) && start !== null) { runs.push([start, z]); start = null; }
+      }
+      return runs;
+    };
+    for (const [a, b] of spans((z) => walkway(z) || road(z))) box.add(BACK_PATH.x0, 0.07, (a + b) / 2, 0.3, 0.14, b - a, 0xb9b8b1); // curb, field side
     const items = PATH_ITEMS.map((p) => p.z);
-    for (const [a, b] of runs) {
+    for (const [a, b] of spans(walkway)) {
       const mid = (a + b) / 2, len = b - a;
-      for (const x of [BACK_PATH.x0, BACK_PATH.x1]) box.add(x, 0.07, mid, 0.3, 0.14, len, 0xb9b8b1); // curbs
+      box.add(BACK_PATH.x1, 0.07, mid, 0.3, 0.14, len, 0xb9b8b1); // curb, building side
       box.add((BED.x0 + BED.x1) / 2, 0.04, mid, BED.x1 - BED.x0, 0.03, len, 0x4a3426); // mulch
       for (let z = a + 1; z < b - 1; z += 1.7) { // hostas, round and low
         if (items.some((iz) => Math.abs(iz - z) < 1.6)) continue;
@@ -366,7 +371,7 @@ export class World {
   /** Where the coal-tar path behind the row starts (by Usdan, at the Boger–South walkway) and ends. */
   static backPathZ(crossings: Crossing[]) {
     const byUsdan = crossings[crossings.length - 1]; // the Boger–South walkway
-    return { z0: byUsdan.z - byUsdan.w / 2, z1: WALK_MIN_Z + 40 };
+    return { z0: byUsdan.z - byUsdan.w / 2, z1: ALLBRITTON.z0 }; // past Judd and the field road, it ends at Allbritton
   }
 
   /** Behind the row: a wide coal-tar path — no lines, no curbs, just students walking back from class. */
@@ -412,8 +417,10 @@ export class World {
     }
     // walkways that cut across the row, from between the buildings to the back sidewalk
     for (const c of this.crossings) {
-      const x0 = BACK_PATH.x0 - 6, x1 = ROAD.x0; // from the field, across the back path, to the High Street curb
-      const cr = new Mesh(new PlaneGeometry(x1 - x0, c.w), lambert(PAL.path));
+      // from the field, across the back path, to the High Street curb (where the field road carries on, it's tar from the back path)
+      const tar = c.z + c.w / 2 > FIELD_ROAD.z0; // the one south of Judd is tar, like the field road it runs into
+      const x0 = tar ? BACK_PATH.x1 : BACK_PATH.x0 - 6, x1 = ROAD.x0;
+      const cr = new Mesh(new PlaneGeometry(x1 - x0, c.w), lambert(tar ? 0x3b3e41 : PAL.path));
       cr.rotation.x = -Math.PI / 2;
       cr.position.set((x0 + x1) / 2, 0.031, c.z);
       cr.receiveShadow = true;
@@ -434,7 +441,7 @@ export class World {
     type T = { x: number; z: number; s: number; id: number };
     const list: T[] = [];
     let id = 1;
-    const nearDoor = (z: number) => stops.some((s) => Math.abs(s.doorZ - z) < 3.4)
+    const nearDoor = (z: number) => stops.some((s) => Math.abs(s.doorZ - z) < (s.id === 'north' ? 9.5 : 3.4)) // (North College's portico is wide)
       || this.crossings.some((c) => Math.abs(c.z - z) < c.w / 2 + 2.5);
     // lawn trees between the walk and the facades
     for (let z = WALK_MIN_Z; z > WALK_MAX_Z; z -= 11) {
@@ -449,7 +456,7 @@ export class World {
       list.push({ x: 6.8 + rng(id) * 1.5, z: z - rng(id + 1) * 4, s: 1.2 + rng(id + 2) * 0.4, id: id++ });
     }
     // lining the field side of the back road, peeking over the rooftops from the walk
-    for (let z = WALK_MIN_Z; z > WALK_MAX_Z - 40; z -= 9) {
+    for (let z = FIELD_ROAD.z0 - 3; z > WALK_MAX_Z - 40; z -= 9) { // (the back path stops at the field road)
       if (nearDoor(z)) continue;
       list.push({ x: BACK_PATH.x0 - 2.6 - rng(id) * 3, z: z - rng(id + 1) * 6, s: 1.6 + rng(id + 2) * 0.8, id: id++ });
     }
@@ -469,7 +476,16 @@ export class World {
       list.push({ x: x + rng(id + 3) * 4, z: WALK_MIN_Z + 45 + rng(id + 4) * 20, s: 1.6 + rng(id + 5), id: id++ });
     }
 
-    for (let i = list.length - 1; i >= 0; i--) if (inUsdan(list[i], 3) || inPlaza(list[i])) list.splice(i, 1); // not in Usdan or on the plaza
+    // along the field road's south verge, west of the bank; and a few up on the bank round the Frank Center and Olin
+    for (let x = BERM.x0 - 4; x > FIELD_ROAD.x0 + 6; x -= 13) list.push({ x: x - rng(id) * 4, z: FIELD_ROAD.z1 + 3 + rng(id + 1) * 3, s: 1.5 + rng(id + 2) * 0.6, id: id++ });
+    // the open lawn south of Judd, past the walkway, beside Allbritton
+    for (const [x, z, s] of [[-18, 50, 1.6], [-28, 56, 1.8], [-14, 62, 1.5], [-30, 47, 1.3]]) list.push({ x, z, s, id: id++ });
+    for (const [x, z, s] of [[-101, 40, 1.9], [-101, 58, 1.7], [-66, 56, 1.4], [-158, 30, 1.6], [-158, 50, 1.8]]) list.push({ x, z, s, id: id++ });
+
+    const clear = (t: T) => inUsdan(t, 3) || inPlaza(t) || inSouthEnd(t, 3)
+      || (t.z > FIELD_ROAD.z0 - 1.5 && t.z < FIELD_ROAD.z1 + 1.5 && t.x < FIELD_ROAD.x1 + 8) // not in the road
+      || (bankY(t.x, t.z) > 0.02 && bankY(t.x, t.z) < 1.98); // nor on the slope of the bank
+    for (let i = list.length - 1; i >= 0; i--) if (clear(list[i])) list.splice(i, 1); // not in Usdan, on the plaza, or in the way
     // the plaza's own trees, in their pits
     for (const it of ITEMS) if (it.kind === 'tree') list.push({ x: it.x, z: it.z, s: it.size ?? 1.1, id: id++ });
 
@@ -485,7 +501,8 @@ export class World {
       const trunkH = 2.6 * t.s;
       const r = 0.3 * t.s + 0.3; // trunk radius + yours
       this.obstacles.push({ x0: t.x - r, x1: t.x + r, z0: t.z - r, z1: t.z + r });
-      m4.compose(v.set(t.x, 0, t.z), q.identity(), sc.set(t.s, trunkH, t.s));
+      const y = groundY(t.x, t.z); // (up on the bank by Olin)
+      m4.compose(v.set(t.x, y, t.z), q.identity(), sc.set(t.s, trunkH, t.s));
       trunks.setMatrixAt(i, m4);
       const col = new Color(leaves[Math.floor(rng(t.id * 13) * leaves.length)]);
       for (let k = 0; k < 3; k++) {
@@ -493,7 +510,7 @@ export class World {
         const ox = (rng(t.id * 5 + k) - 0.5) * 1.6 * t.s;
         const oz = (rng(t.id * 9 + k) - 0.5) * 1.6 * t.s;
         q.setFromAxisAngle(v.set(0, 1, 0), rng(t.id + k) * 3);
-        m4.compose(v.set(t.x + ox, trunkH + r * 0.6 + k * 1.1 * t.s, t.z + oz), q, sc.set(r, r * 0.85, r));
+        m4.compose(v.set(t.x + ox, y + trunkH + r * 0.6 + k * 1.1 * t.s, t.z + oz), q, sc.set(r, r * 0.85, r));
         blobs.setMatrixAt(bi, m4);
         blobs.setColorAt(bi, col.clone().multiplyScalar(0.9 + k * 0.08));
         bi++;
@@ -509,9 +526,12 @@ export class World {
       spots.push({ x: -PATH_HALF - 0.7, z, h: 4, arm: 0 }, { x: PATH_HALF + 0.7, z: z - 12, h: 4, arm: 0 });
     }
     // the back path: heritage lamps along both edges
-    for (let z = WALK_MIN_Z + 20; z > WALK_MAX_Z - 20; z -= 22) {
+    for (let z = ALLBRITTON.z0 - 3; z > WALK_MAX_Z - 20; z -= 22) {
       spots.push({ x: BACK_PATH.x1 + 0.5, z, h: 4, arm: 0 }, { x: BACK_PATH.x0 - 0.5, z: z - 11, h: 4, arm: 0 });
     }
+    // the field road: heritage lamps on its south side (the field's fence is on the other), one on the corner by the stairs
+    spots.push({ x: BACK_PATH.x0 - 5.5, z: FIELD_ROAD.z1 + 0.6, h: 4, arm: 0 });
+    for (let x = -72; x > FIELD_ROAD.x0 + 4; x -= 22) spots.push({ x, z: FIELD_ROAD.z1 + 0.6, h: 4, arm: 0 });
     for (let z = WALK_MIN_Z + 40; z > WALK_MAX_Z - 40; z -= 30) {
       // never in the mouth of a driveway: slide it along to just beside one
       let fz = z - 15;
@@ -519,7 +539,7 @@ export class World {
       if (drive) fz = HOUSE.zc + (fz > HOUSE.zc + (drive.v0 + drive.v1) / 2 ? drive.v1 + 1.6 : drive.v0 - 1.6);
       spots.push({ x: ROAD.x0 - 0.5, z, h: 7.5, arm: 2.6 }, { x: ROAD.x1 + 0.5, z: fz, h: 7.5, arm: -2.6 });
     }
-    return spots.filter((l) => !inUsdan(l, 2)); // nothing inside Usdan
+    return spots.filter((l) => !inUsdan(l, 2) && !inSouthEnd(l, 2) && bankY(l.x, l.z) < 0.05); // nothing inside a building or up the bank
   }
 
   private lamps() {

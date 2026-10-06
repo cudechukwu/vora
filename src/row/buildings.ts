@@ -5,8 +5,9 @@ import {
 import {
   BoxBank, Facing, PAL, WindowBank, WindowKind, block, brickMap, hipRoof, lambert, prism, stoneMap,
 } from './kit';
-import { BuildingId, FRONT_X, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
+import { BuildingId, FRONT_X, PORTICO, ROW, SOUTH_TOWER, USDAN, USDAN_COURT, XZ, layoutRow } from './layout';
 import { DOORS, Door, VESTIBULE } from './usdan/plan';
+import { buildSouthEnd } from './southview';
 
 // ─── College Row buildings ─────────────────────────────────────────────
 // Stylized, never literal (brief R/05): each building keeps the one or two
@@ -18,7 +19,7 @@ type Kit = { g: Group; win: WindowBank; box: BoxBank };
 type Builder = (k: Kit, zc: number) => void;
 
 const BUILDERS: Record<BuildingId, Builder> = {
-  allbritton, judd, chapel, zelnick, north: northCollege, south: southCollege, boger,
+  judd, chapel, zelnick, north: northCollege, south: southCollege, boger,
 };
 
 export function buildRow(win: WindowBank, box: BoxBank) {
@@ -26,6 +27,7 @@ export function buildRow(win: WindowBank, box: BoxBank) {
   const { stops, crossings } = layoutRow();
   for (const s of stops) BUILDERS[s.id]({ g, win, box }, s.zc);
   usdan({ g, win, box });
+  buildSouthEnd({ g, win, box }); // the field road, the Frank Center and Olin, up on their bank
   g.traverse((o) => {
     if ((o as Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; }
   });
@@ -190,26 +192,114 @@ function chapel(k: Kit, zRow: number) {
   spire.rotation.y = Math.PI / 4;
 }
 
+/**
+ * South College (the user's photos): the old brownstone one, four storeys of rubble stone under a slate gable, with a
+ * square tower standing out from the middle of its front: an arched door with a fanlight up granite steps between
+ * brownstone cheeks, three windows above, a white cornice and balustrade, and the white belfry with its green dome.
+ * A black fire escape down one end, and a glass bridge across the gap to North College.
+ */
 function southCollege(k: Kit, zc: number) {
-  const w = 24;
-  const h = hall(k, { zc, w, d: 16, floors: 4, floorH: 3.4, wall: 'stone', color: PAL.brownstone, window: 'rect', roof: 'hip', roofH: 3 });
-  cupola(k, h.cx, h.top + 2.2, zc, true);
+  const { g, win, box } = k;
+  const w = 24, d = 16;
+  const h = hall(k, { zc, w, d, floors: 4, floorH: 3.4, wall: 'stone', color: PAL.brownstone, window: 'rect', roof: 'gable', roofH: 4, skipDoor: true });
+  const stone = lambert(PAL.brownstone, stoneMap(), 'stone');
+  const T = SOUTH_TOWER, tx = FRONT_X + T.out / 2 - 0.5, tw = T.half * 2, top = h.top + 4.2;
+  add(g, block(T.out + 1, top, tw), stone, tx, 0, zc);
+  box.add(tx, top + 0.25, zc, T.out + 1.8, 0.5, tw + 0.8, PAL.trim); // white cornice
+  box.add(tx, top + 0.75, zc, T.out + 1.4, 0.5, tw + 0.4, PAL.trim); // balustrade…
+  for (let i = -2; i <= 2; i++) box.add(FRONT_X + T.out + 0.2, top + 0.75, zc + i * 0.9, 0.12, 0.5, 0.12, 0xd8d2c4);
+  cupola(k, tx, top + 1.0, zc, true);
+  const fx = FRONT_X + T.out;
+  for (const y of [7.6, 11.0, 14.4]) {
+    win.add('rect', fx + 0.02, y, zc, 1.15, 1.9, '+x');
+    box.add(fx + 0.08, y - 1.05, zc, 0.2, 0.14, 1.4, 0x9a7a66);
+  }
+  // the arched door with its fanlight, up granite steps between brownstone cheek walls
+  win.add('arch', fx + 0.02, 4.3, zc, 2.0, 1.2, '+x');
+  box.add(fx + 0.04, 2.3, zc, 0.1, 2.6, 1.9, 0x23262a);
+  for (const o of [-0.95, 0.95]) box.add(fx + 0.06, 2.3, zc + o, 0.12, 2.6, 0.12, 0x23262a);
+  for (let s = 0; s < 5; s++) box.add(fx + 0.4 + s * 0.42, 1.0 - s * 0.2, zc, 0.42, 1.0 - s * 0.2 + 0.001, 2.4, 0xc4c2bb);
+  for (const o of [-1.45, 1.45]) box.add(fx + 1.1, 0.75, zc + o, 2.2, 1.5, 0.5, PAL.brownstone);
+  // a black steel fire escape down the end toward the chapel
+  const ez = zc + w / 2 + 1.0;
+  for (let f = 1; f < 4; f++) {
+    const y = 1 + f * 3.4;
+    box.add(FRONT_X - 4, y, ez, 3.2, 0.08, 1.8, 0x1b1d1f);
+    box.add(FRONT_X - 4, y + 0.55, ez + 0.9, 3.2, 0.06, 0.04, 0x1b1d1f);
+    const flightM = add(g, new BoxGeometry(0.9, 0.08, 3.9), lambert(0x1b1d1f), FRONT_X - 4, y - 1.7, ez);
+    flightM.rotation.z = f % 2 ? 0.9 : -0.9;
+    flightM.rotation.y = Math.PI / 2;
+  }
+  for (const x of [FRONT_X - 5.6, FRONT_X - 2.4]) box.add(x, 6.4, ez + 0.9, 0.08, 12.8, 0.08, 0x1b1d1f);
+  // the glass bridge over the gap to North College (you can walk under it)
+  const z0 = zc - w / 2, gap = ROW.find((s) => s.id === 'south')!.gap, bz = z0 - gap / 2, bx = FRONT_X - 9;
+  add(g, block(9, 3.6, gap + 0.2), lambert(0x2a333a), bx, 3.6, bz);
+  box.add(bx, 7.35, bz, 9.6, 0.3, gap + 0.4, 0x1d2226);
+  box.add(bx, 3.5, bz, 9.6, 0.25, gap + 0.4, 0x1d2226);
+  for (let i = 0; i < 4; i++) win.add('rect', FRONT_X - 4.47, 5.4, bz - gap / 2 + (i + 0.5) * (gap / 4), gap / 4 - 0.15, 3.3, '+x');
+  for (const z of [bz - gap / 2 + 0.3, bz + gap / 2 - 0.3]) box.add(FRONT_X - 4.6, 1.75, z, 0.25, 3.5, 0.25, 0x1d2226);
 }
 
+/**
+ * North College (the user's photos): long, four storeys of smooth brownstone ashlar, giant pilasters at the corners, a
+ * heavy cornice with an attic storey above it, and in the middle a portico of four giant columns under a pediment with
+ * a half-round window, up a wide flight of granite steps.
+ */
 function northCollege(k: Kit, zc: number) {
-  const w = 36;
-  const h = hall(k, { zc, w, d: 18, floors: 4, floorH: 3.5, wall: 'brick', color: PAL.brick, window: 'rect', roof: 'gable', roofH: 4.2 });
-  cupola(k, h.cx, h.top + 3.2, zc, false);
-  for (const dz of [-w / 2 + 2.5, w / 2 - 2.5]) k.box.add(h.cx, h.top + 3.2, zc + dz, 1.2, 3.2, 1.6, PAL.brickDeep); // chimneys
+  const { g, win, box } = k;
+  const w = 60, d = 18;
+  const cx = FRONT_X - d / 2;
+  const ash = lambert(0x7e5a4a, stoneMap(), 'ashlar');
+  const trimC = 0x6e4d40;
+  const base = 1.2, main = 12, attic = 3.6;
+  add(g, block(d + 0.4, base, w + 0.4), lambert(0x6a4a3e, stoneMap(), 'stone2'), cx, 0, zc);
+  add(g, block(d, main - base + attic, w), ash, cx, base, zc);
+  box.add(cx, main + 0.35, zc, d + 1.4, 0.7, w + 1.4, trimC); // the main cornice
+  box.add(cx, main + attic + 0.25, zc, d + 0.6, 0.5, w + 0.6, trimC); // the top one
+  box.add(cx, main + attic + 0.6, zc, d - 0.6, 0.1, w - 0.6, 0x55595c); // flat roof
+  for (const z of [zc - w / 2, zc + w / 2]) box.add(FRONT_X + 0.25, (base + main) / 2, z + (z > zc ? -0.9 : 0.9), 0.5, main - base, 1.8, trimC); // corner pilasters
+  // windows: sixteen bays, four rows (the top one in the attic)
+  const bays = 16, pitch = w / bays;
+  const rows: [number, number][] = [[3.0, 2.4], [6.6, 2.2], [9.9, 2.0], [main + 1.8, 1.5]];
+  for (let b = 0; b < bays; b++) {
+    const z = zc - w / 2 + (b + 0.5) * pitch;
+    rows.forEach(([y, wh], r) => {
+      if (r === 0 && Math.abs(z - zc) < pitch * 0.6) return; // the door
+      win.add('rect', FRONT_X + 0.02, y, z, 1.25, wh, '+x');
+      box.add(FRONT_X + 0.1, y - wh / 2 - 0.07, z, 0.2, 0.14, 1.5, trimC);
+    });
+  }
+  const endBays = 5;
+  for (let b = 0; b < endBays; b++) {
+    const x = FRONT_X - (b + 0.5) * (d / endBays);
+    for (const [y, wh] of rows) { win.add('rect', x, y, zc + w / 2 + 0.02, 1.2, wh, '+z'); win.add('rect', x, y, zc - w / 2 - 0.02, 1.2, wh, '-z'); }
+  }
+  // the portico: four giant columns, an entablature, a pediment with a half-round window
+  const P = PORTICO, px = FRONT_X + P.out;
+  const col = lambert(0x86604f);
+  for (const o of P.at) {
+    add(g, new CylinderGeometry(P.r * 0.88, P.r, main - base - 0.6, 14).translate(0, (main - base - 0.6) / 2, 0), col, px, base, zc + o);
+    box.add(px, base + 0.15, zc + o, P.r * 2.4, 0.3, P.r * 2.4, trimC); // base
+    box.add(px, main - 0.3, zc + o, P.r * 2.4, 0.3, P.r * 2.4, trimC); // capital
+  }
+  const span = P.at[P.at.length - 1] - P.at[0] + 2.4;
+  box.add(FRONT_X + P.out / 2 + 0.3, main + 0.4, zc, P.out + 1.4, 0.8, span, trimC); // entablature
+  const ped = add(g, prism(span, 2.8, P.out + 1.2), lambert(0x7e5a4a, stoneMap(), 'ashlar'), FRONT_X + P.out / 2 + 0.3, main + 0.8, zc);
+  ped.rotation.y = Math.PI / 2;
+  box.add(FRONT_X + P.out + 0.95, main + 1.0, zc, 0.12, 0.2, span, trimC);
+  win.add('arch', FRONT_X + P.out + 0.97, main + 1.75, zc, 1.6, 0.9, '+x');
+  // the door, and the wide flight of granite steps up to it
+  box.add(FRONT_X + 0.06, base + 1.5, zc, 0.12, 3.0, 2.0, 0x2b1d17);
+  box.add(FRONT_X + 0.12, base + 3.2, zc, 0.24, 0.4, 2.8, trimC);
+  for (let s = 0; s < 4; s++) {
+    const t = base * (1 - s / 4);
+    box.add(FRONT_X + 0.5 + P.out / 2 + s * 0.55, t / 2, zc, P.out + 1 - s * 0.55 + 0.001, t, span + 1 - s * 0.6, 0xc4c2bb);
+  }
 }
 
 function judd(k: Kit, zc: number) {
   const w = 30;
   hall(k, { zc, w, d: 18, floors: 4, floorH: 3.8, wall: 'stone', color: 0x86604e, window: 'arch', winW: 1.1, winH: 2.3, roof: 'hip', roofH: 5.5 });
-}
-
-function allbritton(k: Kit, zc: number) {
-  hall(k, { zc, w: 34, d: 18, floors: 3, floorH: 3.6, wall: 'brick', color: PAL.brick, window: 'rect', roof: 'hip', roofH: 4 });
 }
 
 /** Zelnick Pavilion: the glass link between the chapel and North College. */

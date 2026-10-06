@@ -2,6 +2,8 @@ import type { XZ } from './collide';
 import { FIELD_X, ROW_ENTRY, USDAN, byId, layoutRow } from './layout';
 import { DOORS } from './usdan/plan';
 import { HOME_SPAWN } from './house/plan';
+import { FOOTBALL } from './plaza';
+import { ALLBRITTON, ALLBRITTON_DOOR, FIELD_ROAD, FRANK, LINK_DOOR, OLIN } from './southend';
 
 // ─── The campus map (pure) ─────────────────────────────────────────────
 // Named places you can see on the map — and jump straight to, if you don't
@@ -32,8 +34,10 @@ export const PLACES: Place[] = [
   { id: 'north', name: 'North College', pin: { x: at('north').front - 9, z: at('north').zc }, spawn: { x: -1.2, z: at('north').doorZ, heading: 0 } },
   { id: 'chapel', name: 'Memorial Chapel', pin: { x: at('chapel').front - 16, z: at('chapel').zc }, spawn: { x: -1.2, z: at('chapel').doorZ, heading: 0 } },
   { id: 'judd', name: 'Judd Hall', pin: { x: at('judd').front - 9, z: at('judd').zc }, spawn: { x: -1.2, z: at('judd').doorZ, heading: 0 } },
-  { id: 'allbritton', name: 'Allbritton', pin: { x: at('allbritton').front - 9, z: at('allbritton').zc }, spawn: { x: -1.2, z: at('allbritton').zc, heading: 0 } },
-  { id: 'field', name: 'Andrus Field', pin: { x: FIELD_X - 30, z: at('chapel').doorZ }, spawn: { x: FIELD_X - 12, z: at('north').zc, heading: -Math.PI / 2 } },
+  { id: 'allbritton', name: 'Allbritton', pin: { x: (ALLBRITTON.x0 + ALLBRITTON.x1) / 2, z: (ALLBRITTON.z0 + ALLBRITTON.z1) / 2 }, spawn: { x: ALLBRITTON_DOOR.x - 2, z: ALLBRITTON.z0 - 5, heading: 0 } },
+  { id: 'field', name: 'Andrus Field', pin: { x: FIELD_X - 30, z: FOOTBALL.z }, spawn: { x: FIELD_X - 12, z: at('north').zc, heading: -Math.PI / 2 } },
+  { id: 'frank', name: 'Frank Center', pin: { x: (FRANK.x0 + FRANK.x1) / 2, z: (FRANK.z0 + FRANK.z1) / 2 }, spawn: { x: LINK_DOOR.x, z: FIELD_ROAD.z1 - 1.5, heading: 0 } },
+  { id: 'olin', name: 'Olin Library', pin: { x: OLIN.cx, z: OLIN.cz + 6 }, spawn: { x: OLIN.cx, z: FIELD_ROAD.z0 + 1.5, heading: 0 } },
   { id: 'walkway', name: 'Burrito truck', pin: { x: -22, z: walkway.z - 3 }, spawn: { x: -14, z: walkway.z, heading: -Math.PI / 2 } },
 ];
 

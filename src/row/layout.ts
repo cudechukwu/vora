@@ -5,7 +5,12 @@
 // You walk +z along the High Street side, starting at Boger: the row is on
 // your right (−x), High Street on your left (+x), Andrus Field behind the
 // row. ROW is laid out along −z, so walking +z you meet it bottom-up:
-// Boger, South, North, Zelnick, Chapel, Judd, Allbritton.
+// Boger, North College (long, brownstone, a columned portico), a glass
+// bridge, South College (the old one with the belfry tower), Zelnick,
+// Chapel, Judd. Judd is the last one, level with the Frank Center across
+// the back path: south of it, a tar walkway, and Allbritton sits off the
+// row at the south end of the back path (southend.ts). Order and sizes from
+// the user's Google Maps view and photos (2026-10-04).
 // Order from a student's walk-through + the wesleyan.edu/about aerial.
 // Usdan isn't on the row: it's the big triangle behind Boger, north of the
 // field (from the user's Google Maps screenshot), so it's a polygon below.
@@ -13,7 +18,7 @@
 
 export const FRONT_X = -15; // x of most facades
 export const BUILDING_DEPTH = 45; // deepest a building may be (behind its facade); each has its own `depth`
-export const ROW_START_Z = 40;
+export const ROW_START_Z = 60;
 
 /** Walk (sidewalk in front of the row). */
 export const PATH_HALF = 2.6;
@@ -32,7 +37,7 @@ export const FAR_WALK = { x0: 20.3, x1: 23.5 } as const;
 export const CROSSWALK_W = 4;
 
 export type BuildingId =
-  | 'allbritton' | 'judd' | 'chapel' | 'zelnick' | 'north' | 'south' | 'boger';
+  | 'judd' | 'chapel' | 'zelnick' | 'north' | 'south' | 'boger';
 
 export interface Spec {
   id: BuildingId;
@@ -46,14 +51,19 @@ export interface Spec {
 }
 
 export const ROW: Spec[] = [
-  { id: 'allbritton', name: 'Allbritton Center', w: 34, gap: 22, crossing: 7, depth: 18.4 },
-  { id: 'judd', name: 'Judd Hall', w: 30, gap: 10, depth: 18.4 },
+  { id: 'judd', name: 'Judd Hall', w: 30, gap: 36, depth: 18.4 },
   { id: 'chapel', name: 'Memorial Chapel', w: 22, gap: 0, door: 3.2, depth: 32.4 },
   { id: 'zelnick', name: 'Zelnick Pavilion', w: 14, gap: 0, depth: 32.4 }, // the glass link: solid back to the chapel's depth
-  { id: 'north', name: 'North College', w: 36, gap: 8, depth: 18.4 },
-  { id: 'south', name: 'South College', w: 24, gap: 20, crossing: 5, depth: 16.4 },
+  { id: 'south', name: 'South College', w: 24, gap: 8, depth: 16.4 }, // (a glass bridge over the gap to North College)
+  { id: 'north', name: 'North College', w: 60, gap: 20, crossing: 5, depth: 18.4 },
   { id: 'boger', name: 'Boger Hall', w: 44, gap: 10, door: -5, depth: 18.4 },
 ];
+
+/**
+ * The row starts this far in from ROW_START_Z: before Judd (south of it) is open lawn, crossed `walk` m
+ * short of Judd by a tar walkway this wide, from High Street to the back path (and on west as the field road).
+ */
+export const ROW_OPEN = { len: 26, walk: 7.5, w: 7 } as const;
 
 export interface RowStop {
   id: BuildingId;
@@ -72,7 +82,8 @@ export interface Crossing { z: number; w: number }
 export function layoutRow(row: Spec[] = ROW): { stops: RowStop[]; crossings: Crossing[] } {
   const stops: RowStop[] = [];
   const crossings: Crossing[] = [];
-  let z = ROW_START_Z;
+  let z = ROW_START_Z - ROW_OPEN.len;
+  crossings.push({ z: z + ROW_OPEN.walk, w: ROW_OPEN.w }); // the walkway south of Judd
   for (const s of row) {
     const zc = z - s.w / 2;
     stops.push({
@@ -85,7 +96,7 @@ export function layoutRow(row: Spec[] = ROW): { stops: RowStop[]; crossings: Cro
   return { stops, crossings };
 }
 
-export const ROW_END_Z = ROW.reduce((z, s) => z - s.w - s.gap, ROW_START_Z);
+export const ROW_END_Z = ROW.reduce((z, s) => z - s.w - s.gap, ROW_START_Z - ROW_OPEN.len);
 export const WALK_MIN_Z = ROW_START_Z + 30; // +z end of the walk
 export const WALK_MAX_Z = ROW_END_Z - 70; // −z end of the walk: lawn north of Boger, toward Wyllys Ave
 
@@ -143,3 +154,22 @@ export const inUsdan = (p: XZ, pad = 0) => inPoly(p, USDAN) || (pad > 0 && distT
 export const BOUNDS = { xMin: -200, xMax: FAR_WALK.x1 - 0.4, zMin: WALK_MAX_Z - 10, zMax: WALK_MIN_Z + 10 } as const;
 
 export const byId = (stops: RowStop[], id: BuildingId) => stops.find((s) => s.id === id)!;
+
+/** North College's portico: four giant columns this far out in front of its facade, at these offsets from its middle. */
+export const PORTICO = { out: 2.6, r: 0.55, at: [-6.3, -2.1, 2.1, 6.3] } as const;
+/** South College's tower, standing out this far from the middle of its facade, this wide either side. */
+export const SOUTH_TOWER = { out: 3.2, half: 3 } as const;
+
+/** Bits of the row that stand out past the facades (and are solid): the portico's columns, South College's tower. */
+export function rowSolids(stops: RowStop[], pad = 0.3): { x0: number; x1: number; z0: number; z1: number }[] {
+  const out: { x0: number; x1: number; z0: number; z1: number }[] = [];
+  const north = stops.find((s) => s.id === 'north'), south = stops.find((s) => s.id === 'south');
+  if (north) {
+    for (const o of PORTICO.at) {
+      const x = FRONT_X + PORTICO.out, z = north.zc + o, r = PORTICO.r + pad;
+      out.push({ x0: x - r, x1: x + r, z0: z - r, z1: z + r });
+    }
+  }
+  if (south) out.push({ x0: FRONT_X - 1, x1: FRONT_X + SOUTH_TOWER.out + pad, z0: south.zc - SOUTH_TOWER.half - pad, z1: south.zc + SOUTH_TOWER.half + pad });
+  return out;
+}

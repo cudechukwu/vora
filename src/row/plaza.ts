@@ -85,7 +85,7 @@ export const SITTERS: [number, number][] = [
 
 // ─── Along the back path (pure data) ───────────────────────────────────
 // Granite curbs both edges; on the building side, mulch beds of hostas, and
-// up by Judd and Allbritton wooden benches, a row of Bigbelly bins and a red
+// up by Judd wooden benches, a row of Bigbelly bins and a red
 // hydrant; on the field side, heritage lamps and a low chain-link fence
 // round the football field.
 
@@ -96,10 +96,11 @@ export interface PathItem { kind: PathKind; x: number; z: number }
 export const BED = { x0: -50.2, x1: -48.1 } as const;
 
 export const PATH_ITEMS: PathItem[] = [
-  { kind: 'teakBench', x: -49.3, z: 22 }, { kind: 'teakBench', x: -49.3, z: 17.5 },
-  { kind: 'teakBench', x: -49.3, z: -27 }, { kind: 'teakBench', x: -49.3, z: -31.5 },
-  { kind: 'bigbelly', x: -49.2, z: -36.5 }, { kind: 'bigbelly', x: -49.2, z: -37.4 }, { kind: 'bigbelly', x: -49.2, z: -38.3 },
-  { kind: 'hydrant', x: -49.0, z: 12 },
+  // along the back of Judd, across from the Frank Center
+  { kind: 'teakBench', x: -49.3, z: 8 }, { kind: 'teakBench', x: -49.3, z: 11.6 },
+  { kind: 'teakBench', x: -49.3, z: 19 }, { kind: 'teakBench', x: -49.3, z: 22.6 },
+  { kind: 'bigbelly', x: -49.2, z: 27 }, { kind: 'bigbelly', x: -49.2, z: 27.9 }, { kind: 'bigbelly', x: -49.2, z: 28.8 },
+  { kind: 'hydrant', x: -49.0, z: 31.5 },
 ];
 
 export function pathItemHalf(k: PathKind): [number, number] {
@@ -113,8 +114,8 @@ export function pathObstacles(pad = 0.3): Box[] {
   });
 }
 
-/** Andrus Field's football pitch: width (x), length (z), centre x. Its centre z comes from the chapel. */
-export const FOOTBALL = { W: 49, L: 110, gap: 7 } as const;
+/** Andrus Field's football pitch: width (x), length (z), how far past the field's edge it starts, centre z. */
+export const FOOTBALL = { W: 49, L: 110, gap: 7, z: -63.8 } as const; // z: its centre
 
 /**
  * The low chain-link fence round the football field, as straight runs (x0,z0 → x1,z1), with a gate

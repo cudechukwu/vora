@@ -1,4 +1,5 @@
 import { Box, Extra, XZ, blockedAt, inBox } from './collide';
+import { offRoadForCars } from './southend';
 import { ROAD, RowStop } from './layout';
 import { LANES, TrafficState, Vehicle, addVehicle, laneX, removeVehicle } from './traffic';
 import { DRIVEWAYS, RoommateId, toWorld } from './house/plan';
@@ -261,7 +262,7 @@ export function depthIn(p: XZ, blocked: (p: XZ) => boolean): number {
  * Slides along walls where it can; if the turn itself is what hits, it keeps its old heading.
  */
 export function driveMove(c: Car, want: XZ, stops: RowStop[], extra: Extra, was = c.heading): { x: number; z: number; hit: boolean; scrape: boolean } {
-  const blocked = (p: XZ) => blockedAt(p, stops, extra);
+  const blocked = (p: XZ) => blockedAt(p, stops, extra) || offRoadForCars(p); // (cars can't climb the bank by Olin)
   const start = outline(c, c.x, c.z, was);
   const before = start.map(blocked);
   // already (somehow) in something: only moves that leave it less far in are allowed

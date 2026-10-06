@@ -1,3 +1,4 @@
+import { ALLBRITTON } from '../../src/row/southend';
 import { describe, expect, it } from 'vitest';
 import {
   FOOTBALL, ITEMS, PATH_ITEMS, SITTERS, chairs, fenceObstacles, fenceRuns, half, pathObstacles, plazaObstacles,
@@ -7,8 +8,8 @@ import { resolveMove, Extra } from '../../src/row/collide';
 import { truckSpot } from '../../src/row/foodtruck';
 
 const { stops, crossings } = layoutRow();
-const boger = byId(stops, 'boger'), chapel = byId(stops, 'chapel');
-const fz = chapel.doorZ;
+const boger = byId(stops, 'boger');
+const fz = FOOTBALL.z;
 const all: Extra = { solids: [...plazaObstacles(), ...pathObstacles(), ...fenceObstacles(FIELD_X, fz)] };
 const inBuilding = (p: { x: number; z: number }) => stops.some((s) => p.z <= s.z0 && p.z >= s.z1 && p.x <= s.front && p.x >= s.back);
 
@@ -78,8 +79,8 @@ describe('the plaza between Usdan and Boger', () => {
 describe('along the back path', () => {
   it('nothing sticks out into it: you can walk its whole length down the middle', () => {
     const x = (BACK_PATH.x0 + BACK_PATH.x1) / 2;
-    const end = walk({ x, z: -170 }, { x, z: 60 });
-    expect(end.z).toBeCloseTo(60, 1);
+    const end = walk({ x, z: -170 }, { x, z: ALLBRITTON.z0 - 1 });
+    expect(end.z).toBeCloseTo(ALLBRITTON.z0 - 1, 1); // all the way down to Allbritton
   });
 
   it('benches, bins and the hydrant sit on the building side of the path', () => {

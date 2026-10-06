@@ -51,11 +51,13 @@ describe('walking around College Row', () => {
     expect(end.z).toBeCloseTo(boger.z1 - 4, 1);
   });
 
-  it('lets you cut through each walkway onto Andrus Field', () => {
+  it('lets you cut through each walkway to the back path, and the North College–Boger one on onto Andrus Field', () => {
     for (const c of crossings) {
-      const end = walk({ x: 0, z: c.z }, { x: -100, z: c.z });
-      expect(end.x).toBeCloseTo(-100, 5);
+      const end = walk({ x: 0, z: c.z }, { x: -54, z: c.z });
+      expect(end.x).toBeCloseTo(-54, 5);
     }
+    const c = crossings[1];
+    expect(walk({ x: 0, z: c.z }, { x: -100, z: c.z }).x).toBeCloseTo(-100, 5);
   });
 
   it('blocks you from stepping sideways out of a walkway into a building', () => {

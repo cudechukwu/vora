@@ -568,7 +568,7 @@ test('on a bike: the speedometer shows, and your speed builds the longer you ped
   expect(shown).toBeGreaterThan(10); // mph
 });
 
-test('behind the row: walk through a walkway, across the back road, onto Andrus Field', async ({ page }) => {
+test('behind the row: through the walkway south of Judd, across the back path and the plaza, up the bank to the Frank Center', async ({ page }) => {
   const c = crossings[0];
   await open(page, `x=-20&z=${c.z}&yaw=${Math.PI / 2}`); // looking −x, toward the field
   const s = await hold(page, 'w', 46);
@@ -796,4 +796,19 @@ test('jump anywhere from the map: pick Usdan, Go, and you are there — even fro
   await expect.poll(() => page.evaluate(() => (window as any).__vora.where)).toBe('out');
   await expect.poll(async () => { const s = await state(page); return Math.hypot(s.x - -65.3, s.z - -170.4) < 2; }, { timeout: 20_000 }).toBe(true); // by Usdan's walkway entrance
   await expect(page.locator('#passing .v')).toHaveText('Usdan University Center', { timeout: 20_000 });
+});
+
+test('the field road: up the stairs onto the bank to the Frank Center; down the back path to Allbritton at its end @smoke', async ({ page }) => {
+  const errors = await open(page, `t=15&x=-82&z=-2&yaw=${Math.PI}`); // on the field road at the foot of the stairs, looking south (+z)
+  const s = await hold(page, 'w', 30);
+  expect(s.z).toBeGreaterThan(9.6); // up the stairs…
+  expect(s.z).toBeLessThan(15); // …stopped by the glass connector's doors
+  expect(await page.evaluate(() => (window as any).__vora.pos.y)).toBeCloseTo(2, 1); // up on the bank
+  await expect(page.locator('#passing .v')).toHaveText('Frank Center');
+  await open(page, `t=15&x=-54&z=20&yaw=${Math.PI}`); // on the back path, south of the field road
+  const a = await hold(page, 'w', 40);
+  expect(a.z).toBeGreaterThan(60); // walked right up to it
+  await expect(page.locator('#passing .v')).toHaveText('Allbritton Center');
+  expect(await page.evaluate(() => (window as any).__vora.sample())).toBeGreaterThan(20);
+  expect(errors).toEqual([]);
 });
