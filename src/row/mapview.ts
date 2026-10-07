@@ -1,7 +1,7 @@
 import { BACK_PATH, FAR_WALK, FIELD_X, PATH_HALF, PLAZA, PLAZA_GAP, ROAD, RowStop, USDAN, XZ } from './layout';
 import { DRIVEWAYS, HOUSE, toWorld } from './house/plan';
 import { PLACES, Place, View, fitAll, placeAt, toMap } from './map';
-import { ALLBRITTON, BERM, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_LINK, OLIN_LINK, OLIN_POLY, PAVILION, PLAZA_F } from './southend';
+import { ALLBRITTON, BERM, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_LINK, OLIN_LINK_POLY, OLIN_POLY, OLIN_WALK, PLAZA_F, POOL, PRUZAN, PRUZAN_COURT, PRUZAN_ENTRY, PRUZAN_LINK_N, NCOURT, NWALK } from './southend';
 
 // ─── Drawing the map ───────────────────────────────────────────────────
 // One flat, quiet drawing of campus (grass, roads, paths, buildings), used
@@ -43,7 +43,11 @@ export function drawCampus(g: CanvasRenderingContext2D, v: View, stops: RowStop[
   for (const s of stops) rect(s.back, s.front, s.z1, s.z0, COL.building);
   poly(USDAN, COL.usdan);
   rect(PLAZA_F.x0, PLAZA_F.x1, PLAZA_F.z0, PLAZA_F.z1, COL.tar);
-  for (const b of [FRANK, FRANK_LINK, FRANK_ADD, OLIN_LINK, PAVILION, ALLBRITTON]) rect(b.x0, b.x1, b.z0, b.z1, COL.building);
+  rect(OLIN_WALK.x0, OLIN_WALK.x1 + 4.5, OLIN_WALK.z0, OLIN_WALK.z1, COL.path); // (and its stairs)
+  for (const r of [PRUZAN_COURT, NCOURT, NWALK]) rect(r.x0, r.x1, r.z0, r.z1, COL.path);
+  for (const b of [FRANK, FRANK_LINK, FRANK_ADD, PRUZAN, PRUZAN_ENTRY, PRUZAN_LINK_N, ALLBRITTON]) rect(b.x0, b.x1, b.z0, b.z1, COL.building);
+  poly(OLIN_LINK_POLY, COL.building);
+  rect(POOL.x0, POOL.x1, POOL.z0, POOL.z1, '#3d4a52'); // the Pruzan's fountain
   poly(OLIN_POLY, COL.usdan);
   for (const d of DRIVEWAYS) { const a = toWorld(d.u0, d.v0), b = toWorld(d.u1, d.v1); rect(a.x, b.x, a.z, b.z, COL.path); }
   rect(HOUSE.x0, HOUSE.x0 + HOUSE.depth, HOUSE.zc - HOUSE.width / 2, HOUSE.zc + HOUSE.width / 2, COL.house);

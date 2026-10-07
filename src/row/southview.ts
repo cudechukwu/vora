@@ -3,12 +3,13 @@ import {
   Material, Mesh, MeshBasicMaterial, MeshLambertMaterial, PlaneGeometry, RepeatWrapping, SRGBColorSpace, Vector3,
 } from 'three';
 import { BoxBank, Facing, WindowBank, block, brickMap, hipRoof, lambert, prism, seeGlass, stoneMap } from './kit';
+import { buildPruzan } from './pruzanview';
 import { BACK_PATH } from './layout';
 import { noise2, rng } from './noise';
 import {
   ALLB_FORECOURT, ALLB_WELLS, ALLBRITTON, ALLBRITTON_DOOR, BERM, BOLLARDS, CHEEK, FIELD_ROAD, FLAGPOLE, FRANK, FRANK_ADD, FRANK_DOOR, FRANK_LINK, LANDING,
-  CLASS_TAKEN, FRANK_ROOMS, FRANK_WINDOWS, GRAND_STAIR, LINK_DOOR, LOUNGE, LOUNGE_SEATS, LOUNGE_TABLES, LINK_DOOR_S, LINK_WALK, MAIN_ENTRY, MULCH, classroom, OLIN, OLIN_LINK, PAVILION, PLAZA_BENCHES, PLAZA_BIN, PLAZA_F, PLAZA_TABLES, SIGN, STAIRS,
-  STAIRS_E, SYCAMORE, SYCAMORE2, TERRACE_Y, UTILITY_BOX, groundY, plazaChairs,
+  CLASS_TAKEN, FRANK_ROOMS, FRANK_WINDOWS, GRAND_STAIR, LINK_DOOR, LOUNGE, LOUNGE_SEATS, LOUNGE_TABLES, LINK_DOOR_S, LINK_WALK, MAIN_ENTRY, MULCH, classroom, OLIN, OLIN_LINK, PLAZA_BENCHES, PLAZA_BIN, PLAZA_F, PLAZA_TABLES, SIGN, STAIRS,
+  STAIRS_E, OLIN_WALK, OLIN_DOOR, OLIN_COLUMNS, FRANK_NICHE_W, FRANK_NICHE_N, PRUZAN_LINK_N, PRUZAN_ENTRY, STAIRS_W, SYCAMORE, SYCAMORE2, TERRACE_Y, UTILITY_BOX, groundY, plazaChairs,
 } from './southend';
 
 // ─── The south end of Andrus Field: draws what southend.ts lays out ────
@@ -88,7 +89,7 @@ export function buildSouthEnd(k: Kit) {
   frankAddition(k);
   plaza(k);
   olin(k);
-  olinLink(k);
+  buildPruzan(k); // the art center in the gap between them (its gallery block, against Olin, is in there too)
   allbritton(k);
 }
 
@@ -121,7 +122,7 @@ function bank({ g, box }: Kit) {
     pos.setY(i, groundY(x, z) + 0.012);
     const n = noise2(x / 9, z / 9);
     const bed = (x > MULCH.x0 && z < 10.5) // round the sycamore, east of the stairs
-      || (x > FRANK.x1 + 1 && z > FRANK_LINK.z1 && z < FRANK.z1 + 4); // down the slope to the plaza
+      || (x > FRANK.x1 + 1 && z > FRANK_LINK.z1 && z < STAIRS_E.z0 - 1.5); // down the slope to the plaza
     if (bed) c.copy(mulch).multiplyScalar(0.85 + n * 0.3);
     else c.copy(a).lerp(b, n);
     cols.push(c.r, c.g, c.b);
@@ -137,8 +138,8 @@ function bank({ g, box }: Kit) {
   for (let i = 0; i < 26; i++) { // ornamental grasses and low shrubs in the beds
     const onSlope = i % 2 === 0;
     const bx = onSlope ? FRANK.x1 + 1.5 + rng(i + 970) * 5 : MULCH.x0 + 1 + rng(i + 970) * (MULCH.x1 - MULCH.x0 - 2);
-    const bz = onSlope ? FRANK_LINK.z1 + 1 + rng(i + 980) * (FRANK.z1 - FRANK_LINK.z1) : 4 + rng(i + 980) * 6;
-    if (Math.abs(bz - FRANK_DOOR.z) < 3.2 && onSlope) continue; // not on the east stairs
+    const bz = onSlope ? FRANK_LINK.z1 + 1 + rng(i + 980) * (STAIRS_E.z0 - 3 - FRANK_LINK.z1) : 4 + rng(i + 980) * 6;
+    if (Math.abs(bz - FRANK_DOOR.z) < 2.2 && onSlope && bx < LINK_WALK.x0) continue; // not on the way to the medallion door
     if (!onSlope && Math.hypot(bx - SYCAMORE.x, bz - SYCAMORE.z) < 1.6) continue;
     if (bx > LINK_WALK.x0 - 0.5 && bx < LINK_WALK.x1 + 0.5 && bz > LINK_WALK.z0 && bz < LINK_WALK.z1 + 1.5) continue; // nor on the walk to the south doors
     box.add(bx, groundY(bx, bz) + 0.22, bz, 0.5, 0.45, 0.5, i % 3 ? 0x9a9a5c : 0x5f7d3a, rng(i) * 3);
@@ -196,10 +197,15 @@ function stairs(k: Kit) {
   };
   pavers(LANDING.x0, LANDING.x1, LANDING.z0, LANDING.z1, 0.035);
   pavers(STAIRS.x0 - 0.5, STAIRS.x1 + 0.5, STAIRS.z1, FRANK_LINK.z0, TERRACE_Y + 0.03); // up to the glass connector's doors
-  pavers(LINK_WALK.x0, LINK_WALK.x1, LINK_WALK.z0, LINK_WALK.z1 + 1, TERRACE_Y + 0.031); // from the east stairs' top to its south doors
-  pavers(FRANK.x1, STAIRS_E.x0, STAIRS_E.z0 - 0.5, STAIRS_E.z1 + 0.5, TERRACE_Y + 0.03); // up to the medallion door
+  pavers(LINK_WALK.x0, LINK_WALK.x1, LINK_WALK.z0, LINK_WALK.z1, TERRACE_Y + 0.031); // from the walk to Olin north to the connector's south doors…
+  pavers(FRANK.x1, LINK_WALK.x0, FRANK_DOOR.z - 1.4, FRANK_DOOR.z + 1.4, TERRACE_Y + 0.031); // …with a turn to the medallion door
+  // the concrete walk from the top of the east stairs west to Olin's front door
+  const W = OLIN_WALK, slabs = slabTexture();
+  slabs.repeat.set((W.x1 - W.x0) / 1.5, (W.z1 - W.z0) / 1.5);
+  flat(g, W.x0, W.x1, W.z0, W.z1, TERRACE_Y + 0.03, new MeshLambertMaterial({ map: slabs }));
   flight(k, STAIRS, '+z');
   flight(k, STAIRS_E, '-x');
+  flight(k, STAIRS_W, '+z'); // down the bank in front of the Pruzan's gallery block
   const brown = lambert(0x553a2a);
   for (const p of BOLLARDS) {
     const y = groundY(p.x, p.z);
@@ -314,9 +320,36 @@ function frankHistoric({ g, win, box }: Kit) {
   // the west side (above Olin's connector) and the south end
   for (let z = z0 + 2.6; z < z1 - 1.5; z += 3.4) {
     floors.forEach((y, i) => {
-      if (i < 2 && z > 22 && z < 48) return; // the limestone connector to Olin is against it here
+      if (i < 2 && z > PRUZAN_LINK_N.z0 - 0.8 && z < PRUZAN_ENTRY.z1 + 0.8) return; // the Pruzan's glass link is against it here
+      if (i < 2 && Math.abs(z - FRANK_NICHE_W) < 2) return; // the niches
+      if (i < 3 && Math.abs(z - FRANK_NICHE_N) < 2) return;
       sash(win, box, x0, y, z, '-x', 1.25, i === 3 ? 1.6 : 2.1);
     });
+  }
+  // looking onto the Pruzan's courtyard, another medallion in an arched niche over a blind stone panel (the photos)
+  {
+    const nz = FRANK_NICHE_W, nx = x0 - 0.06;
+    box.add(nx - 0.04, Y + 2.0, nz, 0.16, 2.6, 2.0, LIME); // the blind panel…
+    box.add(nx - 0.1, Y + 3.4, nz, 0.3, 0.25, 2.4, LIME); // …its cornice
+    box.add(nx - 0.04, Y + 5.6, nz, 0.16, 2.4, 2.6, LIME); // the niche, square part…
+    const head = mesh(g, new CylinderGeometry(1.3, 1.3, 0.16, 16, 1, false, 0, Math.PI), lime, nx - 0.04, Y + 6.8, nz);
+    head.rotation.z = Math.PI / 2; // …its round head
+    const md = mesh(g, new CylinderGeometry(0.85, 0.85, 0.12, 20), lambert(0xd9d2c2), nx - 0.16, Y + 6.2, nz);
+    md.rotation.z = Math.PI / 2;
+    const rl = mesh(g, new CylinderGeometry(0.55, 0.55, 0.1, 16), lambert(0xc8c0ae), nx - 0.24, Y + 6.2, nz);
+    rl.rotation.z = Math.PI / 2;
+  }
+  // and onto the tables further north, a tall arched niche in a white surround, a pale panel let into it (the photo)
+  {
+    const nz = FRANK_NICHE_N, nx = x0 - 0.06;
+    box.add(nx + 0.02, Y + 4.2, nz, 0.1, 8.4, 2.8, 0x8a3e30); // the recess, darker brick
+    box.add(nx - 0.04, Y + 4.0, nz, 0.14, 7.2, 1.6, 0xe9e3d4); // the pale panel
+    for (const e of [-1, 1]) box.add(nx - 0.06, Y + 4.2, nz + e * 1.5, 0.2, 8.4, 0.3, LIME); // the white surround
+    const head = mesh(g, new CylinderGeometry(1.6, 1.6, 0.2, 16, 1, false, 0, Math.PI), lime, nx - 0.06, Y + 8.4, nz);
+    head.rotation.z = Math.PI / 2;
+    const inner = mesh(g, new CylinderGeometry(1.35, 1.35, 0.22, 16, 1, false, 0, Math.PI), lambert(0x8a3e30), nx - 0.05, Y + 8.4, nz);
+    inner.rotation.z = Math.PI / 2;
+    box.add(nx - 0.16, Y + 10.0, nz, 0.3, 0.55, 0.5, LIME); // keystone
   }
   for (const dx of N) floors.forEach((y, i) => sash(win, box, cx + dx, y, z1, '+z', 1.3, i === 3 ? 1.6 : 2.2));
 }
@@ -611,7 +644,7 @@ function olin({ g, win, box }: Kit) {
   }
   for (let z = cz + 3; z < z1 - 1.5; z += 4.2) {
     tall(x0 - 0.03, z, '-x');
-    if (z > OLIN_LINK.z1 + 2) tall(x1 + 0.03, z, '+x'); // (the connector to the Frank Center is against the rest)
+    if (z > OLIN_LINK.z1 + 2 && Math.abs(z - OLIN_DOOR.z) > OLIN_DOOR.half + 0.5) tall(x1 + 0.03, z, '+x'); // (the connector to the Frank Center is against the rest; the portico)
   }
   // the drum: half a cylinder, bricks wrapped round it
   const drum = new CylinderGeometry(r, r, h, 48, 1, true, Math.PI / 2, Math.PI);
@@ -631,35 +664,30 @@ function olin({ g, win, box }: Kit) {
     box.add(s.x, Y + 11.05, s.z, 0.5, 0.6, 0.2, LIME, a); // keystone
     win.add('rect', b.x, Y + 1.6, b.z, 1.2, 1.1, a); // small windows in the base
   }
+  // the front door on the east side, at the end of the walk up from the plaza: a limestone portico of four columns under
+  // a pediment, against the brick; tall doors in a stone surround
+  const D = OLIN_DOOR, colH = 8.4, px = D.x + D.out / 2;
+  box.add(D.x + 0.12, Y + 2.3, D.z, 0.24, 4.6, 3.4, LIME); // the door surround
+  for (const dz of [-D.half, D.half]) box.add(D.x + 0.1, Y + colH / 2, D.z + dz, 0.2, colH, 0.9, LIME); // pilasters behind the end columns
+  box.add(D.x + 0.32, Y + 1.7, D.z, 0.08, 3.4, 2.4, 0x2a2420); // the doors…
+  box.add(D.x + 0.36, Y + 1.7, D.z, 0.04, 3.4, 0.06, 0x8a7a62);
+  win.add('arch', D.x + 0.03, Y + 6.6, D.z, 2.0, 3.0, '+x'); // …and a tall arched window over them
+  box.add(px, Y + 0.08, D.z, D.out + 0.6, 0.16, D.half * 2 + 1.6, 0xcfc8b8); // the porch floor
+  for (const c of OLIN_COLUMNS) {
+    const col = mesh(g, new CylinderGeometry(0.34, 0.4, colH, 14).translate(0, colH / 2, 0), lime, c.x, Y + 0.16, c.z);
+    col.castShadow = true;
+    box.add(c.x, Y + 0.3, c.z, 0.95, 0.3, 0.95, LIME); // base
+    box.add(c.x, Y + colH + 0.05, c.z, 0.95, 0.3, 0.95, LIME); // capital
+  }
+  box.add(px, Y + colH + 0.75, D.z, D.out + 0.6, 1.1, D.half * 2 + 1.6, LIME); // entablature
+  const ped = mesh(g, prism(D.half * 2 + 1.6, 2.2, D.out + 0.6), lime, px, Y + colH + 1.3, D.z);
+  ped.rotation.y = Math.PI / 2; // (the pediment's gable faces the walk)
   // the flagpole, out front between Olin and the Frank Center
   const F = FLAGPOLE;
   mesh(g, new CylinderGeometry(0.05, 0.08, 11, 6).translate(0, 5.5, 0), lambert(0xe8e8e4), F.x, Y, F.z);
   box.add(F.x, Y + 11.05, F.z, 0.22, 0.22, 0.22, 0xd4af37); // gilt finial
   box.add(F.x, Y + 10.3, F.z - 0.8, 0.04, 0.9, 1.5, 0xb22234); // the flag, hanging still
   box.add(F.x, Y + 10.5, F.z - 0.45, 0.05, 0.45, 0.65, 0x3c3b6e);
-}
-
-/** Between Olin and the Frank Center: a pale limestone connector, and a glass entrance pavilion under a thin flat roof in front of it. */
-function olinLink({ g, win, box }: Kit) {
-  const Y = TERRACE_Y, L = OLIN_LINK, P = PAVILION;
-  const lcx = (L.x0 + L.x1) / 2, lcz = (L.z0 + L.z1) / 2;
-  mesh(g, block(L.x1 - L.x0, L.h, L.z1 - L.z0), lambert(0xd8d1c1, stoneMap(), 'limeLink'), lcx, Y, lcz);
-  box.add(lcx, Y + L.h + 0.15, lcz, L.x1 - L.x0 + 0.2, 0.3, L.z1 - L.z0 + 0.3, 0xc9c2b2);
-  for (const z of [L.z0 + 6, L.z1 - 5]) win.add('rect', lcx, Y + 4.6, z, 0.9, 1.4, '-z'); // (a few narrow slots, high up)
-  const pcx = (P.x0 + P.x1) / 2, pcz = (P.z0 + P.z1) / 2;
-  mesh(g, block(P.x1 - P.x0 - 0.3, P.h, P.z1 - P.z0 - 0.3), lambert(0x2a333a), pcx, Y, pcz);
-  const panes = 4, pw = (P.x1 - P.x0) / panes;
-  for (let i = 0; i < panes; i++) {
-    const x = P.x0 + (i + 0.5) * pw;
-    win.add('rect', x, Y + P.h / 2, P.z0 - 0.05, pw - 0.1, P.h - 0.3, '-z');
-    box.add(P.x0 + i * pw, Y + P.h / 2, P.z0 - 0.06, 0.08, P.h, 0.08, 0x3a3027);
-  }
-  for (const [x, f] of [[P.x0 - 0.05, '-x'], [P.x1 + 0.05, '+x']] as const) win.add('rect', x, Y + P.h / 2, pcz, P.z1 - P.z0 - 0.4, P.h - 0.3, f);
-  // the thin dark roof, overhanging all round (like Zelnick's)
-  const roof = mesh(g, new BoxGeometry(P.x1 - P.x0 + 2.4, 0.25, P.z1 - P.z0 + 2.4), lambert(0x5a4632), pcx, Y + P.h + 0.12, pcz - 0.4);
-  roof.rotation.x = 0.03;
-  for (const ox of [-0.8, 0.8]) box.add(pcx + ox, Y + 1.2, P.z0 - 0.1, 0.06, 2.4, 0.06, 0x2b2f33); // the doors
-  box.add(pcx, Y + 0.04, P.z0 - 1.6, 4, 0.08, 3, 0xbdb7a8); // a pale apron in front
 }
 
 /**

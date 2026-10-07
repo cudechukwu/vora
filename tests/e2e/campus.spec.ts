@@ -83,9 +83,9 @@ test('the field road: up the stairs onto the bank to the Frank Center; down the 
   expect(s.z).toBeLessThan(15); // …stopped by the glass connector's doors
   expect(await page.evaluate(() => (window as any).__vora.pos.y)).toBeCloseTo(2, 1); // up on the bank
   await expect(page.locator('#passing .v')).toHaveText('Frank Center');
-  await open(page, `t=15&x=-54&z=20&yaw=${Math.PI}`); // on the back path, south of the field road
+  await open(page, `t=15&x=-54&z=42&yaw=${Math.PI}`); // on the back path, by the Frank Center's plaza
   const a = await hold(page, 'w', 40);
-  expect(a.z).toBeGreaterThan(60); // walked right up to it
+  expect(a.z).toBeGreaterThan(80); // walked right up to it
   await expect(page.locator('#passing .v')).toHaveText('Allbritton Center');
   expect(await page.evaluate(() => (window as any).__vora.sample())).toBeGreaterThan(20);
   expect(errors).toEqual([]);

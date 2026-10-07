@@ -5,10 +5,11 @@ import {
 import { Sky, moodAt } from './sky';
 import { BoxBank, WindowBank, lambert } from './kit';
 import { buildRow } from './buildings';
+import { pruzanNight, pruzanTick } from './pruzanview';
 import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, ROW_ENTRY, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
 import { World } from './world';
 import { along, quadX } from './backlawn';
-import { CLASS_TAKEN, FIELD_ROAD, FRANK_ROOMS, GRAND_STAIR, LOUNGE_SEATS, PLAZA_SITTERS, TERRACE_Y, classroom, PLAZA_TABLES, ROAD_LANES, ROAD_WALK, STAIRS, groundY, plazaChairs, southEndNear } from './southend';
+import { CLASS_TAKEN, FIELD_ROAD, FRANK_ROOMS, GALLERY_SITTERS, GALLERY_VISITORS, GRAND_STAIR, LOUNGE_SEATS, NCOURT_SITTERS, NCOURT_TABLES, POOL_SITTERS, PLAZA_SITTERS, TERRACE_Y, classroom, PLAZA_TABLES, ROAD_LANES, ROAD_WALK, STAIRS, groundY, plazaChairs, southEndNear } from './southend';
 import { resolveMove } from './collide';
 import {
   SPEED, actionAt, airborne, carry, createMobility, dismount, isRunning, mount, newJump, newMover, startJump, stepJump, stepMover,
@@ -307,7 +308,27 @@ const indoors = (p: Person, x: number, y: number, z: number, heading: number) =>
     person.root.position.y = p.y;
   });
   indoors(new Person(randomLook(850)), -78.6, TERRACE_Y, 21.4, Math.PI * 0.8); // standing, chatting
+  // in the Pruzan Art Center, behind its glass: two on the sofas, two looking at the show
+  GALLERY_SITTERS.forEach((p, k) => {
+    const person = new Person(randomLook(860 + k));
+    sitAt(person, p.x, p.z, p.heading, 0.42);
+    person.root.position.y = p.y;
+  });
+  GALLERY_VISITORS.forEach((p, k) => indoors(new Person(randomLook(865 + k)), p.x, p.y, p.z, p.heading));
 }
+// out at the teak tables in the courtyard on its field side
+NCOURT_SITTERS.forEach(([t, c], k) => {
+  const at = plazaChairs(NCOURT_TABLES[t])[c];
+  const person = new Person(randomLook(880 + k));
+  sitAt(person, at.x, at.z, at.heading, 0.46);
+  person.root.position.y = TERRACE_Y;
+});
+// and two on the rim of its fountain, facing out
+POOL_SITTERS.forEach((p, k) => {
+  const person = new Person(randomLook(870 + k));
+  sitAt(person, p.x, p.z, p.heading, p.y - TERRACE_Y);
+  person.root.position.y = TERRACE_Y;
+});
 // and out at the tables on the plaza by the Frank Center's main entry
 PLAZA_SITTERS.forEach(([t, c], k) => {
   const at = plazaChairs(PLAZA_TABLES[t])[c];
@@ -523,6 +544,7 @@ function applyMood(h: number) {
   glass.copy(m.top).lerp(m.horizon, 0.45).multiplyScalar(0.55);
   windows.paint(glass, m.night);
   world.setNight(m.night);
+  pruzanNight(m.night);
   sun.userData.dir = m.sunDir;
   clockBtn.innerHTML = `${formatHour(h)}<small>${periodOf(h)}</small>`;
 }
@@ -1012,6 +1034,7 @@ function frame(now: number) {
   if (!driving) input.gasHeld = input.brakeHeld = false;
   tyres.update(dt);
   exhaust.update(dt);
+  pruzanTick(dt);
   updateFleers(dt);
   const act = currentAction();
   const key = act ? act.key : '';
