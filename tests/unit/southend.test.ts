@@ -5,7 +5,8 @@ import {
   POOL_SITTERS, GALLERY, GALLERY_SOFAS, PRUZAN_BIRCH, pruzanSoffit, pruzanPaveEdge, PRUZAN_FRANK_BED, FRANK_NICHE_W,
   OLIN_LINK_POLY, NCOURT, NCOURT_TABLES, NCOURT_BED, NWALK, PRUZAN_LINK_N, PRUZAN_DOOR_N, STAIRS_W, BALUSTRADE, FLAGPOLE, FRANK_NICHE_N, ALLB_WELLS, ALLBRITTON_DOOR, LINK_DOOR_S, LINK_WALK, OLIN_WALK, OLIN_DOOR, PLAZA_TABLES,
   OLIN_Y, OLIN_RISE, OLIN_SITE, STAIRS_O, terrainY, PORTICO_O, OLIN_STEPS, OLIN_COLUMNS, OLIN_LAWN, LAWN_WALKS, OLIN_TREES, OLIN_BENCHES, lawnWalkDist,
-  CHURCH, CHURCH_WALK_N, CHURCH_WALK_S, CHURCH_XWALK, WALKWAY, WALKWAY_PTS, CHAIN_POSTS, WALKWAY_LAMPS, walkwayAt, walkwayPoint,
+  CHURCH, CHURCH_WALK_N, CHURCH_WALK_S, CHURCH_XWALK, WALKWAY, WALKWAY_PTS, CHAIN_POSTS, WALKWAY_LAMPS, walkwayAt, walkwayPoint, churchY,
+  CLARK, CLARK_Y, CLARK_DOOR, CLARK_LANE, CLARK_STALLS, CLARK_PARKED, CLARK_ENDS, CLARK_GAP, CLARK_COURT, CLARK_STAIRS_W, CLARK_STAIRS_S, STAIRS_C, DUMPSTERS, BANK_FLIGHTS, balustradeRuns, CLARK_LOW, OLIN_LOW_WALL,
   ALLB_TOWER, ALLB_BAY, ALLB_WING, ALLB_WING_DOOR, ALLB_REAR_DOOR, ALLB_LANDING, ALLB_STEPS, ALLB_RAMP, ALLB_LOT, ALLB_DRIVE, ALLB_STALLS, ALLB_PARKED, ALLB_WALL,
 } from '../../src/row/southend';
 import { BACK_PATH, ROAD, FIELD_X, byId, inPoly, layoutRow } from '../../src/row/layout';
@@ -116,7 +117,8 @@ describe('the Frank Center and Olin, up on their bank', () => {
     expect(inPoly({ x: OLIN.cx, z: OLIN.cz }, OLIN_POLY)).toBe(true);
     expect(OLIN_LINK.x0).toBe(OLIN.x1);
     expect(FRANK.x0 - OLIN_LINK.x1).toBeGreaterThan(6); // a courtyard between it and the Frank Center
-    expect(Math.min(...OLIN_LINK_POLY.map((p) => p.z))).toBeGreaterThan(BALUSTRADE.z + 4); // a lawn in front of it
+    expect(Math.min(...OLIN_LINK_POLY.map((p) => p.z))).toBeGreaterThan(BALUSTRADE.z + 4); // a paved terrace in front of it
+    expect(BALUSTRADE.x0).toBeLessThan(OLIN.x0); // the fence runs straight on along Olin's drum to the end, behind the dumpsters
   });
 
   it('walk up the stairs from the road: the ground rises step by step to the top of the bank, then the connector\'s doors stop you', () => {
@@ -253,7 +255,7 @@ describe('the Frank Center and Olin, up on their bank', () => {
     expect(southEndNear({ x: LINK_DOOR.x, z: 10 })).toBe('Frank Center');
     expect(southEndNear({ x: OLIN.cx, z: 12 })).toBe('Olin Library');
     expect(southEndNear({ x: -54, z: ALLBRITTON.z0 - 3 })).toBe('Allbritton Center');
-    expect(southEndNear({ x: -186, z: 0 })).toBeNull();
+    expect(southEndNear({ x: -150, z: -12 })).toBeNull(); // (out on the field)
     const f = PLACES.find((p) => p.id === 'frank')!.spawn; // on the road at the foot of its stairs
     expect(groundY(f.x, f.z)).toBe(0);
     expect(f.z).toBeGreaterThan(FIELD_ROAD.z0);
@@ -499,14 +501,14 @@ describe('the walkway down Allbritton\'s side to Church Street', () => {
 });
 
 describe('Church Street', () => {
-  it('runs along the bottom of the bank, south of Olin\'s lawn and Allbritton, out to High Street; flat, with sidewalks both sides', () => {
+  it('runs south of Olin\'s lawn and Allbritton, out to High Street, with sidewalks both sides', () => {
     expect(CHURCH.x1).toBe(ROAD.x0); // High Street's near edge
     expect(CHURCH_WALK_N.z0).toBeGreaterThanOrEqual(BERM.z1); // the bank is down by its sidewalk
     expect(CHURCH_WALK_N.z0).toBeGreaterThan(ALLBRITTON.z1);
     expect(CHURCH_WALK_N.z0).toBeGreaterThan(OLIN_LAWN.z1 + 4);
     expect(CHURCH_WALK_N.z1).toBe(CHURCH.z0);
     expect(CHURCH_WALK_S.z0).toBe(CHURCH.z1);
-    for (const x of [-180, -100, -78, -40, 0]) for (const z of [CHURCH_WALK_N.z0 + 0.2, (CHURCH.z0 + CHURCH.z1) / 2, CHURCH_WALK_S.z1 - 0.2]) expect(groundY(x, z)).toBe(0);
+    for (const x of [-180, -100, -78, -40, 0]) for (const z of [CHURCH_WALK_N.z0 + 0.2, (CHURCH.z0 + CHURCH.z1) / 2, CHURCH_WALK_S.z1 - 0.2]) expect(groundY(x, z)).toBeCloseTo(churchY(x), 5); // (level across; climbing west)
     expect(southEndNear({ x: -60, z: (CHURCH.z0 + CHURCH.z1) / 2 })).toBe('Church Street');
     // you can walk across it to the far sidewalk, and cars can drive it
     const p = walk({ x: -78, z: CHURCH_WALK_N.z0 + 0.5 }, { x: -78, z: CHURCH_WALK_S.z0 + 1 });
@@ -614,5 +616,146 @@ describe('the lawn in front of College Row (frontlawn.ts)', () => {
       expect(t.x).toBeGreaterThan(FRONT_LAWN.x0); expect(t.x).toBeLessThan(FRONT_LAWN.x1);
     }
     for (const b of frontBenches(stops)) { const d = frontWalkDist(b, walks, []); expect(d).toBeGreaterThan(0.3); expect(d).toBeLessThan(1.5); }
+  });
+});
+
+describe('Church Street climbs west, toward Foss Hill (the user: the campus slopes up; biking it hurts)', () => {
+  it('level by High Street, Allbritton and the walkway\'s foot; up to Olin\'s height in front of Olin; on up past it', () => {
+    for (const x of [ROAD.x0 - 1, -40, -60, -75]) expect(churchY(x)).toBe(0);
+    for (let x = OLIN_LAWN.x0; x <= OLIN.cx; x += 2) expect(Math.abs(churchY(x) - OLIN_Y)).toBeLessThan(0.1); // level with Olin from its middle west
+    expect(OLIN_Y - churchY(OLIN_LAWN.x1)).toBeLessThan(1); // and only a little below its lawn's east end
+    expect(churchY(-195)).toBeGreaterThan(OLIN_Y);
+    for (let x = -79; x > -200; x -= 0.5) {
+      expect(churchY(x)).toBeGreaterThanOrEqual(churchY(x + 0.5)); // only ever up, going west
+      expect(churchY(x) - churchY(x + 0.5)).toBeLessThan(0.5 * 0.065); // a long, even climb: never steeper than 6.5% (the user)
+    }
+    for (const z of [CHURCH_WALK_N.z0 + 0.3, (CHURCH.z0 + CHURCH.z1) / 2, CHURCH_WALK_S.z1 - 0.3]) expect(groundY(-150, z)).toBeCloseTo(churchY(-150), 5);
+  });
+
+  it('in front of Olin, its lawn and the street are on one line (from its middle west), easing gently together further east', () => {
+    for (let x = OLIN_LAWN.x0; x <= OLIN.cx; x += 3) {
+      for (let z = OLIN_LAWN.z1 - 2; z <= CHURCH_WALK_N.z1; z += 0.25) expect(Math.abs(groundY(x, z) - OLIN_Y)).toBeLessThan(0.12);
+    }
+    for (let x = OLIN.cx; x <= OLIN_LAWN.x1; x += 3) { // further east the lawn eases down to the street, gently
+      let y = groundY(x, OLIN_LAWN.z1 - 2);
+      for (let z = OLIN_LAWN.z1 - 2; z <= CHURCH_WALK_N.z1; z += 0.25) { const h = groundY(x, z); expect(Math.abs(h - y)).toBeLessThan(0.1); y = h; }
+    }
+    // so you can walk straight off the lawn onto the sidewalk and across
+    const p = walk({ x: OLIN.cx + 5, z: OLIN_LAWN.z1 - 3 }, { x: OLIN.cx + 5, z: CHURCH_WALK_S.z0 + 0.5 }); // (between the lamps)
+    expect(p.z).toBeCloseTo(CHURCH_WALK_S.z0 + 0.5, 1);
+  });
+
+  it('the bank meets it smoothly wherever it\'s lower; and you can drive up it', () => {
+    for (let x = -190; x < -82; x += 4) {
+      let y = groundY(x, CHURCH_WALK_N.z0 - 8);
+      for (let z = CHURCH_WALK_N.z0 - 8; z <= CHURCH_WALK_N.z0; z += 0.25) { const h = groundY(x, z); expect(Math.abs(h - y)).toBeLessThan(0.25); y = h; }
+    }
+    for (let x = -75; x > -190; x -= 5) expect(offRoadForCars({ x, z: (CHURCH.z0 + CHURCH.z1) / 2 })).toBe(false);
+  });
+});
+
+describe('Clark Hall, west of Olin', () => {
+  it('close to Olin, only a narrow path between them; its north end in line with Olin\'s; wider blocks at both ends; solid', () => {
+    expect(OLIN.x0 - CLARK.x1).toBeLessThan(13); // (the user: much closer)
+    expect(CLARK_GAP.x0).toBeGreaterThan(CLARK.x1); expect(CLARK_GAP.x1).toBe(OLIN.x0); // tar from wall to wall (no low wall, no lines: the user)
+    expect(CLARK.z0).toBeLessThan(OLIN.cz - OLIN.r); // its north end runs on past Olin's drum…
+    expect(CLARK.z0).toBeGreaterThan(FIELD_ROAD.z1 + 1); // …nearly to the field road (the user)
+    expect(CLARK.z1).toBeLessThan(CHURCH_WALK_N.z0 - 30);
+    for (const e of CLARK_ENDS) { expect(e.x0).toBeLessThan(CLARK.x0); expect(e.x1).toBeGreaterThan(CLARK.x1); }
+    expect(blockedAt({ x: (CLARK.x0 + CLARK.x1) / 2, z: (CLARK.z0 + CLARK.z1) / 2 }, stops)).toBe(true);
+    expect(southEndNear({ x: (CLARK_GAP.x0 + CLARK_GAP.x1) / 2, z: 40 })).toBe('Clark Hall');
+  });
+  it('the entrance is down in a sunken court on the west, at basement level; stairs climb out of it', () => {
+    expect(CLARK_DOOR.x).toBe(CLARK.x0);
+    expect(CLARK_Y - CLARK_COURT.y).toBeGreaterThan(1.5);
+    expect(groundY(CLARK_DOOR.x - 1, CLARK_DOOR.z)).toBe(CLARK_COURT.y);
+    // from the path, down the west stairs (only ever down), across the court to the doors
+    let p = { x: CLARK_STAIRS_W.x0 - 2, z: CLARK_DOOR.z }, y = groundY(p.x, p.z);
+    for (let i = 0; i < 160; i++) {
+      p = resolveMove(p, { x: p.x + 0.1, z: p.z }, stops, all);
+      const h = groundY(p.x, p.z);
+      expect(h).toBeLessThanOrEqual(y + 0.02);
+      y = h;
+    }
+    expect(y).toBe(CLARK_COURT.y);
+    expect(p.x).toBeGreaterThan(CLARK_DOOR.x - 1.1); // right up to the doors, between the piers
+    // and out the south-west stairs
+    const q = walk({ x: (CLARK_STAIRS_S.x0 + CLARK_STAIRS_S.x1) / 2, z: CLARK_COURT.z1 - 1 }, { x: (CLARK_STAIRS_S.x0 + CLARK_STAIRS_S.x1) / 2, z: CLARK_STAIRS_S.z1 + 1.5 });
+    expect(groundY(q.x, q.z)).toBeCloseTo(CLARK_Y, 1);
+    // but you can't just step off the lawn into it: the wall stops you
+    const r = walk({ x: CLARK_COURT.x0 - 3, z: CLARK_COURT.z0 + 2 }, { x: CLARK_COURT.x0 + 3, z: CLARK_COURT.z0 + 2 });
+    expect(r.x).toBeLessThan(CLARK_COURT.x0);
+  });
+  it('from the parking, north down the stairs to a flat walk at the field\'s level, between Clark and a tall retaining wall, out to the field road', () => {
+    for (let x = CLARK_GAP.x0 + 0.1; x < CLARK_GAP.x1; x += 0.5) expect(groundY(x, 45)).toBeCloseTo(CLARK_Y, 5); // flat tar, wall to wall
+    for (let z = OLIN.z1 - 2; z < OLIN.z1 + 8; z += 0.25) expect(Math.abs(groundY(OLIN.x0 - 2, z + 0.25) - groundY(OLIN.x0 - 2, z))).toBeLessThan(0.15); // easing into Olin's grounds past its front
+    const x = (STAIRS_C.x0 + STAIRS_C.x1) / 2;
+    let p = { x, z: 40 }, y = groundY(x, 40);
+    for (let i = 0; i < 450; i++) {
+      p = resolveMove(p, { x, z: p.z - 0.1 }, stops, all);
+      const h = groundY(p.x, p.z);
+      expect(h).toBeLessThanOrEqual(y + 0.02);
+      y = h;
+    }
+    expect(p.z).toBeLessThan(FIELD_ROAD.z1 + 0.5); // down the stairs, along the flat walk, to the field road
+    for (let z = CLARK_LOW.z0 + 0.5; z < CLARK_LOW.z1; z += 1) expect(groundY(x, z)).toBe(0); // flat, the field's level, before the stairs
+    expect(STAIRS_C.z0 - CLARK_LOW.z0).toBeGreaterThan(12);
+    const q = walk({ x: OLIN_LOW_WALL.x1 + 1.5, z: 21.5 }, { x: OLIN_LOW_WALL.x0 - 2, z: 21.5 }); // (just past the dumpsters) // the wall stops you stepping off the upper tar
+    expect(q.x).toBeGreaterThan(OLIN_LOW_WALL.x1);
+    expect(y).toBe(0);
+    expect(PLACES.find((q) => q.id === 'clark')).toBeDefined();
+  });
+  it('the lane comes up off Church Street; cars can drive it, and some are parked along it', () => {
+    for (let z = CLARK_LANE.z0 + 1; z < CLARK_LANE.z1; z += 3) expect(offRoadForCars({ x: (CLARK_LANE.x0 + CLARK_LANE.x1) / 2, z })).toBe(false);
+    for (let z = CLARK_GAP.z0 + 1; z < CLARK_GAP.z1; z += 3) expect(offRoadForCars({ x: (CLARK_GAP.x0 + CLARK_GAP.x1) / 2, z })).toBe(false);
+    expect(CLARK_PARKED).toHaveLength(2); // only two cars, but a whole row of lined spaces
+    expect(CLARK_STALLS.length).toBeGreaterThan(8);
+    // the dumpsters' pad, north of the gap by Olin's drum: the same level as the tar, cars allowed; the dumpsters solid
+    for (const d of DUMPSTERS) {
+      expect(groundY(d.x, d.z)).toBe(CLARK_Y);
+      expect(blockedAt({ x: d.x, z: d.z }, stops, all)).toBe(true);
+      expect(inPoly({ x: d.x + d.w / 2, z: d.z - d.len / 2 }, OLIN_POLY)).toBe(false);
+    }
+    expect(DUMPSTERS.filter((d) => d.open)).toHaveLength(1);
+    for (const d of DUMPSTERS) expect(Math.hypot(d.x - (STAIRS_C.x0 + STAIRS_C.x1) / 2, d.z - STAIRS_C.z1)).toBeLessThan(13); // by the top of the stairs (the user)
+    for (const s of CLARK_STALLS) { // nose-in to Olin's wall, clear of Clark's end blocks, room to drive by
+      expect(offRoadForCars(s)).toBe(false);
+      expect(s.x + s.len / 2).toBeLessThanOrEqual(OLIN.x0); expect(OLIN.x0 - (s.x + s.len / 2)).toBeLessThan(1); // right up against Olin
+      expect(s.z - s.w / 2).toBeGreaterThanOrEqual(CLARK_GAP.z0); expect(s.z + s.w / 2).toBeLessThanOrEqual(CLARK_GAP.z1);
+      for (const d of DUMPSTERS) expect(Math.abs(s.z - d.z)).toBeGreaterThan(d.len / 2 + s.w / 2);
+      expect(s.x - s.len / 2 - CLARK.x1).toBeGreaterThan(2.4);
+    }
+    const g = createGarage();
+    for (const [i] of CLARK_PARKED) { const c = g.cars.find((q) => Math.hypot(q.x - CLARK_STALLS[i].x, q.z - CLARK_STALLS[i].z) < 0.01)!; expect(c).toBeDefined(); expect(Math.sin(c.heading)).toBeCloseTo(1, 5); }
+    let y = groundY((CLARK_LANE.x0 + CLARK_LANE.x1) / 2, CLARK_LANE.z1);
+    for (let z = CLARK_LANE.z1; z > CLARK_LANE.z0; z -= 0.5) { const h = groundY((CLARK_LANE.x0 + CLARK_LANE.x1) / 2, z); expect(Math.abs(h - y)).toBeLessThan(0.1); y = h; }
+  });
+});
+
+describe('the fence along the top of the bank, and the stairs down to Andrus', () => {
+  it('runs straight from the Frank Center past Olin\'s drum to the end by the dumpsters, behind them; open only at the stairs', () => {
+    expect(BALUSTRADE.x0).toBe(OLIN_LOW_WALL.x1);
+    for (const d of DUMPSTERS) expect(d.z - d.len / 2).toBeGreaterThan(BALUSTRADE.z); // the dumpsters are on its far side
+    const runs = balustradeRuns();
+    expect(runs[0][0]).toBe(BALUSTRADE.x0);
+    expect(runs[runs.length - 1][1]).toBe(BALUSTRADE.x1);
+    expect(runs.length).toBe(BANK_FLIGHTS.length + 2); // (one run either side of each opening, the flights and the Pruzan's stairs)
+  });
+  it('stairs come down from it at intervals (and at its west end); each climbs only up, to the ground at its top', () => {
+    expect(BANK_FLIGHTS.length).toBeGreaterThanOrEqual(4);
+    expect(BANK_FLIGHTS[0].x0).toBeLessThan(OLIN.x0); // the one at the end, by the dumpsters
+    for (const f of BANK_FLIGHTS) {
+      const x = (f.x0 + f.x1) / 2;
+      let p = { x, z: FIELD_ROAD.z1 - 0.5 }, y = 0;
+      for (let i = 0; i < 110; i++) {
+        p = resolveMove(p, { x, z: p.z + 0.1 }, stops, all);
+        const h = groundY(p.x, p.z);
+        expect(h).toBeGreaterThanOrEqual(y - 0.02);
+        y = h;
+      }
+      expect(p.z).toBeGreaterThan(BALUSTRADE.z); // up through the gap in the fence
+      expect(y).toBeGreaterThan(TERRACE_Y - 0.05);
+      expect(offRoadForCars({ x, z: (f.z0 + f.z1) / 2 })).toBe(true);
+    }
   });
 });

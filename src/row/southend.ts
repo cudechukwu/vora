@@ -32,7 +32,7 @@ export const FIELD_ROAD = { x0: -190, x1: BACK_PATH.x0, z0: -4.2, z1: 2.8 } as c
 export const TERRACE_Y = 2;
 
 /** The bank: flat on top, sloping down to its edges here (the north slope, to the road, is longer). */
-export const BERM = { x0: -184, x1: -73, z0: 3.4, z1: 122.5 } as const; // (on south under Olin's lawn, down to Church Street's sidewalk)
+export const BERM = { x0: -234, x1: -73, z0: 3.4, z1: 122.5 } as const; // (on south under Olin's lawn, down to Church Street's sidewalk)
 const SLOPE = 5, SLOPE_N = 6;
 
 type Rect = { x0: number; x1: number; z0: number; z1: number };
@@ -191,6 +191,80 @@ export const OLIN_BENCHES = [
 ] as const;
 export const OLIN_LAMPS: XZ[] = [{ x: PORTICO_O.x0 - 1.2, z: OLIN_WALK.z1 + 0.6 }, { x: PORTICO_O.x1 + 1.2, z: OLIN_WALK.z1 + 0.6 }];
 export const OLIN_SIGN: XZ = { x: OLIN.cx + 6.5, z: OLIN_LAWN.z0 + 2.5 };
+
+/**
+ * Clark Hall (the user's photos, street views and aerial, 2026-10-07: a first-year residence hall, "we should be perfect
+ * with it"): close west of Olin, only a narrow tar path between them (`CLARK_GAP`, tar right up to Olin's wall), long north–south with a wider block across each end (`CLARK_ENDS`), its north end
+ * in line with Olin's. Rough-faced brownstone, a basement and four storeys, bands over the ground floor and under the
+ * eaves, windows in pairs (dark six-over-six sashes), stone relieving arches over the ground floor's, a low grey hip
+ * roof with a deep eave, a big chimney stack in the middle. Its entrance is on the west, down in a sunken paved court at
+ * basement level (`CLARK_COURT`): the basement shows there, tall brownstone piers rise from the court to a flat dark porch
+ * roof, a boxwood bed, and stairs climb out of it (west, `CLARK_STAIRS_W`; south-west, `CLARK_STAIRS_S`) with
+ * galvanized railings. The narrow path runs north between it and Olin to stairs down the bank toward Andrus Field
+ * (`STAIRS_C`, from the flat walk at the field's level, `CLARK_LOW`); south of Olin the lane off Church Street (`CLARK_LANE`) has cars parked along it.
+ */
+export const CLARK = { x0: -198, x1: -184, z0: 5, z1: 41, name: 'Clark Hall' } as const; // (it runs north past Olin's drum, down the bank, almost to the field road: the user)
+/** The wider blocks across each end, standing out from both long sides. */
+export const CLARK_ENDS = [
+  { x0: CLARK.x0 - 1.4, x1: CLARK.x1 + 1.4, z0: CLARK.z0, z1: CLARK.z0 + 9 },
+  { x0: CLARK.x0 - 1.4, x1: CLARK.x1 + 1.4, z0: CLARK.z1 - 9, z1: CLARK.z1 },
+] as const;
+/** Its grounds' level (the path and lawns round it): a little below Olin's terrace. The ground floor's a little above it. */
+export const CLARK_Y = TERRACE_Y + 0.4;
+export const CLARK_FLOOR = CLARK_Y + 0.6;
+export const CLARK_SITE = { x0: -226, x1: OLIN.x0 - 4, z0: 10, z1: 117 } as const; // (north of it, the bank slopes down to the field road, Clark's north end standing on it)
+const CLARK_MID = (CLARK.z0 + CLARK.z1) / 2;
+/** The sunken entrance court on its west side, at basement level; the porch over its doors; the doors. */
+export const CLARK_COURT = { x0: CLARK.x0 - 8, x1: CLARK.x0, z0: CLARK_MID - 7, z1: CLARK_MID + 7, y: CLARK_Y - 1.8 } as const;
+export const CLARK_PORCH = { x0: CLARK.x0 - 3, x1: CLARK.x0, z0: CLARK_MID - 3.5, z1: CLARK_MID + 3.5 } as const;
+export const CLARK_DOOR = { x: CLARK.x0, z: CLARK_MID } as const;
+/** Stairs out of the court: west (rising toward −x) to the path, and south-west (rising toward +z) to the lawn. */
+export const CLARK_STAIRS_W = { x0: CLARK_COURT.x0 - 3.6, x1: CLARK_COURT.x0, z0: CLARK_MID - 1.6, z1: CLARK_MID + 1.6, steps: 10 } as const;
+export const CLARK_STAIRS_S = { x0: CLARK_COURT.x0 + 0.4, x1: CLARK_COURT.x0 + 3.4, z0: CLARK_COURT.z1, z1: CLARK_COURT.z1 + 3.6, steps: 10 } as const;
+/** The boxwood bed in the court, by the porch. */
+export const CLARK_HEDGE = { x0: CLARK_COURT.x0 + 3.6, x1: CLARK_COURT.x0 + 5.6, z0: CLARK_MID - 6.2, z1: CLARK_MID - 4.2 } as const;
+/** From the top of the west stairs, a walk out west, then down the west side to Church Street. */
+export const CLARK_PATH = { x0: -223, x1: CLARK_STAIRS_W.x0, z0: CLARK_DOOR.z - 1.3, z1: CLARK_DOOR.z + 1.3 } as const;
+export const CLARK_WALK = { x0: -223, x1: -220.6, z0: CLARK_PATH.z0, z1: 122.6 } as const; // (to Church Street's sidewalk)
+/** The narrow tar path between Clark and Olin, north to the stairs down toward Andrus; the lane carries on south of it. */
+/** All tar from Clark's wall to Olin's (the user: no wall, no lines): a couple of cars park in it, the path goes by. */
+export const CLARK_GAP = { x0: CLARK.x1 + 0.2, x1: OLIN.x0, z0: 25.6, z1: OLIN.z1 } as const;
+/**
+ * North of the parking, the way down to Andrus Field (the user's street views): a flat tar walk at the field's level
+ * (`CLARK_LOW`) between Clark's wall and a tall limestone retaining wall (`OLIN_LOW_WALL`) holding up the ground on
+ * Olin's side; at its south end, stairs climb to the parking's level (`STAIRS_C`), a planted bed beside them
+ * (`STAIRS_C_BED`); up behind the wall, a strip of tar on to the dumpsters' pad (`CLARK_UPPER`).
+ */
+export const OLIN_LOW_WALL = { x0: CLARK.x1 + 4.9, x1: CLARK.x1 + 5.2, z0: 2.8, z1: CLARK_GAP.z0 } as const;
+export const STAIRS_C = { x0: CLARK.x1 + 2.1, x1: OLIN_LOW_WALL.x0, z0: 20, z1: CLARK_GAP.z0, steps: 14 } as const; // (up toward +z, to CLARK_Y)
+export const STAIRS_C_BED = { x0: CLARK.x1, x1: STAIRS_C.x0, z0: STAIRS_C.z0, z1: STAIRS_C.z1 } as const;
+export const CLARK_LOW = { x0: CLARK.x1, x1: OLIN_LOW_WALL.x0, z0: 2.8, z1: STAIRS_C.z0 } as const;
+export const CLARK_UPPER = { x0: OLIN_LOW_WALL.x1, x1: OLIN.x0, z0: 10.4, z1: CLARK_GAP.z0 } as const; // (north of it, the fence)
+/** South of Olin, the lane carries on down to Church Street (cars may drive it and the gap). */
+export const CLARK_LANE = { x0: CLARK_GAP.x0, x1: OLIN.x0 - 4, z0: OLIN.z1 - 4, z1: 122.6 } as const;
+/** The spaces: a row nose-in to Olin's wall (heading +x), white lines, between Clark's end blocks; only two with cars in (the user). */
+export const CLARK_STALLS: (XZ & { w: number; len: number })[] = Array.from({ length: 12 }, (_, i) => ({ x: OLIN.x0 - 0.5 - 2.4, z: 27 + i * 2.7, w: 2.7, len: 4.8 }));
+export const CLARK_PARKED: [number, number][] = [[4, 0x23262b], [5, 0xd9dadb]];
+/** By the top of the stairs down to Andrus, against the retaining wall: two green roll-off dumpsters, one open, both overflowing. */
+export const DUMPSTERS = [
+  { x: OLIN_LOW_WALL.x1 + 1.5, z: 15.5, w: 2.4, len: 6, h: 1.8, open: true },
+  { x: OLIN_LOW_WALL.x1 + 4.3, z: 15.5, w: 2.4, len: 6, h: 1.8, open: false },
+] as const;
+/** The tall piers holding up the porch roof, standing in the court. */
+export const CLARK_PIERS: XZ[] = [
+  { x: CLARK_PORCH.x0 + 0.4, z: CLARK_PORCH.z0 + 0.4 }, { x: CLARK_PORCH.x0 + 0.4, z: CLARK_PORCH.z1 - 0.4 },
+  { x: CLARK_PORCH.x0 + 0.4, z: CLARK_DOOR.z - 1.4 }, { x: CLARK_PORCH.x0 + 0.4, z: CLARK_DOOR.z + 1.4 },
+];
+/** Disc-headed pole lamps: by the court's west stairs, down the narrow path, by the lane. */
+export const CLARK_LAMPS: XZ[] = [
+  { x: CLARK_PATH.x1 - 1, z: CLARK_PATH.z1 + 1.2 }, { x: OLIN.x0 - 4.5, z: 12 }, { x: OLIN.x0 - 4.5, z: 66 },
+  { x: CLARK_LANE.x0 - 0.7, z: 80 }, { x: CLARK_WALK.x1 + 0.9, z: CLARK.z1 + 6 },
+];
+/** A few young trees round it (the photos). */
+export const CLARK_TREES: XZ[] = [
+  { x: CLARK_COURT.x0 - 5, z: CLARK_COURT.z0 - 2 }, { x: CLARK_COURT.x0 - 6, z: CLARK_COURT.z1 + 6 }, { x: CLARK.x0 - 5, z: CLARK.z0 + 4 },
+  { x: CLARK.x0 - 4, z: CLARK.z1 + 6 }, { x: CLARK_LANE.x0 - 2.5, z: 95 },
+];
 /**
  * The Pruzan Art Center's tall limestone block of galleries, against Olin's east side (the user's photos, 2026-10-07).
  * It stops short of the Frank Center: a paved courtyard runs between them (`NCOURT`). Its north end, to the field,
@@ -310,7 +384,12 @@ export const FRANK_NICHE_N = 23;
 /** Stairs down the bank to the field road, in front of the gallery block. */
 export const STAIRS_W = { x0: OLIN_LINK.x0 + 3, x1: OLIN_LINK.x0 + 6.5, z0: 3.6, z1: 9.6, steps: 12 } as const;
 /** The white balustrade along the top of the bank, from in front of Olin to the Frank Center, open at the stairs. */
-export const BALUSTRADE = { x0: OLIN.cx + 9, x1: FRANK.x0, z: 10.4 } as const;
+export const BALUSTRADE = { x0: OLIN_LOW_WALL.x1, x1: FRANK.x0, z: 10.4 } as const; // (straight on along Olin's drum to the end, behind the dumpsters: the user)
+/**
+ * Stairs down the grass bank from the fence to the field road, at intervals along Olin's drum (the user's photos), and
+ * one at the fence's west end, by the dumpsters. Each climbs (+z) to the ground at its top.
+ */
+export const BANK_FLIGHTS = [OLIN_LOW_WALL.x1 + 1.9, -161, -149, -137].map((cx) => ({ x0: cx - 1.3, x1: cx + 1.3, z0: 3.6, z1: 9.6, steps: 12 }));
 /** The paver walk from the stairs along the lawn into the courtyard. */
 export const NWALK = { x0: STAIRS_W.x0 - 0.5, x1: FRANK.x0, z0: BALUSTRADE.z + 0.3, z1: NCOURT.z0 } as const;
 /** A stone bench and a small tree on the lawn, the flagpole in front of the block. */
@@ -354,9 +433,33 @@ export const LINK_WALK = { x0: LINK_DOOR_S.x - 1.4, x1: LINK_DOOR_S.x + 1.4, z0:
  * Allbritton, two lanes and a double yellow line, curbs and sidewalks both sides; it meets High Street at a T. Across it
  * (not built yet): the Exley Science Center and the rest.
  */
-export const CHURCH = { x0: -200, x1: ROAD.x0, z0: 125, z1: 133 } as const;
-export const CHURCH_WALK_N = { x0: -190, x1: ROAD.x0, z0: 122.6, z1: CHURCH.z0 } as const;
-export const CHURCH_WALK_S = { x0: -190, x1: ROAD.x0, z0: CHURCH.z1, z1: 135.4 } as const;
+export const CHURCH = { x0: -236, x1: ROAD.x0, z0: 125, z1: 133 } as const;
+export const CHURCH_WALK_N = { x0: -236, x1: ROAD.x0, z0: 122.6, z1: CHURCH.z0 } as const;
+export const CHURCH_WALK_S = { x0: -236, x1: ROAD.x0, z0: CHURCH.z1, z1: 135.4 } as const;
+/**
+ * How high Church Street is at x (the user, 2026-10-07: campus climbs westward toward Foss Hill — biking up it hurts).
+ * Level from High Street past Allbritton and the walkway's foot; then up past the bank to Olin's height, so in front of
+ * Olin the street and Olin's grounds are on one line; then on up, gently, toward Foss Hill.
+ */
+export const CHURCH_CLIMB = { x0: -78, x1: -155, west: -172, grade: 0.015 } as const; // (a long, even climb: the user found a short one too sudden)
+export function churchY(x: number): number {
+  const C = CHURCH_CLIMB;
+  if (x >= C.x0) return 0;
+  const t = Math.min(1, (C.x0 - x) / (C.x0 - C.x1));
+  return (OLIN_Y * (1 - Math.cos(Math.PI * t))) / 2 + (x < C.west ? (C.west - x) * C.grade : 0);
+}
+/** Where the ground starts blending toward the street, north of it; and how far south it takes to come back down. */
+const CH_NORTH = 6, CH_SOUTH = 20;
+/** The ground near Church Street: the street's own height across it (and its sidewalks), blending into what's either side. */
+function nearChurch(x: number, z: number, base: (x: number, z: number) => number): number {
+  const N = CHURCH_WALK_N.z0, S = CHURCH_WALK_S.z1, h = churchY(x);
+  if (z >= N && z <= S) return h;
+  const sm = (t: number) => t * t * (3 - 2 * t);
+  if (z > S) return h * (1 - sm(Math.min(1, (z - S) / CH_SOUTH)));
+  if (z < N - CH_NORTH) return base(x, z);
+  const from = base(x, N - CH_NORTH), t = sm((z - (N - CH_NORTH)) / CH_NORTH);
+  return from + (h - from) * t;
+}
 
 /**
  * Allbritton's back, onto Church Street (the user's street views, 2026-10-07). Not one flat wall but three parts, on a
@@ -452,7 +555,7 @@ export const HYDRANT: XZ = { x: FOOT.x + 2.6, z: CHURCH_WALK_N.z0 - 0.9 };
 export const XING_SIGN: XZ = { x: FOOT.x + 3.4, z: CHURCH.z0 - 0.4 };
 export const CHURCH_XWALK = { x0: FOOT.x - 1.9, x1: FOOT.x + 1.9 } as const;
 /** Lamps along Church Street's north sidewalk. */
-export const CHURCH_LAMPS: XZ[] = [-170, -140, -110, -50, -20, 4].map((x) => ({ x, z: CHURCH_WALK_N.z0 + 0.4 }));
+export const CHURCH_LAMPS: XZ[] = [-226, -195, -170, -140, -110, -50, -20, 4].map((x) => ({ x, z: CHURCH_WALK_N.z0 + 0.4 }));
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const inRect = (p: XZ, b: Rect, pad = 0) => p.x > b.x0 - pad && p.x < b.x1 + pad && p.z > b.z0 - pad && p.z < b.z1 + pad;
 
@@ -482,31 +585,57 @@ export function groundY(x: number, z: number): number {
   if (inRect(p, STAIRS_O)) return TERRACE_Y + OLIN_RISE * clamp01((STAIRS_O.x1 - x) / (STAIRS_O.x1 - STAIRS_O.x0));
   if (inRect(p, OLIN_STEPS)) return OLIN_Y + (PORTICO_O.y - OLIN_Y) * clamp01((OLIN_STEPS.z1 - z) / (OLIN_STEPS.z1 - OLIN_STEPS.z0));
   if (inRect(p, PORTICO_O)) return PORTICO_O.y;
-  return (bankY(x, z) + oliny(x, z)) || zelnickY(x, z); // (and up the steps and ramp at Zelnick's back entrance)
+  if (inRect(p, CLARK_COURT)) return CLARK_COURT.y;
+  if (inRect(p, CLARK_STAIRS_W)) return CLARK_COURT.y + (CLARK_Y - CLARK_COURT.y) * clamp01((CLARK_STAIRS_W.x1 - x) / (CLARK_STAIRS_W.x1 - CLARK_STAIRS_W.x0));
+  if (inRect(p, CLARK_STAIRS_S)) return CLARK_COURT.y + (CLARK_Y - CLARK_COURT.y) * clamp01((z - CLARK_STAIRS_S.z0) / (CLARK_STAIRS_S.z1 - CLARK_STAIRS_S.z0));
+  if (inRect(p, CLARK_LOW)) return 0;
+  for (const f of BANK_FLIGHTS) if (inRect(p, f)) return terrainBase((f.x0 + f.x1) / 2, f.z1 + 0.05) * clamp01((z - f.z0) / (f.z1 - f.z0));
+  if (inRect(p, STAIRS_C)) return CLARK_Y * clamp01((z - STAIRS_C.z0) / (STAIRS_C.z1 - STAIRS_C.z0));
+  return terrainBase(x, z) || zelnickY(x, z); // (and up the steps and ramp at Zelnick's back entrance)
+}
+/** The bank and Olin's grounds, running into Church Street's climb at their south edge. */
+function terrainBase(x: number, z: number): number {
+  const base = (a: number, b: number) => {
+    const h = bankY(a, b) + oliny(a, b), t = clarkT(a, b), south = h + (CLARK_Y - h) * t;
+    // beside Olin, north of its front, the tar runs flat from Clark right up to Olin's wall; easing into Olin's grounds past its front
+    if (a >= OLIN.x0 && a < OLIN.x0 + 4 && b >= CLARK_SITE.z0 && b < OLIN.cz - 4) { const u = (a - OLIN.x0) / 4; return CLARK_Y + (south - CLARK_Y) * u * u * (3 - 2 * u); } // (the tar eases down onto the paved terrace)
+    if (a >= OLIN.x0 || a < OLIN.x0 - 8 || b > OLIN.z1 + 4 || b < CLARK_SITE.z0) return south;
+    const s = clamp01((b - OLIN.z1) / 4);
+    return CLARK_Y + (south - CLARK_Y) * s * s * (3 - 2 * s);
+  };
+  return z > CHURCH_WALK_N.z0 - CH_NORTH ? nearChurch(x, z, base) : base(x, z);
 }
 
 /** The ground itself, under anything built on it (Olin's steps and portico, the small stairs): for drawing the grass. */
 export function terrainY(x: number, z: number): number {
   const p = { x, z };
-  if (inRect(p, OLIN_STEPS) || inRect(p, PORTICO_O)) return bankY(x, z) + oliny(x, z);
+  if (inRect(p, OLIN_STEPS) || inRect(p, PORTICO_O) || inRect(p, CLARK_STAIRS_W) || inRect(p, CLARK_STAIRS_S)) return terrainBase(x, z);
   return groundY(x, z);
+}
+
+/** How much of Clark's (level) site is at (x, z): 1 on it, easing to 0 over a few metres round it. */
+function clarkT(x: number, z: number): number {
+  const S = CLARK_SITE, R = 3;
+  if (x >= S.x1) return 0; // (a wall on the east: Olin's terrace)
+  const t = clamp01(Math.min((x - S.x0 + R) / R, (z - S.z0 + R) / R, (S.z1 + R - z) / R));
+  return t * t * (3 - 2 * t);
 }
 
 /** How much higher Olin's grounds are at (x, z): grass slopes up all round; on the east, a long straight one beside the small stairs. */
 function oliny(x: number, z: number): number {
   const S = OLIN_SITE, R = 2;
-  if (x >= S.x1) return 0;
-  const t = clamp01(Math.min((x - S.x0 + R) / R, (z - S.z0 + R) / R, (S.z1 + R - z) / R));
+  if (x >= S.x1 || x < S.x0) return 0; // (on the west, a retaining wall down to the path by Clark)
+  const t = clamp01(Math.min(1, (z - S.z0 + R) / R, (S.z1 + R - z) / R));
   const east = clamp01((S.x1 - x) / (STAIRS_O.x1 - STAIRS_O.x0)); // (rising just as the stairs do)
   return OLIN_RISE * Math.min(t * t * (3 - 2 * t), east);
 }
 
 /** Too steep or high for a car: anywhere up the bank (or on the stairs). */
 export const offRoadForCars = (p: XZ) =>
-  !inRect(p, LANDING) && (inRect(p, STAIRS) || inRect(p, STAIRS_E) || inRect(p, STAIRS_W) || bankY(p.x, p.z) > 0.12);
+  !inRect(p, LANDING) && !inRect(p, CLARK_LANE) && !inRect(p, CLARK_GAP) && !inRect(p, CLARK_UPPER) && (inRect(p, STAIRS) || inRect(p, STAIRS_E) || inRect(p, STAIRS_W) || BANK_FLIGHTS.some((f) => inRect(p, f)) || inRect(p, STAIRS_C) || bankY(p.x, p.z) > 0.12);
 
 const FRANK_PARTS: Rect[] = [FRANK, FRANK_LINK, FRANK_ADD];
-const ALLB_PARTS: Rect[] = [ALLBRITTON, ALLB_TOWER, ALLB_WING, ALLB_BAY];
+const ALLB_PARTS: Rect[] = [ALLBRITTON, ALLB_TOWER, ALLB_WING, ALLB_BAY, CLARK, ...CLARK_ENDS];
 const PRUZAN_PARTS: Rect[] = [PRUZAN, PRUZAN_ENTRY, PRUZAN_LINK_N, ...PRUZAN_PIERS];
 const inBlock = (p: XZ, pad: number) => inPoly(p, OLIN_LINK_POLY) || (pad > 0 && distToPoly(p, OLIN_LINK_POLY) < pad);
 
@@ -520,6 +649,7 @@ export function inSouthEnd(p: XZ, pad = 0): boolean {
 export function southEndNear(p: XZ, reach = 8): string | null {
   if (PRUZAN_PARTS.some((b) => inRect(p, b, 4)) || inBlock(p, 4) || inRect(p, PRUZAN_COURT, 3) || inRect(p, NCOURT)) return PRUZAN.name; // (first: it's between the other two)
   if (FRANK_PARTS.some((b) => inRect(p, b, reach))) return FRANK.name;
+  if (inRect(p, CLARK, 6) || inRect(p, CLARK_GAP) || inRect(p, CLARK_LOW) || inRect(p, CLARK_COURT)) return CLARK.name;
   if (inPoly(p, OLIN_POLY) || distToPoly(p, OLIN_POLY) < reach || inRect(p, OLIN_LAWN) || inRect(p, PORTICO_O, 2)) return OLIN.name;
   if (inRect(p, ALLBRITTON, reach) || inRect(p, ALLB_LOT)) return ALLBRITTON.name;
   if (p.x > CHURCH.x0 && p.x < CHURCH.x1 && p.z > CHURCH_WALK_N.z0 && p.z < CHURCH_WALK_S.z1) return 'Church Street';
@@ -545,6 +675,25 @@ export const MULCH = { x0: STAIRS.x1 + 0.5, x1: FRANK_ADD.x1 + 2, z1: FRANK_ADD.
 export const FLAGPOLE: XZ = { x: OLIN_LINK.x1 - 2.5, z: 15.2 };
 export const CHEEK = 0.35; // stair cheek wall thickness
 
+/** The sunken court's retaining walls, as thin boxes along its edges: west (open at the west stairs), north, south (open at the south-west stairs). */
+export function courtWalls(): Rect[] {
+  const C = CLARK_COURT, W = CLARK_STAIRS_W, S = CLARK_STAIRS_S, t = 0.3;
+  return [
+    { x0: C.x0 - t, x1: C.x0, z0: C.z0 - t, z1: W.z0 }, { x0: C.x0 - t, x1: C.x0, z0: W.z1, z1: C.z1 + t },
+    { x0: C.x0, x1: C.x1, z0: C.z0 - t, z1: C.z0 },
+    { x0: C.x0, x1: S.x0, z0: C.z1, z1: C.z1 + t }, { x0: S.x1, x1: C.x1, z0: C.z1, z1: C.z1 + t },
+  ];
+}
+
+/** The fence's runs, between the openings for the stairs down the bank. */
+export function balustradeRuns(): [number, number][] {
+  const gaps = [...BANK_FLIGHTS, STAIRS_W].sort((a, b) => a.x0 - b.x0), out: [number, number][] = [];
+  let x = BALUSTRADE.x0;
+  for (const f of gaps) { if (f.x0 - CHEEK > x) out.push([x, f.x0 - CHEEK]); x = f.x1 + CHEEK; }
+  if (BALUSTRADE.x1 > x) out.push([x, BALUSTRADE.x1]);
+  return out;
+}
+
 /** Points every 0.35 m along one edge's chain, post to post: they're solid, so you stay on the walkway. */
 function chainLine(side: number): XZ[] {
   const posts = CHAIN_POSTS.filter((p) => p.side === side), out: XZ[] = [];
@@ -566,7 +715,8 @@ export function southObstacles(pad = 0.3): Box[] {
   return [
     b(STAIRS.x0 - CHEEK / 2, nz, CHEEK / 2, nh), b(STAIRS.x1 + CHEEK / 2, nz, CHEEK / 2, nh),
     b(STAIRS_W.x0 - CHEEK / 2, wz, CHEEK / 2, wh), b(STAIRS_W.x1 + CHEEK / 2, wz, CHEEK / 2, wh),
-    bal(BALUSTRADE.x0, STAIRS_W.x0 - CHEEK), bal(STAIRS_W.x1 + CHEEK, BALUSTRADE.x1), // (open at the stairs)
+    ...balustradeRuns().map(([x0, x1]) => bal(x0, x1)), // (open at each flight of stairs)
+    ...BANK_FLIGHTS.flatMap((f) => [f.x0 - CHEEK / 2, f.x1 + CHEEK / 2].map((x) => b(x, (f.z0 + f.z1) / 2, CHEEK / 2, (f.z1 - f.z0) / 2))),
     ...NCOURT_TABLES.map((t) => b(t.x, t.z, 0.6, 0.6)),
     ...[...NCOURT_TREES, LAWN_TREE].map((t) => b(t.x, t.z, 0.2, 0.2)),
     ...[LAWN_BENCH_N, LAWN_BENCH_S].map((t) => b(t.x, t.z, t.len / 2, t.len / 2)), // (roughly: they're turned)
@@ -588,6 +738,16 @@ export function southObstacles(pad = 0.3): Box[] {
     ...[ALLB_RAMP.x0, ALLB_RAMP.x1].map((x) => b(x, (ALLB_RAMP.z0 + ALLB_RAMP.z1) / 2, 0.05, (ALLB_RAMP.z1 - ALLB_RAMP.z0) / 2)),
     b((ALLB_WALL.x0 + ALLB_WALL.x1) / 2, (ALLB_WALL.z0 + ALLB_WALL.z1) / 2, (ALLB_WALL.x1 - ALLB_WALL.x0) / 2, (ALLB_WALL.z1 - ALLB_WALL.z0) / 2),
     b(ALLB_SIGN.x, ALLB_SIGN.z, 0.45, 0.1),
+    // Clark Hall: its porch piers, the railings down both sides of its steps, its lamps
+    ...CLARK_PIERS.map((q) => b(q.x, q.z, 0.35, 0.35)),
+    ...CLARK_LAMPS.map((q) => b(q.x, q.z, 0.12, 0.12)), ...CLARK_TREES.map((q) => b(q.x, q.z, 0.2, 0.2)),
+    ...DUMPSTERS.map((d) => b(d.x, d.z, d.w / 2 + 0.2, d.len / 2 + 0.2)), // (and the bags round them)
+    // the court's retaining walls (open at its two stairs), its hedge; the cheeks of the stairs to Andrus
+    ...courtWalls().map((w) => b((w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2, (w.x1 - w.x0) / 2, (w.z1 - w.z0) / 2)),
+    b((CLARK_HEDGE.x0 + CLARK_HEDGE.x1) / 2, (CLARK_HEDGE.z0 + CLARK_HEDGE.z1) / 2, (CLARK_HEDGE.x1 - CLARK_HEDGE.x0) / 2, (CLARK_HEDGE.z1 - CLARK_HEDGE.z0) / 2),
+    // the tall retaining wall along the flat walk (and up beside the stairs), the bed beside the stairs
+    b((OLIN_LOW_WALL.x0 + OLIN_LOW_WALL.x1) / 2, (OLIN_LOW_WALL.z0 + OLIN_LOW_WALL.z1) / 2, (OLIN_LOW_WALL.x1 - OLIN_LOW_WALL.x0) / 2, (OLIN_LOW_WALL.z1 - OLIN_LOW_WALL.z0) / 2),
+    b((STAIRS_C_BED.x0 + STAIRS_C_BED.x1) / 2, (STAIRS_C_BED.z0 + STAIRS_C_BED.z1) / 2, (STAIRS_C_BED.x1 - STAIRS_C_BED.x0) / 2, (STAIRS_C_BED.z1 - STAIRS_C_BED.z0) / 2),
     // the walkway down to Church Street: its lamps, the hydrant, the sign, and the chains along both edges (posts and all)
     ...[...WALKWAY_LAMPS, HYDRANT, XING_SIGN, ...CHURCH_LAMPS].map((t) => b(t.x, t.z, 0.15, 0.15)),
     ...chainLine(-1).map((t) => b(t.x, t.z, 0.08, 0.08)), ...chainLine(1).map((t) => b(t.x, t.z, 0.08, 0.08)),

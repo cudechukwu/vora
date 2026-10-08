@@ -9,6 +9,7 @@ import { LANES, Light, TrafficState, Vehicle, lightAt } from './traffic';
 import type { Car, Garage, Pedals } from './cars';
 import { SPEC } from './cars';
 import { Surface, leavesMark } from './surface';
+import { groundY } from './southend';
 
 // ─── Drawing High Street ───────────────────────────────────────────────
 // Meshes for the vehicles + traffic signals, driven by traffic.ts state.
@@ -282,8 +283,11 @@ export class CarsView {
   }
 
   private place(root: Group, c: Car, dt: number, driving: boolean) {
-    root.position.set(c.x, 0, c.z);
-    root.rotation.set(0, c.heading, 0);
+    // on the ground (Church Street climbs; the lot behind Allbritton), nose tipped up or down with it
+    const fx = Math.sin(c.heading) * c.len * 0.4, fz = Math.cos(c.heading) * c.len * 0.4;
+    const yf = groundY(c.x + fx, c.z + fz), yb = groundY(c.x - fx, c.z - fz);
+    root.position.set(c.x, (yf + yb) / 2, c.z);
+    root.rotation.set(-Math.atan2(yf - yb, c.len * 0.8), c.heading, 0, 'YXZ');
     lit(root, driving);
     const wheels = (root.userData.wheels ?? []) as Mesh[];
     const front = Math.max(...wheels.map((w) => w.position.z));
@@ -333,7 +337,7 @@ export class TireMarks {
       if (!mark || !prev) { this.last.set(key, { x, z }); continue; }
       const d = Math.hypot(x - prev.x, z - prev.z);
       if (d < 0.55) continue;
-      this.tmp.position.set((x + prev.x) / 2, 0.045, (z + prev.z) / 2);
+      this.tmp.position.set((x + prev.x) / 2, groundY((x + prev.x) / 2, (z + prev.z) / 2) + 0.045, (z + prev.z) / 2);
       this.tmp.rotation.set(0, Math.atan2(x - prev.x, z - prev.z), 0);
       this.tmp.scale.set(1, 1, Math.min(2, d / 0.62));
       this.tmp.updateMatrix();
@@ -386,7 +390,7 @@ export class Exhaust {
       const p = this.puffs[this.next];
       this.next = (this.next + 1) % PUFFS;
       p.age = 0;
-      p.s.position.set(c.x - fx * (c.len / 2 + 0.15) + fz * hw * 0.55, 0.35, c.z - fz * (c.len / 2 + 0.15) - fx * hw * 0.55);
+      p.s.position.set(c.x - fx * (c.len / 2 + 0.15) + fz * hw * 0.55, groundY(c.x, c.z) + 0.35, c.z - fz * (c.len / 2 + 0.15) - fx * hw * 0.55);
       p.vx = -fx * (0.6 + gas) + (Math.random() - 0.5) * 0.4;
       p.vz = -fz * (0.6 + gas) + (Math.random() - 0.5) * 0.4;
       p.s.visible = true;

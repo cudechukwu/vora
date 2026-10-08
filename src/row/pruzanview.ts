@@ -7,9 +7,9 @@ import { BoxBank, PAVER_TILE, WindowBank, lambert, paverMap, seeGlass, stoneMap,
 import { rng } from './noise';
 import type { XZ } from './collide';
 import {
-  BALUSTRADE, CHEEK, FRANK, GALLERY, GALLERY_SOFAS, LAWN_BENCH_N, LAWN_BENCH_S, LAWN_TREE, NCOURT, NCOURT_BED, NCOURT_TABLES, NCOURT_TREES,
+  BALUSTRADE, balustradeRuns, FRANK, GALLERY, GALLERY_SOFAS, LAWN_BENCH_N, LAWN_BENCH_S, LAWN_TREE, NCOURT, NCOURT_BED, NCOURT_TABLES, NCOURT_TREES,
   NWALK, OLIN, OLIN_LINK, OLIN_LINK_POLY, POOL, POOL_BED, PRUZAN, PRUZAN_BIRCH, PRUZAN_COURT, PRUZAN_DOOR, PRUZAN_DOOR_N, PRUZAN_ENTRY,
-  PRUZAN_FRANK_BED, PRUZAN_GLASS, PRUZAN_LINK_N, PRUZAN_PIERS, STAIRS_W, TERRACE_Y, plazaChairs, pruzanPaveEdge, pruzanSoffit,
+  PRUZAN_FRANK_BED, PRUZAN_GLASS, PRUZAN_LINK_N, PRUZAN_PIERS, TERRACE_Y, plazaChairs, pruzanPaveEdge, pruzanSoffit,
 } from './southend';
 
 // ─── The Pruzan Art Center: draws what southend.ts lays out ────────────
@@ -515,8 +515,9 @@ function northLawn(k: Kit) {
       if (i % 2 === 0) urn(k, x, Y + 1.1, B.z);
     }
   };
-  run(B.x0, STAIRS_W.x0 - CHEEK);
-  run(STAIRS_W.x1 + CHEEK, B.x1);
+  for (const [x0, x1] of balustradeRuns()) run(x0, x1); // (open at each flight of stairs down the bank)
+  // the terrace behind it, between the fence and the buildings: interlocking pavers, no grass (the user); the tar by Clark runs onto it
+  ground(g, [{ x: OLIN.x0 + 4, z: B.z + 0.25 }, { x: B.x1, z: B.z + 0.25 }, { x: B.x1, z: 24 }, { x: OLIN.x0 + 4, z: 24 }], Y + 0.026, paverMat());
   bench(k, LAWN_BENCH_N, 0xe6e3dc);
   const T = LAWN_TREE;
   mesh(g, new CylinderGeometry(0.1, 0.14, 2.6, 6).translate(0, 1.3, 0), lambert(0x6b5a48), T.x, Y, T.z);

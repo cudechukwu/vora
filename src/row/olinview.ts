@@ -303,7 +303,7 @@ function steps({ g, box }: Kit) {
     }
     box.add(x, OLIN_Y + 0.5, S.z1 + 0.35, 0.05, 1.0, 0.05, IRON); // the curl-over at the foot, roughly
   };
-  for (const dx of [-7.2, -2.4, 2.4, 7.2]) rail(cx + dx);
+  void rail; // (no handrails on Olin's steps: the user, 2026-10-08)
 }
 
 /**
@@ -312,17 +312,11 @@ function steps({ g, box }: Kit) {
  */
 function grounds(k: Kit) {
   const { g, box } = k, S = STAIRS_O, top = OLIN_Y;
-  // the small flight: five granite steps up toward Olin, set into the grass slope, iron rails either side
+  // the small flight: five granite steps up toward Olin, set into the grass slope (no rails)
   const tread = (S.x1 - S.x0) / S.steps, rise = OLIN_RISE / S.steps, sz = (S.z0 + S.z1) / 2;
   for (let i = 0; i < S.steps; i++) {
     const h = (i + 1) * rise, rest = S.x1 - S.x0 - i * tread;
     box.add(S.x0 + rest / 2, (Y + Y + h) / 2, sz, rest, h, S.z1 - S.z0, i % 2 ? 0xc4c2bb : 0xcac8c1);
-  }
-  for (const z of [S.z0 + 0.12, S.z1 - 0.12]) {
-    const lo = new Vector3(S.x1 + 0.1, Y + 0.9, z), hi = new Vector3(S.x0 - 0.1, top + 0.9, z);
-    const m = mesh(g, new BoxGeometry(0.05, 0.05, lo.distanceTo(hi)), lambert(IRON), (lo.x + hi.x) / 2, (lo.y + hi.y) / 2, z);
-    m.lookAt(hi);
-    for (const t of [0, 0.5, 1]) box.add(lo.x + (hi.x - lo.x) * t, lo.y + (hi.y - lo.y) * t - 0.45, z, 0.04, 0.9, 0.04, IRON);
   }
   // the walk along the front, and the lawn's walks
   const F = OLIN_FRONT_WALK;

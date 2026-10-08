@@ -5,6 +5,7 @@ import {
 import { BoxBank, Facing, WindowBank, block, brickMap, hipRoof, lambert, prism, seeGlass, stoneMap } from './kit';
 import { buildPruzan } from './pruzanview';
 import { buildOlin } from './olinview';
+import { buildClark } from './clarkview';
 import { buildChurch } from './churchview';
 import { allbrittonRear } from './allbview';
 import { BACK_PATH } from './layout';
@@ -12,7 +13,7 @@ import { noise2, rng } from './noise';
 import {
   ALLB_FORECOURT, ALLB_WELLS, ALLBRITTON, ALLBRITTON_DOOR, BERM, BOLLARDS, CHEEK, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_DOOR, FRANK_LINK, LANDING,
   CLASS_TAKEN, FRANK_ROOMS, FRANK_WINDOWS, GRAND_STAIR, LINK_DOOR, LOUNGE, LOUNGE_SEATS, LOUNGE_TABLES, LINK_DOOR_S, LINK_WALK, MAIN_ENTRY, MULCH, classroom, PLAZA_BENCHES, PLAZA_BIN, PLAZA_F, PLAZA_TABLES, SIGN, STAIRS,
-  STAIRS_E, OLIN_WALK, OLIN_LAWN, OLIN_SITE, FRANK_NICHE_W, FRANK_NICHE_N, PRUZAN_LINK_N, PRUZAN_ENTRY, STAIRS_W, SYCAMORE, SYCAMORE2, TERRACE_Y, UTILITY_BOX, groundY, plazaChairs, terrainY,
+  STAIRS_E, OLIN_WALK, OLIN_LAWN, OLIN_SITE, CLARK_SITE, BANK_FLIGHTS, FRANK_NICHE_W, FRANK_NICHE_N, PRUZAN_LINK_N, PRUZAN_ENTRY, STAIRS_W, SYCAMORE, SYCAMORE2, TERRACE_Y, UTILITY_BOX, groundY, plazaChairs, terrainY,
 } from './southend';
 
 // ─── The south end of Andrus Field: draws what southend.ts lays out ────
@@ -113,6 +114,7 @@ export function buildSouthEnd(k: Kit) {
   far(k, { x0: OLIN_SITE.x1, x1: FRANK.x0, z0: 9, z1: OLIN_WALK.z0 }, buildPruzan); // the art center in the gap between them (its gallery block, against Olin, is in there too)
   allbritton(k);
   allbrittonRear(k); // its back onto Church Street, the rear door, the lot (allbview.ts)
+  far(k, { x0: CLARK_SITE.x0, x1: CLARK_SITE.x1, z0: CLARK_SITE.z0, z1: CLARK_SITE.z1 }, buildClark); // Clark Hall, west of Olin (clarkview.ts)
   buildChurch(k); // Church Street, and the walkway down the bank to it (churchview.ts)
 }
 
@@ -173,10 +175,10 @@ function bank({ g, box }: Kit) {
 type Flight = { x0: number; x1: number; z0: number; z1: number; steps: number };
 
 /** Granite steps with cheek walls and black rails. `up` is the way they climb. */
-function flight({ g, box }: Kit, f: Flight, up: '+z' | '-x') {
+function flight({ g, box }: Kit, f: Flight, up: '+z' | '-x', top = TERRACE_Y, rails = true) {
   const alongZ = up === '+z';
   const run = alongZ ? f.z1 - f.z0 : f.x1 - f.x0;
-  const tread = run / f.steps, rise = TERRACE_Y / f.steps;
+  const tread = run / f.steps, rise = top / f.steps;
   const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, wide = alongZ ? f.x1 - f.x0 : f.z1 - f.z0;
   for (let i = 0; i < f.steps; i++) {
     const h = (i + 1) * rise, rest = run - i * tread; // this step and everything above it
@@ -189,13 +191,13 @@ function flight({ g, box }: Kit, f: Flight, up: '+z' | '-x') {
       for (const z of [f.z0 - CHEEK / 2, f.z1 + CHEEK / 2]) box.add(f.x1 - (i + 0.5) * tread, (h + 0.35) / 2, z, tread, h + 0.35, CHEEK, 0xb4b2ab);
     }
   }
-  const sides = alongZ ? [f.x0 - CHEEK / 2, f.x1 + CHEEK / 2] : [f.z0 - CHEEK / 2, f.z1 + CHEEK / 2];
+  const sides = !rails ? [] : alongZ ? [f.x0 - CHEEK / 2, f.x1 + CHEEK / 2] : [f.z0 - CHEEK / 2, f.z1 + CHEEK / 2];
   for (const s of sides) {
     // the handrail: from just past the bottom step to just past the top, 1.3 m over the cheek wall all the way, so it
     // follows the flight whichever way it climbs (+z for the north stairs, −x for the east ones)
     const at = (t: number) => { // t: metres up the run from the bottom
       const x = alongZ ? s : f.x1 - t, z = alongZ ? f.z0 + t : s;
-      return new Vector3(x, (TERRACE_Y * Math.min(1, Math.max(0, t / run))) + 1.3, z);
+      return new Vector3(x, (top * Math.min(1, Math.max(0, t / run))) + 1.3, z);
     };
     const lo = at(0.15), hi = at(run - 0.15);
     const rail = mesh(g, new BoxGeometry(0.06, 0.06, lo.distanceTo(hi)), lambert(IRON), (lo.x + hi.x) / 2, (lo.y + hi.y) / 2, (lo.z + hi.z) / 2);
@@ -230,6 +232,7 @@ function stairs(k: Kit) {
   flight(k, STAIRS, '+z');
   flight(k, STAIRS_E, '-x');
   flight(k, STAIRS_W, '+z'); // down the bank in front of the Pruzan's gallery block
+  for (const f of BANK_FLIGHTS) flight(k, f, '+z', groundY((f.x0 + f.x1) / 2, f.z1 + 0.05), false); // and along Olin's drum, and at the fence's west end (no rails: Olin's steps have none)
   const brown = lambert(0x553a2a);
   for (const p of BOLLARDS) {
     const y = groundY(p.x, p.z);

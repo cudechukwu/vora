@@ -14,7 +14,7 @@ const AREAS = {
   mobility: [/mobility\.ts$/, /rideables\.ts$/],
   house: [/\/house\//],
   cars: [/cars\.ts$/, /vehicles\.ts$/, /knock\.ts$/, /traffic\.ts$/, /surface\.ts$/],
-  campus: [/\/usdan\//, /campus\.ts$/, /foodtruck\.ts$/, /cart\.ts$/, /southend\.ts$/, /southview\.ts$/, /pruzanview\.ts$/, /olinview\.ts$/, /churchview\.ts$/, /allbview\.ts$/, /plaza\.ts$/],
+  campus: [/\/usdan\//, /campus\.ts$/, /foodtruck\.ts$/, /cart\.ts$/, /southend\.ts$/, /southview\.ts$/, /pruzanview\.ts$/, /olinview\.ts$/, /churchview\.ts$/, /allbview\.ts$/, /clarkview\.ts$/, /plaza\.ts$/],
   hud: [/hud\.ts$/, /icons\.ts$/, /controls\.ts$/, /save\.ts$/, /surface\.ts$/],
   sound: [/audio\.ts$/, /soundscape\.ts$/, /\/sounds\//],
   map: [/map\.ts$/, /mapview\.ts$/],

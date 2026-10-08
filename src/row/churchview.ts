@@ -4,9 +4,9 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BoxBank, PAL, WindowBank, lambert } from './kit';
-import { rng } from './noise';
+import { noise2, rng } from './noise';
 import {
-  ALLB_DRIVE, CHAIN_POSTS, CHURCH, CHURCH_LAMPS, CHURCH_WALK_N, CHURCH_WALK_S, CHURCH_XWALK, HYDRANT, WALKWAY, WALKWAY_LAMPS, WALKWAY_PTS,
+  ALLB_DRIVE, BERM, CHAIN_POSTS, CHURCH, CHURCH_CLIMB, churchY, CHURCH_LAMPS, CHURCH_WALK_N, CHURCH_WALK_S, CHURCH_XWALK, HYDRANT, WALKWAY, WALKWAY_LAMPS, WALKWAY_PTS,
   XING_SIGN, groundY, walkwayPoint,
 } from './southend';
 
@@ -77,20 +77,28 @@ function lamp(box: BoxBank, heads: BufferGeometry[], x: number, z: number) {
 
 /** Church Street: the road, its double yellow line, curbs, sidewalks both sides, the crosswalk at the walkway's foot, lamps. */
 function street({ g, box }: Kit, heads: BufferGeometry[]) {
-  const C = CHURCH, N = CHURCH_WALK_N, S = CHURCH_WALK_S, X = CHURCH_XWALK, len = C.x1 - C.x0, cx = (C.x0 + C.x1) / 2;
-  flat(g, C.x0, C.x1, C.z0, C.z1, 0.026, lambert(0x44484c));
+  const C = CHURCH, N = CHURCH_WALK_N, S = CHURCH_WALK_S, X = CHURCH_XWALK;
+  // (it climbs to the west: everything on it follows `churchY`, long pieces cut short where it slopes)
+  const along = (x0: number, x1: number, each: (a: number, b: number, y: number) => void) => {
+    for (let a = x0; a < x1 - 1e-6;) {
+      const step = a + 0.5 < CHURCH_CLIMB.x0 ? 0.5 : x1 - a, b = Math.min(x1, a + step);
+      each(a, b, churchY((a + b) / 2));
+      a = b;
+    }
+  };
+  sloped(g, C.x0, C.x1, C.z0, C.z1, 0.026, lambert(0x44484c));
   const mid = (C.z0 + C.z1) / 2;
-  for (const dz of [-0.12, 0.12]) box.add(cx, 0.034, mid + dz, len, 0.02, 0.1, 0xe8c14a); // the double yellow line
-  // curbs (lowered at the crosswalk), the north one painted yellow by it
+  for (const dz of [-0.12, 0.12]) along(C.x0, C.x1, (a, b, y) => box.add((a + b) / 2, y + 0.034, mid + dz, b - a + 0.02, 0.02, 0.1, 0xe8c14a)); // the double yellow line
+  // curbs (lowered at the crosswalk and the lot's driveway)
   for (const z of [C.z0, C.z1]) {
-    const gaps = z === C.z0 ? [X, ALLB_DRIVE].sort((a, b) => a.x0 - b.x0) : [X]; // (the crosswalk's curb ramps; the lot's driveway)
+    const gaps = z === C.z0 ? [X, ALLB_DRIVE].sort((a, b) => a.x0 - b.x0) : [X];
     let from: number = C.x0;
     for (const gp of gaps) {
-      box.add((from + gp.x0) / 2, 0.08, z, gp.x0 - from, 0.16, 0.25, PAL.curb);
+      along(from, gp.x0, (a, b, y) => box.add((a + b) / 2, y + 0.08, z, b - a + 0.02, 0.16, 0.25, PAL.curb));
       box.add((gp.x0 + gp.x1) / 2, 0.03, z, gp.x1 - gp.x0, 0.04, 0.25, PAL.curb);
       from = gp.x1;
     }
-    box.add((from + C.x1) / 2, 0.08, z, C.x1 - from, 0.16, 0.25, PAL.curb);
+    along(from, C.x1, (a, b, y) => box.add((a + b) / 2, y + 0.08, z, b - a + 0.02, 0.16, 0.25, PAL.curb));
   }
   flat(g, ALLB_DRIVE.x0, ALLB_DRIVE.x1, N.z0, N.z1, 0.034, lambert(0x3d4043)); // the lot's driveway across the sidewalk
   for (const dx of [-4, 4]) box.add((dx < 0 ? X.x0 : X.x1) + dx / 2, 0.165, C.z0, 4, 0.01, 0.26, 0xd9b23c);
@@ -98,9 +106,40 @@ function street({ g, box }: Kit, heads: BufferGeometry[]) {
   for (let z = C.z0 + 0.6; z < C.z1 - 0.3; z += 1.1) box.add((X.x0 + X.x1) / 2, 0.036, z, X.x1 - X.x0, 0.02, 0.55, 0xf2f0ea);
   for (const z of [C.z0 - 0.7, C.z1 + 0.7]) box.add((X.x0 + X.x1) / 2, 0.045, z, 1.6, 0.02, 0.9, 0xa8473a); // the red pads at the curb ramps
   // the sidewalks
-  flat(g, N.x0, N.x1, N.z0, N.z1, 0.03, slabMat(N.x1 - N.x0, N.z1 - N.z0));
-  flat(g, S.x0, S.x1, S.z0, S.z1, 0.03, slabMat(S.x1 - S.x0, S.z1 - S.z0));
+  sloped(g, N.x0, N.x1, N.z0, N.z1, 0.03, slabMat(N.x1 - N.x0, N.z1 - N.z0));
+  sloped(g, S.x0, S.x1, S.z0, S.z1, 0.03, slabMat(S.x1 - S.x0, S.z1 - S.z0));
   for (const l of CHURCH_LAMPS) lamp(box, heads, l.x, l.z);
+  // and the ground south of it, coming back down from the street's height (the bank is the north side's)
+  const x0 = BERM.x0, x1 = CHURCH_CLIMB.x0 + 4, z0 = S.z1, z1 = S.z1 + 21;
+  const geo = new PlaneGeometry(x1 - x0, z1 - z0, Math.round((x1 - x0) / 2), 14);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
+  const pos = geo.getAttribute('position'), cols: number[] = [], a = new Color(0x5f9a3a), b = new Color(0x7aae48), c = new Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    pos.setY(i, groundY(x, z) + 0.01);
+    c.copy(a).lerp(b, noise2(x / 22, z / 22));
+    cols.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new Float32BufferAttribute(cols, 3));
+  geo.computeVertexNormals();
+  const m = new Mesh(geo, new MeshLambertMaterial({ vertexColors: true }));
+  m.receiveShadow = true;
+  g.add(m);
+}
+
+/** A flat strip (x0..x1 by z0..z1) laid on Church Street's climb, `lift` above it. */
+function sloped(g: Group, x0: number, x1: number, z0: number, z1: number, lift: number, mat: MeshLambertMaterial) {
+  const geo = new PlaneGeometry(x1 - x0, z1 - z0, Math.max(1, Math.round((x1 - x0) / 1.5)), 1);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
+  const pos = geo.getAttribute('position');
+  for (let i = 0; i < pos.count; i++) pos.setY(i, churchY(pos.getX(i)) + lift);
+  geo.computeVertexNormals();
+  const m = new Mesh(geo, mat);
+  m.receiveShadow = true;
+  g.add(m);
+  return m;
 }
 
 /**

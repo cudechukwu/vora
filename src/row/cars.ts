@@ -1,5 +1,5 @@
 import { Box, Extra, XZ, blockedAt, inBox } from './collide';
-import { ALLB_PARKED, ALLB_STALLS, offRoadForCars } from './southend';
+import { ALLB_PARKED, ALLB_STALLS, CLARK_PARKED, CLARK_STALLS, offRoadForCars } from './southend';
 import { ROAD, RowStop } from './layout';
 import { LANES, TrafficState, Vehicle, addVehicle, laneX, removeVehicle } from './traffic';
 import { DRIVEWAYS, RoommateId, toWorld } from './house/plan';
@@ -82,6 +82,7 @@ export function createGarage(saved: SavedCar | null = null): Garage {
     cars: [
       mkCar(0, 'you', YOUR_PAINT, saved ?? drivewaySpot('you')), mkCar(1, 'kofi', KOFI_PAINT, drivewaySpot('kofi')),
       ...ALLB_PARKED.map(([stall, color], i) => mkCar(2 + i, null, color, { x: ALLB_STALLS[stall].x, z: ALLB_STALLS[stall].z, heading: Math.PI })),
+      ...CLARK_PARKED.map(([stall, color], i) => mkCar(2 + ALLB_PARKED.length + i, null, color, { x: CLARK_STALLS[stall].x, z: CLARK_STALLS[stall].z, heading: Math.PI / 2 })), // (and nose-in to Olin's wall, by Clark Hall)
     ],
     driving: null,
   };
