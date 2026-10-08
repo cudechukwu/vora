@@ -436,6 +436,118 @@ export const LINK_WALK = { x0: LINK_DOOR_S.x - 1.4, x1: LINK_DOOR_S.x + 1.4, z0:
 export const CHURCH = { x0: -236, x1: ROAD.x0, z0: 125, z1: 133 } as const;
 export const CHURCH_WALK_N = { x0: -236, x1: ROAD.x0, z0: 122.6, z1: CHURCH.z0 } as const;
 export const CHURCH_WALK_S = { x0: -236, x1: ROAD.x0, z0: CHURCH.z1, z1: 135.4 } as const;
+
+/**
+ * Exley Science Center (the user's photos and street views, 2026-10-08), across Church Street from Clark and Olin.
+ * Brutalist, in pinkish granite-aggregate concrete: an eight-storey square tower (`EXLEY_TOWER`) wrapped in a deep grid of
+ * fins and floor ledges, narrow dark windows set back in each bay; round its foot a long one-storey glass pavilion
+ * (`EXLEY_PAV`) of square piers, dark glass and a deep fascia, its doors onto the plaza; on the west a two-storey finned
+ * block cantilevered over a glass ground floor (`EXLEY_WING`, its upper storeys `EXLEY_WING_UP`). In front, a plaza of
+ * big concrete slabs with dark bands (`EXLEY_PLAZA`), a low concrete planter wall along it (open at the entry), round
+ * planters with red flowers; a lawn mounded up from the sidewalk with big trees and a tall pine, hedges; the entry walk
+ * straight from a crosswalk on Church Street (`EXLEY_XWALK`), a STOP-for-pedestrians sign in the road.
+ * Its site is level (`EXLEY_Y`): campus climbs west, and Church Street is near that height here.
+ */
+export const EXLEY_Y = 2.6;
+export const EXLEY_SITE = { x0: -208, x1: -104, z0: 138.5, z1: 220 } as const; // (east of it the ground eases down to Shanklin's level)
+// (the tower on the west, the raised wing on the east, set well back behind a big plaza: the user, 2026-10-08)
+export const EXLEY_PAV = { x0: -204, x1: -134, z0: 160, z1: 174, h: 4.6 } as const;
+export const EXLEY_TOWER = { x0: -188, x1: -160, z0: 166, z1: 194, floors: 8, fh: 3.7 } as const;
+export const EXLEY_WING = { x0: -134, x1: -108, z0: 160, z1: 184 } as const;
+export const EXLEY_WING_UP = { x0: -136.5, x1: -107, z0: 157.6, z1: 184, y0: EXLEY_Y + 4.8, y1: EXLEY_Y + 12.2 } as const;
+export const EXLEY_PLAZA = { x0: -206, x1: -106, z0: 146, z1: EXLEY_PAV.z0 } as const;
+export const EXLEY_XWALK = { x0: -176.2, x1: -171.8 } as const;
+export const EXLEY_ENTRY = { x0: -177, x1: -171, z0: CHURCH_WALK_S.z1, z1: EXLEY_PLAZA.z0 } as const;
+export const EXLEY_DOOR = { x: -174, z: EXLEY_PAV.z0 } as const;
+/** The low planter wall along the plaza's north edge (a gap at the entry), round planters, the in-street sign. */
+export const EXLEY_WALLS = [
+  { x0: EXLEY_PLAZA.x0, x1: EXLEY_ENTRY.x0 - 0.5, z0: EXLEY_PLAZA.z0, z1: EXLEY_PLAZA.z0 + 0.6 },
+  { x0: EXLEY_ENTRY.x1 + 0.5, x1: EXLEY_PLAZA.x1, z0: EXLEY_PLAZA.z0, z1: EXLEY_PLAZA.z0 + 0.6 },
+] as const;
+export const EXLEY_PLANTERS: XZ[] = [{ x: -179, z: 148.6 }, { x: -169, z: 148.6 }, { x: -190, z: 154 }, { x: -154, z: 154 }, { x: -140, z: 149 }];
+export const EXLEY_STOP: XZ = { x: (EXLEY_XWALK.x0 + EXLEY_XWALK.x1) / 2 + 2.8, z: (CHURCH.z0 + CHURCH.z1) / 2 };
+/** Big trees on the lawn (and the pine at its east corner); a bench on the plaza. */
+export const EXLEY_TREES: XZ[] = [{ x: -150, z: 141.8 }]; // (just one, and the pine: the user)
+export const EXLEY_PINE: XZ = { x: -121, z: 143 }; // (on the lawn, clear of the steps up beside the wing)
+export const EXLEY_BENCH = { x: -162, z: 152, len: 3.2 } as const;
+/**
+ * Shanklin Hall and Hall-Atwater (the user's photos, 2026-10-08), east of Exley's raised wing. Shanklin: long north–south,
+ * its main front to the west onto Exley's plaza, its narrow end to Church Street; red brick on a raised basement, giant
+ * white pilasters at the corners, white bands and tablets, tall white-framed windows (the ground floor's under brick
+ * arches with round white medallions), the arched door in the middle up steps (`SHANK_STEPS`), a heavy white cornice and
+ * balustrade, a slate roof with round dormers; on the street end a balcony with an outside stair down. Hall-Atwater,
+ * joined to its east: a rough brownstone base, two storeys of dark glass in white frames, a dark top band, a plain brick
+ * block at its east end, rows of white exhaust stacks. Their site (`SHANK_Y`) is a little above the street.
+ */
+export const SHANK_Y = 1.6;
+export const SHANK_SITE = { x0: -103, x1: -44, z0: 139, z1: 218 } as const;
+export const SHANKLIN = { x0: -97, x1: -81, z0: 154, z1: 198, // (set well back from Church Street: the user)
+  base: 1.6, fh: 3.8, floors: 3, name: 'Shanklin Hall' } as const;
+export const SHANK_DOOR = { x: SHANKLIN.x0, z: 176 } as const;
+/** It sits at a slight angle to the street (the user's photos): turned this much about its middle (drawn only: it's fenced off). */
+export const SHANK_SLANT = -0.12; // (its street end swung east: a V opening toward the street, its point by Exley)
+export const SHANK_STEPS = { x0: SHANKLIN.x0 - 4.4, x1: SHANKLIN.x0, landing: 1.0, z0: SHANK_DOOR.z - 1.6, z1: SHANK_DOOR.z + 1.6, steps: 9 } as const; // (up toward +x)
+export const SHANK_BALCONY = { x0: -92, x1: -86, z0: SHANKLIN.z0 - 1.3, z1: SHANKLIN.z0 } as const;
+export const SHANK_STAIR = { x0: -86, x1: -82.2, z0: SHANKLIN.z0 - 1.2, z1: SHANKLIN.z0 } as const; // (down toward +x from the balcony)
+export const SHANK_WALK = { x0: -106, x1: SHANK_STEPS.x0, z0: SHANK_DOOR.z - 1.2, z1: SHANK_DOOR.z + 1.2 } as const;
+export const HALL_ATWATER = { x0: SHANKLIN.x1, x1: -50, z0: 162, z1: 194, h: 11.2, name: 'Hall-Atwater' } as const;
+export const HA_BLOCK = { x0: -57, x1: -50, z0: 162, z1: 194, h: 13.4 } as const;
+/**
+ * Shanklin is being renovated (the user, 2026-10-08): a black construction fence (chain link with black screening) round
+ * it and Hall-Atwater (`SHANK_FENCE`, solid). Between it and Exley, interlocking pavers at Exley's level (`EXLEY_GAP`),
+ * up a flight of stairs from the sidewalk (`EXLEY_GAP_STAIRS`, just off it: not on the sidewalk).
+ */
+export const SHANK_FENCE = { x0: -100.4, x1: -46, z0: CHURCH_WALK_S.z1 + 1.2, z1: HALL_ATWATER.z1 + 5 } as const; // (its grassy bank to the street inside it too)
+/** Little trees on that bank, inside the fence. */
+export const SHANK_SAPLINGS: XZ[] = [{ x: -96, z: 141 }, { x: -88, z: 143.5 }, { x: -80, z: 140.5 }, { x: -71, z: 144 }, { x: -63, z: 141.5 }];
+/** (The user's street view: a wide concrete walk in from the sidewalk between hedges, then three broad low steps, a landing, three more; no side walls.) */
+const GS0 = CHURCH_WALK_S.z1;
+export const EXLEY_GAP_STAIRS = {
+  x0: -109, x1: -100.6, z0: GS0, z1: GS0 + 11.7,
+  approach: [GS0, GS0 + 4.6], flight1: [GS0 + 4.6, GS0 + 6.4], landing: [GS0 + 6.4, GS0 + 9.9], flight2: [GS0 + 9.9, GS0 + 11.7], steps: 3,
+} as const;
+export const EXLEY_GAP = { x0: -107, x1: -100.6, z0: EXLEY_GAP_STAIRS.z1, z1: SHANK_FENCE.z1 } as const;
+/** How far up (0 at the sidewalk, 1 at Exley's level) the walk and steps are at z: a gentle slope in, three steps, the landing, three steps. */
+export function gapRise(z: number, smooth = false): number {
+  const G = EXLEY_GAP_STAIRS, k = (r: readonly number[], a: number, b: number) => a + (b - a) * clamp01((z - r[0]) / (r[1] - r[0]));
+  if (smooth) return z < G.approach[1] ? k(G.approach, 0, 0.24) : z < G.flight1[1] ? k(G.flight1, 0.24, 0.62) : z < G.landing[1] ? 0.62 : k(G.flight2, 0.62, 1);
+  if (z < G.approach[1]) return k(G.approach, 0, 0.24);
+  if (z < G.flight1[1]) return 0.24 + 0.38 * Math.min(1, Math.ceil(((z - G.flight1[0]) / (G.flight1[1] - G.flight1[0])) * G.steps - 1e-9) / G.steps);
+  if (z < G.landing[1]) return 0.62;
+  return 0.62 + 0.38 * Math.min(1, Math.ceil(((z - G.flight2[0]) / (G.flight2[1] - G.flight2[0])) * G.steps - 1e-9) / G.steps);
+}
+export const SHANK_TREES: XZ[] = [];
+
+/**
+ * The new science building (the user's renders and photo, 2026-10-08), east of Shanklin's barricade, across Church Street
+ * from Allbritton, on level ground. A long block clad in tan limestone panels with tall paired slot windows in deep
+ * reveals (`SCI`); at its west end a two-storey glass volume cantilevered out over a recessed glass lobby (`SCI_GLASS`,
+ * its doors `SCI_DOOR`); a stone screen round the plant on its roof. In front of the glass, a paved plaza (`SCI_PLAZA`)
+ * with a curved lawn, reached by a walk straight in from Church Street (`SCI_WALK`). The Casper Life Sciences Building (2026): biology, chemistry, MB&B; between Church Street and Lawn Avenue.
+ */
+export const SCI = { x0: -30, x1: 22, z0: 148, z1: 176, h: 17, name: 'Casper Life Sciences' } as const;
+export const SCI_GLASS = { x0: SCI.x0 - 3, x1: SCI.x0 + 17, z0: SCI.z0 - 1.5, z1: SCI.z1 + 1.5, y0: 5.4 } as const;
+export const SCI_LOBBY = { x0: SCI.x0 + 2.5, x1: SCI.x0 + 15, z0: SCI.z0 + 2, z1: SCI.z1 - 2 } as const;
+export const SCI_DOOR = { x: SCI_LOBBY.x0, z: (SCI.z0 + SCI.z1) / 2 } as const;
+export const SCI_PLAZA = { x0: -44, x1: SCI.x0, z0: 142, z1: 182 } as const;
+export const SCI_WALK = { x0: -40, x1: -35, z0: CHURCH_WALK_S.z1, z1: SCI_PLAZA.z0 } as const;
+export const SCI_LAWN = { x: -38, z: 163, r: 4.5 } as const;
+/** Its entrance on the long side to Church Street (the user): big glass doors in a tall stone recess, interlocking pavers up to them from the sidewalk. */
+export const SCI_NDOOR = { x: SCI.x0 + 31.5, z: SCI.z0, half: 2.4 } as const;
+export const SCI_NWALK = { x0: SCI_NDOOR.x - 2.6, x1: SCI_NDOOR.x + 2.6, z0: CHURCH_WALK_S.z1, z1: SCI.z0 } as const;
+export const SCI_TREES: XZ[] = [{ x: -42, z: 150 }, { x: -33, z: 174 }, { x: -42, z: 178 }, { x: -8, z: 142 }, { x: 16, z: 142 }];
+
+/** How much of Exley's level site is at (x, z): 1 on it, easing to 0 round it. */
+function shankT(x: number, z: number): number {
+  const S = SHANK_SITE, R = 5;
+  const t = Math.min(1, Math.max(0, Math.min((x - S.x0 + R) / R, (S.x1 + R - x) / R, (z - S.z0 + 3) / 3, (S.z1 + R - z) / R)));
+  return t * t * (3 - 2 * t);
+}
+function exleyT(x: number, z: number): number {
+  const S = EXLEY_SITE, R = 5;
+  const t = Math.min(1, Math.max(0, Math.min((x - S.x0 + R) / R, (S.x1 + R - x) / R, (z - S.z0 + 3) / 3, (S.z1 + R - z) / R)));
+  return t * t * (3 - 2 * t);
+}
 /**
  * How high Church Street is at x (the user, 2026-10-07: campus climbs westward toward Foss Hill — biking up it hurts).
  * Level from High Street past Allbritton and the walkway's foot; then up past the bank to Olin's height, so in front of
@@ -455,7 +567,7 @@ function nearChurch(x: number, z: number, base: (x: number, z: number) => number
   const N = CHURCH_WALK_N.z0, S = CHURCH_WALK_S.z1, h = churchY(x);
   if (z >= N && z <= S) return h;
   const sm = (t: number) => t * t * (3 - 2 * t);
-  if (z > S) return h * (1 - sm(Math.min(1, (z - S) / CH_SOUTH)));
+  if (z > S) { const e = exleyT(x, z), k = shankT(x, z), w = Math.max(e, k), len = CH_SOUTH * (1 - w) + 3 * w, target = Math.max(EXLEY_Y * e, SHANK_Y * k); return h + (target - h) * sm(Math.min(1, (z - S) / len)); } // (up onto Exley's or Shanklin's site, or down)
   if (z < N - CH_NORTH) return base(x, z);
   const from = base(x, N - CH_NORTH), t = sm((z - (N - CH_NORTH)) / CH_NORTH);
   return from + (h - from) * t;
@@ -589,6 +701,9 @@ export function groundY(x: number, z: number): number {
   if (inRect(p, CLARK_STAIRS_W)) return CLARK_COURT.y + (CLARK_Y - CLARK_COURT.y) * clamp01((CLARK_STAIRS_W.x1 - x) / (CLARK_STAIRS_W.x1 - CLARK_STAIRS_W.x0));
   if (inRect(p, CLARK_STAIRS_S)) return CLARK_COURT.y + (CLARK_Y - CLARK_COURT.y) * clamp01((z - CLARK_STAIRS_S.z0) / (CLARK_STAIRS_S.z1 - CLARK_STAIRS_S.z0));
   if (inRect(p, CLARK_LOW)) return 0;
+  if (inRect(p, EXLEY_GAP_STAIRS)) { const h0 = churchY(x); return h0 + (EXLEY_Y - h0) * gapRise(z); }
+  if (inRect(p, EXLEY_GAP)) return EXLEY_Y;
+  if (inRect(p, SHANK_STEPS)) return SHANK_Y + SHANKLIN.base * clamp01((x - SHANK_STEPS.x0) / (SHANK_STEPS.x1 - SHANK_STEPS.landing - SHANK_STEPS.x0)); // (a landing at the top)
   for (const f of BANK_FLIGHTS) if (inRect(p, f)) return terrainBase((f.x0 + f.x1) / 2, f.z1 + 0.05) * clamp01((z - f.z0) / (f.z1 - f.z0));
   if (inRect(p, STAIRS_C)) return CLARK_Y * clamp01((z - STAIRS_C.z0) / (STAIRS_C.z1 - STAIRS_C.z0));
   return terrainBase(x, z) || zelnickY(x, z); // (and up the steps and ramp at Zelnick's back entrance)
@@ -610,6 +725,7 @@ function terrainBase(x: number, z: number): number {
 export function terrainY(x: number, z: number): number {
   const p = { x, z };
   if (inRect(p, OLIN_STEPS) || inRect(p, PORTICO_O) || inRect(p, CLARK_STAIRS_W) || inRect(p, CLARK_STAIRS_S)) return terrainBase(x, z);
+  if (inRect(p, EXLEY_GAP_STAIRS)) { const h0 = churchY(x); return h0 + (EXLEY_Y - h0) * gapRise(z, true) - 0.06; } // (just under the steps, smoothly: no grass on them)
   return groundY(x, z);
 }
 
@@ -635,7 +751,7 @@ export const offRoadForCars = (p: XZ) =>
   !inRect(p, LANDING) && !inRect(p, CLARK_LANE) && !inRect(p, CLARK_GAP) && !inRect(p, CLARK_UPPER) && (inRect(p, STAIRS) || inRect(p, STAIRS_E) || inRect(p, STAIRS_W) || BANK_FLIGHTS.some((f) => inRect(p, f)) || inRect(p, STAIRS_C) || bankY(p.x, p.z) > 0.12);
 
 const FRANK_PARTS: Rect[] = [FRANK, FRANK_LINK, FRANK_ADD];
-const ALLB_PARTS: Rect[] = [ALLBRITTON, ALLB_TOWER, ALLB_WING, ALLB_BAY, CLARK, ...CLARK_ENDS];
+const ALLB_PARTS: Rect[] = [ALLBRITTON, ALLB_TOWER, ALLB_WING, ALLB_BAY, CLARK, ...CLARK_ENDS, EXLEY_PAV, EXLEY_TOWER, EXLEY_WING, SHANKLIN, HALL_ATWATER, { x0: SCI.x0, x1: SCI.x1, z0: SCI.z0, z1: SCI.z1 }];
 const PRUZAN_PARTS: Rect[] = [PRUZAN, PRUZAN_ENTRY, PRUZAN_LINK_N, ...PRUZAN_PIERS];
 const inBlock = (p: XZ, pad: number) => inPoly(p, OLIN_LINK_POLY) || (pad > 0 && distToPoly(p, OLIN_LINK_POLY) < pad);
 
@@ -649,6 +765,10 @@ export function inSouthEnd(p: XZ, pad = 0): boolean {
 export function southEndNear(p: XZ, reach = 8): string | null {
   if (PRUZAN_PARTS.some((b) => inRect(p, b, 4)) || inBlock(p, 4) || inRect(p, PRUZAN_COURT, 3) || inRect(p, NCOURT)) return PRUZAN.name; // (first: it's between the other two)
   if (FRANK_PARTS.some((b) => inRect(p, b, reach))) return FRANK.name;
+  if ((inRect(p, SCI, 5) || inRect(p, SCI_PLAZA)) && p.z > CHURCH_WALK_S.z1) return SCI.name;
+  if (inRect(p, SHANKLIN, 5) && p.z > CHURCH_WALK_S.z1) return SHANKLIN.name;
+  if (inRect(p, HALL_ATWATER, 5) && p.z > CHURCH_WALK_S.z1) return HALL_ATWATER.name;
+  if (inRect(p, EXLEY_SITE) && p.z > CHURCH_WALK_S.z1) return 'Exley Science Center';
   if (inRect(p, CLARK, 6) || inRect(p, CLARK_GAP) || inRect(p, CLARK_LOW) || inRect(p, CLARK_COURT)) return CLARK.name;
   if (inPoly(p, OLIN_POLY) || distToPoly(p, OLIN_POLY) < reach || inRect(p, OLIN_LAWN) || inRect(p, PORTICO_O, 2)) return OLIN.name;
   if (inRect(p, ALLBRITTON, reach) || inRect(p, ALLB_LOT)) return ALLBRITTON.name;
@@ -749,6 +869,18 @@ export function southObstacles(pad = 0.3): Box[] {
     // the tall retaining wall along the flat walk (and up beside the stairs), the bed beside the stairs
     b((OLIN_LOW_WALL.x0 + OLIN_LOW_WALL.x1) / 2, (OLIN_LOW_WALL.z0 + OLIN_LOW_WALL.z1) / 2, (OLIN_LOW_WALL.x1 - OLIN_LOW_WALL.x0) / 2, (OLIN_LOW_WALL.z1 - OLIN_LOW_WALL.z0) / 2),
     b((STAIRS_C_BED.x0 + STAIRS_C_BED.x1) / 2, (STAIRS_C_BED.z0 + STAIRS_C_BED.z1) / 2, (STAIRS_C_BED.x1 - STAIRS_C_BED.x0) / 2, (STAIRS_C_BED.z1 - STAIRS_C_BED.z0) / 2),
+    ...SCI_TREES.map((q) => b(q.x, q.z, 0.4, 0.4)), // the science building's trees
+    // the construction fence round Shanklin and Hall-Atwater
+    ...[[SHANK_FENCE.x0, SHANK_FENCE.z0, SHANK_FENCE.x1, SHANK_FENCE.z0], [SHANK_FENCE.x0, SHANK_FENCE.z1, SHANK_FENCE.x1, SHANK_FENCE.z1], [SHANK_FENCE.x0, SHANK_FENCE.z0, SHANK_FENCE.x0, SHANK_FENCE.z1], [SHANK_FENCE.x1, SHANK_FENCE.z0, SHANK_FENCE.x1, SHANK_FENCE.z1]]
+      .map(([x0, z0, x1, z1]) => b((x0 + x1) / 2, (z0 + z1) / 2, Math.max(0.05, (x1 - x0) / 2), Math.max(0.05, (z1 - z0) / 2))),
+    // Shanklin: its steps' sides, the outside stair at its street end; its trees
+    ...[SHANK_STEPS.z0, SHANK_STEPS.z1].map((z) => b((SHANK_STEPS.x0 + SHANK_STEPS.x1) / 2, z, (SHANK_STEPS.x1 - SHANK_STEPS.x0) / 2, 0.06)),
+    b((SHANK_STAIR.x0 + SHANK_STAIR.x1) / 2, (SHANK_STAIR.z0 + SHANK_STAIR.z1) / 2, (SHANK_STAIR.x1 - SHANK_STAIR.x0) / 2, (SHANK_STAIR.z1 - SHANK_STAIR.z0) / 2),
+    ...SHANK_TREES.map((q) => b(q.x, q.z, 0.4, 0.4)),
+    // Exley: the planter walls, the round planters, the trees, the bench, the sign in the road
+    ...EXLEY_WALLS.map((w) => b((w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2, (w.x1 - w.x0) / 2, (w.z1 - w.z0) / 2)),
+    ...EXLEY_PLANTERS.map((q) => b(q.x, q.z, 0.7, 0.7)), ...EXLEY_TREES.map((q) => b(q.x, q.z, 0.4, 0.4)), b(EXLEY_PINE.x, EXLEY_PINE.z, 0.5, 0.5),
+    b(EXLEY_BENCH.x, EXLEY_BENCH.z, EXLEY_BENCH.len / 2, 0.3), b(EXLEY_STOP.x, EXLEY_STOP.z, 0.25, 0.25),
     // the walkway down to Church Street: its lamps, the hydrant, the sign, and the chains along both edges (posts and all)
     ...[...WALKWAY_LAMPS, HYDRANT, XING_SIGN, ...CHURCH_LAMPS].map((t) => b(t.x, t.z, 0.15, 0.15)),
     ...chainLine(-1).map((t) => b(t.x, t.z, 0.08, 0.08)), ...chainLine(1).map((t) => b(t.x, t.z, 0.08, 0.08)),

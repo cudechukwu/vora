@@ -1,7 +1,7 @@
 import { BACK_PATH, FAR_WALK, FIELD_X, PATH_HALF, PLAZA, PLAZA_GAP, ROAD, RowStop, USDAN, XZ } from './layout';
 import { DRIVEWAYS, HOUSE, toWorld } from './house/plan';
 import { PLACES, Place, View, fitAll, placeAt, toMap } from './map';
-import { ALLBRITTON, BERM, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_LINK, OLIN_LINK_POLY, OLIN_POLY, OLIN_WALK, PLAZA_F, POOL, PRUZAN, PRUZAN_COURT, PRUZAN_ENTRY, PRUZAN_LINK_N, NCOURT, NWALK, CHURCH, CHURCH_WALK_N, CHURCH_WALK_S, WALKWAY_PTS, ALLB_LOT, ALLB_TOWER, CLARK, CLARK_ENDS, CLARK_GAP, CLARK_LANE, CLARK_COURT } from './southend';
+import { ALLBRITTON, BERM, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_LINK, OLIN_LINK_POLY, OLIN_POLY, OLIN_WALK, PLAZA_F, POOL, PRUZAN, PRUZAN_COURT, PRUZAN_ENTRY, PRUZAN_LINK_N, NCOURT, NWALK, CHURCH, CHURCH_WALK_N, CHURCH_WALK_S, WALKWAY_PTS, ALLB_LOT, ALLB_TOWER, CLARK, CLARK_ENDS, CLARK_GAP, CLARK_LANE, CLARK_COURT, EXLEY_PAV, EXLEY_PLAZA, EXLEY_TOWER, EXLEY_WING_UP, SHANKLIN, HALL_ATWATER, SCI, SCI_PLAZA } from './southend';
 
 // ─── Drawing the map ───────────────────────────────────────────────────
 // One flat, quiet drawing of campus (grass, roads, paths, buildings), used
@@ -51,6 +51,9 @@ export function drawCampus(g: CanvasRenderingContext2D, v: View, stops: RowStop[
   for (const r of [CLARK_LANE, CLARK_GAP]) rect(r.x0, r.x1, r.z0, r.z1, COL.tar);
   rect(CLARK_COURT.x0, CLARK_COURT.x1, CLARK_COURT.z0, CLARK_COURT.z1, COL.path);
   for (const r of [CLARK, ...CLARK_ENDS]) rect(r.x0, r.x1, r.z0, r.z1, COL.building); // Clark Hall
+  rect(EXLEY_PLAZA.x0, EXLEY_PLAZA.x1, EXLEY_PLAZA.z0, EXLEY_PLAZA.z1, COL.path);
+  rect(SCI_PLAZA.x0, SCI_PLAZA.x1, SCI_PLAZA.z0, SCI_PLAZA.z1, COL.path);
+  for (const r of [EXLEY_PAV, EXLEY_TOWER, EXLEY_WING_UP, SHANKLIN, HALL_ATWATER, SCI]) rect(r.x0, r.x1, r.z0, r.z1, COL.building); // Exley
   rect(CHURCH.x0, CHURCH.x1, CHURCH.z0, CHURCH.z1, COL.tar); // Church Street…
   for (const w of [CHURCH_WALK_N, CHURCH_WALK_S]) rect(w.x0, w.x1, w.z0, w.z1, COL.path);
   g.strokeStyle = COL.tar; g.lineWidth = Math.max(1, 2.4 * v.scale); g.beginPath(); // …and the walkway down to it

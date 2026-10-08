@@ -18,7 +18,7 @@ import {
 import { noise2, rng } from './noise';
 import { DRIVEWAYS, HOUSE } from './house/plan';
 import { NEAR_WALK, frontBenches, frontTrees, frontWalkDist, frontWalks } from './frontlawn';
-import { ALLBRITTON, BERM, CHURCH, CHURCH_WALK_S, FIELD_ROAD, OLIN_TREES, bankY, groundY, inSouthEnd, southObstacles } from './southend';
+import { ALLBRITTON, BERM, CHURCH, CHURCH_WALK_S, EXLEY_SITE, EXLEY_TREES, SHANK_TREES, SCI, SCI_TREES, FIELD_ROAD, OLIN_TREES, bankY, groundY, inSouthEnd, southObstacles } from './southend';
 
 // ─── The ground around the row ─────────────────────────────────────────
 // Lawn in front of the buildings, the walk, a tree line along the field
@@ -560,7 +560,10 @@ export class World {
     const clear = (t: T) => inUsdan(t, 3) || inPlaza(t) || inSouthEnd(t, 3) || onQuadX(t, stops, 1.6) || zelnickSolids(2).some((b) => t.x > b.x0 && t.x < b.x1 && t.z > b.z0 && t.z < b.z1)
       || (t.z > FIELD_ROAD.z0 - 1.5 && t.z < FIELD_ROAD.z1 + 1.5 && t.x < FIELD_ROAD.x1 + 8) // not in the road
       || (bankY(t.x, t.z) > 0.02 && bankY(t.x, t.z) < 1.98); // nor on the slope of the bank
-    for (let i = list.length - 1; i >= 0; i--) if (clear(list[i])) list.splice(i, 1); // not in Usdan, on the plaza, or in the way
+    for (let i = list.length - 1; i >= 0; i--) if (clear(list[i]) || (list[i].x > EXLEY_SITE.x0 - 4 && list[i].x < SCI.x1 + 6 && list[i].z > CHURCH_WALK_S.z1 && list[i].z < EXLEY_SITE.z1 + 4)) list.splice(i, 1); // (and none of the background trees on Exley's site) // not in Usdan, on the plaza, or in the way
+    for (const [i, t] of SCI_TREES.entries()) list.push({ x: t.x, z: t.z, s: 1.2 + (i % 2) * 0.2, id: id++ }); // young trees by the science building
+    for (const [i, t] of SHANK_TREES.entries()) list.push({ x: t.x, z: t.z, s: 1.9 + (i % 2) * 0.3, id: id++ }); // by Shanklin
+    for (const [i, t] of EXLEY_TREES.entries()) list.push({ x: t.x, z: t.z, s: 2.1 + (i % 2) * 0.3, id: id++ }); // the big trees on Exley's lawn (after the clearing)
     // a few small ones on the lawns behind the row
     for (const t of BACK_TREES) list.push({ ...t, id: id++ });
     // the plaza's own trees, in their pits

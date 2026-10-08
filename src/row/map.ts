@@ -3,7 +3,7 @@ import { FIELD_X, ROW_ENTRY, USDAN, byId, layoutRow } from './layout';
 import { DOORS } from './usdan/plan';
 import { HOME_SPAWN } from './house/plan';
 import { FOOTBALL } from './plaza';
-import { ALLBRITTON, ALLBRITTON_DOOR, CLARK, CLARK_PATH, FIELD_ROAD, FRANK, LINK_DOOR, OLIN, OLIN_LAWN, POOL, PRUZAN, PRUZAN_COURT } from './southend';
+import { ALLBRITTON, ALLBRITTON_DOOR, EXLEY_ENTRY, EXLEY_TOWER, SHANKLIN, SCI, SCI_WALK, CLARK, CLARK_PATH, FIELD_ROAD, FRANK, LINK_DOOR, OLIN, OLIN_LAWN, POOL, PRUZAN, PRUZAN_COURT } from './southend';
 
 // ─── The campus map (pure) ─────────────────────────────────────────────
 // Named places you can see on the map — and jump straight to, if you don't
@@ -39,6 +39,9 @@ export const PLACES: Place[] = [
   { id: 'frank', name: 'Frank Center', pin: { x: (FRANK.x0 + FRANK.x1) / 2, z: (FRANK.z0 + FRANK.z1) / 2 }, spawn: { x: LINK_DOOR.x, z: FIELD_ROAD.z1 - 1.5, heading: 0 } },
   { id: 'pruzan', name: 'Pruzan Art Center', pin: { x: (PRUZAN.x0 + PRUZAN.x1) / 2, z: (PRUZAN.z0 + PRUZAN.z1) / 2 }, spawn: { x: (POOL.x1 + FRANK.x0) / 2 + 0.6, z: PRUZAN_COURT.z1 - 1, heading: Math.PI } },
   { id: 'clark', name: 'Clark Hall', pin: { x: (CLARK.x0 + CLARK.x1) / 2, z: (CLARK.z0 + CLARK.z1) / 2 }, spawn: { x: CLARK_PATH.x0 + 3, z: (CLARK_PATH.z0 + CLARK_PATH.z1) / 2, heading: Math.PI / 2 } }, // on its path, facing the entrance (east)
+  { id: 'exley', name: 'Exley Science Center', pin: { x: (EXLEY_TOWER.x0 + EXLEY_TOWER.x1) / 2, z: (EXLEY_TOWER.z0 + EXLEY_TOWER.z1) / 2 }, spawn: { x: (EXLEY_ENTRY.x0 + EXLEY_ENTRY.x1) / 2, z: EXLEY_ENTRY.z0 + 2, heading: 0 } }, // on its entry walk, facing it
+  { id: 'shanklin', name: 'Shanklin Hall', pin: { x: (SHANKLIN.x0 + SHANKLIN.x1) / 2, z: (SHANKLIN.z0 + SHANKLIN.z1) / 2 }, spawn: { x: -104, z: 150, heading: -Math.PI / 2 } }, // on the paving beside it, by its fence
+  { id: 'sci', name: 'Casper Life Sciences', pin: { x: (SCI.x0 + SCI.x1) / 2, z: (SCI.z0 + SCI.z1) / 2 }, spawn: { x: (SCI_WALK.x0 + SCI_WALK.x1) / 2, z: SCI_WALK.z1 - 1, heading: 0 } }, // on its walk, facing it
   { id: 'olin', name: 'Olin Library', pin: { x: OLIN.cx, z: OLIN.cz + 6 }, spawn: { x: OLIN.cx, z: OLIN_LAWN.z0 + 9, heading: Math.PI } }, // on the lawn, between its two walks, facing the portico
   { id: 'walkway', name: 'Burrito truck', pin: { x: -22, z: walkway.z - 3 }, spawn: { x: -14, z: walkway.z, heading: -Math.PI / 2 } },
 ];

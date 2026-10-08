@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { BoxBank, PAL, WindowBank, lambert } from './kit';
 import { noise2, rng } from './noise';
 import {
-  ALLB_DRIVE, BERM, CHAIN_POSTS, CHURCH, CHURCH_CLIMB, churchY, CHURCH_LAMPS, CHURCH_WALK_N, CHURCH_WALK_S, CHURCH_XWALK, HYDRANT, WALKWAY, WALKWAY_LAMPS, WALKWAY_PTS,
+  ALLB_DRIVE, BERM, SHANK_SITE, terrainY, EXLEY_SITE, EXLEY_STOP, EXLEY_XWALK, CHAIN_POSTS, CHURCH, CHURCH_CLIMB, churchY, CHURCH_LAMPS, CHURCH_WALK_N, CHURCH_WALK_S, CHURCH_XWALK, HYDRANT, WALKWAY, WALKWAY_LAMPS, WALKWAY_PTS,
   XING_SIGN, groundY, walkwayPoint,
 } from './southend';
 
@@ -91,11 +91,11 @@ function street({ g, box }: Kit, heads: BufferGeometry[]) {
   for (const dz of [-0.12, 0.12]) along(C.x0, C.x1, (a, b, y) => box.add((a + b) / 2, y + 0.034, mid + dz, b - a + 0.02, 0.02, 0.1, 0xe8c14a)); // the double yellow line
   // curbs (lowered at the crosswalk and the lot's driveway)
   for (const z of [C.z0, C.z1]) {
-    const gaps = z === C.z0 ? [X, ALLB_DRIVE].sort((a, b) => a.x0 - b.x0) : [X];
+    const gaps = (z === C.z0 ? [X, ALLB_DRIVE, EXLEY_XWALK] : [X, EXLEY_XWALK]).sort((a, b) => a.x0 - b.x0);
     let from: number = C.x0;
     for (const gp of gaps) {
       along(from, gp.x0, (a, b, y) => box.add((a + b) / 2, y + 0.08, z, b - a + 0.02, 0.16, 0.25, PAL.curb));
-      box.add((gp.x0 + gp.x1) / 2, 0.03, z, gp.x1 - gp.x0, 0.04, 0.25, PAL.curb);
+      box.add((gp.x0 + gp.x1) / 2, churchY((gp.x0 + gp.x1) / 2) + 0.03, z, gp.x1 - gp.x0, 0.04, 0.25, PAL.curb);
       from = gp.x1;
     }
     along(from, C.x1, (a, b, y) => box.add((a + b) / 2, y + 0.08, z, b - a + 0.02, 0.16, 0.25, PAL.curb));
@@ -105,19 +105,31 @@ function street({ g, box }: Kit, heads: BufferGeometry[]) {
   // the crosswalk: wide white bars along the road, across it
   for (let z = C.z0 + 0.6; z < C.z1 - 0.3; z += 1.1) box.add((X.x0 + X.x1) / 2, 0.036, z, X.x1 - X.x0, 0.02, 0.55, 0xf2f0ea);
   for (const z of [C.z0 - 0.7, C.z1 + 0.7]) box.add((X.x0 + X.x1) / 2, 0.045, z, 1.6, 0.02, 0.9, 0xa8473a); // the red pads at the curb ramps
+  // the crosswalk to Exley: bars across the road, red pads, the STOP-for-pedestrians sign standing on the centre line;
+  // the south curb painted yellow along Exley's frontage (the photos)
+  const XE = EXLEY_XWALK, xy = churchY((XE.x0 + XE.x1) / 2);
+  for (let z = C.z0 + 0.6; z < C.z1 - 0.3; z += 1.1) box.add((XE.x0 + XE.x1) / 2, xy + 0.036, z, XE.x1 - XE.x0, 0.02, 0.55, 0xf2f0ea);
+  for (const z of [C.z0 - 0.7, C.z1 + 0.7]) box.add((XE.x0 + XE.x1) / 2, xy + 0.045, z, 1.6, 0.02, 0.9, 0xa8473a);
+  const St = EXLEY_STOP, sy = churchY(St.x);
+  box.add(St.x, sy + 0.08, St.z, 0.55, 0.16, 0.55, 0x1c1c1c); // its rubber base
+  box.add(St.x, sy + 0.75, St.z, 0.06, 1.3, 0.06, 0xe9e9e4);
+  box.add(St.x, sy + 1.15, St.z, 0.04, 0.95, 0.5, 0xd6e33a); // the panel: fluorescent yellow…
+  box.add(St.x, sy + 1.42, St.z, 0.05, 0.36, 0.36, 0xc8102e); // …the STOP octagon on it, roughly
+  box.add(St.x, sy + 0.95, St.z, 0.05, 0.3, 0.34, 0x1c1c1c); // (FOR PEDESTRIAN IN CROSSWALK)
+  for (const [a, b2] of [[-182, XE.x0 - 0.2], [XE.x1 + 0.2, -102]] as const) along(a, b2, (a1, b1, y) => box.add((a1 + b1) / 2, y + 0.165, C.z1, b1 - a1 + 0.02, 0.01, 0.26, 0xd9b23c));
   // the sidewalks
   sloped(g, N.x0, N.x1, N.z0, N.z1, 0.03, slabMat(N.x1 - N.x0, N.z1 - N.z0));
   sloped(g, S.x0, S.x1, S.z0, S.z1, 0.03, slabMat(S.x1 - S.x0, S.z1 - S.z0));
   for (const l of CHURCH_LAMPS) lamp(box, heads, l.x, l.z);
   // and the ground south of it, coming back down from the street's height (the bank is the north side's)
-  const x0 = BERM.x0, x1 = CHURCH_CLIMB.x0 + 4, z0 = S.z1, z1 = S.z1 + 21;
-  const geo = new PlaneGeometry(x1 - x0, z1 - z0, Math.round((x1 - x0) / 2), 14);
+  const x0 = BERM.x0, x1 = SHANK_SITE.x1 + 8, z0 = S.z1, z1 = EXLEY_SITE.z1 + 8; // (and up onto Exley's site)
+  const geo = new PlaneGeometry(x1 - x0, z1 - z0, Math.round((x1 - x0) / 2), Math.round((z1 - z0) / 2));
   geo.rotateX(-Math.PI / 2);
   geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const pos = geo.getAttribute('position'), cols: number[] = [], a = new Color(0x5f9a3a), b = new Color(0x7aae48), c = new Color();
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
-    pos.setY(i, groundY(x, z) + 0.01);
+    pos.setY(i, terrainY(x, z) + 0.01); // (under steps, the ground stays below them)
     c.copy(a).lerp(b, noise2(x / 22, z / 22));
     cols.push(c.r, c.g, c.b);
   }

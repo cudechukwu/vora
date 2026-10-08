@@ -152,7 +152,7 @@ export function distToPoly(p: XZ, poly: XZ[]): number {
 export const inUsdan = (p: XZ, pad = 0) => inPoly(p, USDAN) || (pad > 0 && distToPoly(p, USDAN) < pad);
 
 /** Everywhere you can stand. */
-export const BOUNDS = { xMin: -232, xMax: FAR_WALK.x1 - 0.4, zMin: WALK_MAX_Z - 10, zMax: 135 } as const; // (south: Church Street's far sidewalk)
+export const BOUNDS = { xMin: -232, xMax: FAR_WALK.x1 - 0.4, zMin: WALK_MAX_Z - 10, zMax: 226 } as const; // (south: Church Street's far sidewalk)
 
 export const byId = (stops: RowStop[], id: BuildingId) => stops.find((s) => s.id === id)!;
 

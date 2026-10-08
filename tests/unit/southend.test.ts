@@ -6,6 +6,9 @@ import {
   OLIN_LINK_POLY, NCOURT, NCOURT_TABLES, NCOURT_BED, NWALK, PRUZAN_LINK_N, PRUZAN_DOOR_N, STAIRS_W, BALUSTRADE, FLAGPOLE, FRANK_NICHE_N, ALLB_WELLS, ALLBRITTON_DOOR, LINK_DOOR_S, LINK_WALK, OLIN_WALK, OLIN_DOOR, PLAZA_TABLES,
   OLIN_Y, OLIN_RISE, OLIN_SITE, STAIRS_O, terrainY, PORTICO_O, OLIN_STEPS, OLIN_COLUMNS, OLIN_LAWN, LAWN_WALKS, OLIN_TREES, OLIN_BENCHES, lawnWalkDist,
   CHURCH, CHURCH_WALK_N, CHURCH_WALK_S, CHURCH_XWALK, WALKWAY, WALKWAY_PTS, CHAIN_POSTS, WALKWAY_LAMPS, walkwayAt, walkwayPoint, churchY,
+  SCI, SCI_DOOR, SCI_PLAZA, SCI_WALK, SCI_NDOOR, SCI_NWALK,
+  SHANKLIN, SHANK_DOOR, SHANK_FENCE, EXLEY_GAP, EXLEY_GAP_STAIRS, EXLEY_PINE, HALL_ATWATER, HA_BLOCK,
+  EXLEY_Y, EXLEY_PAV, EXLEY_TOWER, EXLEY_WING, EXLEY_WING_UP, EXLEY_PLAZA, EXLEY_XWALK, EXLEY_DOOR,
   CLARK, CLARK_Y, CLARK_DOOR, CLARK_LANE, CLARK_STALLS, CLARK_PARKED, CLARK_ENDS, CLARK_GAP, CLARK_COURT, CLARK_STAIRS_W, CLARK_STAIRS_S, STAIRS_C, DUMPSTERS, BANK_FLIGHTS, balustradeRuns, CLARK_LOW, OLIN_LOW_WALL,
   ALLB_TOWER, ALLB_BAY, ALLB_WING, ALLB_WING_DOOR, ALLB_REAR_DOOR, ALLB_LANDING, ALLB_STEPS, ALLB_RAMP, ALLB_LOT, ALLB_DRIVE, ALLB_STALLS, ALLB_PARKED, ALLB_WALL,
 } from '../../src/row/southend';
@@ -760,5 +763,88 @@ describe('the fence along the top of the bank, and the stairs down to Andrus', (
       expect(y).toBeGreaterThan(TERRACE_Y - 0.05);
       expect(offRoadForCars({ x, z: (f.z0 + f.z1) / 2 })).toBe(true);
     }
+  });
+});
+
+describe('Exley Science Center, across Church Street', () => {
+  it('stands south of Church Street across from Clark and Olin; its tower behind the pavilion, the wing on the west; solid', () => {
+    expect(EXLEY_PLAZA.z0).toBeGreaterThan(CHURCH_WALK_S.z1 + 6); // a lawn between the sidewalk and the plaza
+    expect(EXLEY_TOWER.z0).toBeGreaterThan(EXLEY_PAV.z0); expect(EXLEY_TOWER.z1).toBeGreaterThan(EXLEY_PAV.z1);
+    expect(EXLEY_WING.x0).toBeGreaterThanOrEqual(EXLEY_PAV.x1); // the wing on the east, the tower on the west (the user)
+    expect(EXLEY_TOWER.x1).toBeLessThan(EXLEY_WING.x0);
+    expect(EXLEY_PAV.z0 - EXLEY_PLAZA.z0).toBeGreaterThan(12); // a big plaza in front
+    expect(EXLEY_WING_UP.z0).toBeLessThan(EXLEY_WING.z0); // cantilevered out over its glass ground floor
+    for (const b of [EXLEY_PAV, EXLEY_TOWER, EXLEY_WING]) expect(blockedAt({ x: (b.x0 + b.x1) / 2, z: (b.z0 + b.z1) / 2 }, stops)).toBe(true);
+    expect(southEndNear({ x: EXLEY_DOOR.x, z: 150 })).toBe('Exley Science Center');
+  });
+  it('from the crosswalk on Church Street, up the entry walk across the lawn and plaza to its doors; the site is level', () => {
+    expect(EXLEY_XWALK.x0).toBeLessThan(EXLEY_DOOR.x); expect(EXLEY_XWALK.x1).toBeGreaterThan(EXLEY_DOOR.x);
+    for (let x = EXLEY_PLAZA.x0 + 1; x < EXLEY_PLAZA.x1; x += 5) expect(groundY(x, (EXLEY_PLAZA.z0 + EXLEY_PLAZA.z1) / 2)).toBeCloseTo(EXLEY_Y, 5);
+    let p: { x: number; z: number } = { x: EXLEY_DOOR.x, z: CHURCH_WALK_N.z0 + 0.3 }, y = groundY(p.x, p.z);
+    for (let i = 0; i < 420; i++) {
+      p = resolveMove(p, { x: p.x, z: p.z + 0.1 }, stops, all);
+      const h = groundY(p.x, p.z);
+      expect(Math.abs(h - y)).toBeLessThan(0.12); // a gentle walk up, never a step
+      y = h;
+    }
+    expect(p.z).toBeGreaterThan(EXLEY_DOOR.z - 1); expect(p.z).toBeLessThan(EXLEY_DOOR.z);
+    const s = PLACES.find((q) => q.id === 'exley')!.spawn;
+    expect(blockedAt(s, stops)).toBe(false);
+  });
+});
+
+describe('Shanklin Hall and Hall-Atwater, east of Exley', () => {
+  it('Shanklin: long north–south east of Exley\'s wing, its narrow end to Church Street; Hall-Atwater joined to its east; solid', () => {
+    expect(SHANKLIN.x0).toBeGreaterThan(EXLEY_WING_UP.x1);
+    expect(SHANKLIN.z1 - SHANKLIN.z0).toBeGreaterThan(2 * (SHANKLIN.x1 - SHANKLIN.x0));
+    expect(SHANKLIN.z0).toBeGreaterThan(CHURCH_WALK_S.z1 + 6);
+    expect(HALL_ATWATER.x0).toBe(SHANKLIN.x1);
+    expect(HA_BLOCK.x1).toBe(HALL_ATWATER.x1);
+    for (const b of [SHANKLIN, HALL_ATWATER]) expect(blockedAt({ x: (b.x0 + b.x1) / 2, z: (b.z0 + b.z1) / 2 }, stops)).toBe(true);
+    expect(southEndNear({ x: SHANKLIN.x0 - 3, z: SHANK_DOOR.z })).toBe('Shanklin Hall');
+    expect(SHANKLIN.z0).toBeGreaterThan(CHURCH_WALK_S.z1 + 12); // back behind its bank (the user)
+  });
+  it('it\'s fenced off for its renovation; beside it, stairs up from just off the sidewalk to paving at Exley\'s level', () => {
+    const x = (EXLEY_GAP_STAIRS.x0 + EXLEY_GAP_STAIRS.x1) / 2;
+    expect(EXLEY_GAP_STAIRS.flight1[0] - CHURCH_WALK_S.z1).toBeGreaterThan(3); // the steps start well back from the sidewalk
+    expect(EXLEY_GAP_STAIRS.steps).toBeLessThanOrEqual(4); // a few broad low steps a flight
+    expect(Math.hypot(EXLEY_PINE.x - x, EXLEY_PINE.z - 142)).toBeGreaterThan(8); // no tree on the steps
+    let p: { x: number; z: number } = { x, z: CHURCH_WALK_S.z0 + 0.5 }, y = groundY(p.x, p.z);
+    for (let i = 0; i < 260; i++) {
+      p = resolveMove(p, { x, z: p.z + 0.1 }, stops, all);
+      const h = groundY(p.x, p.z);
+      expect(h).toBeGreaterThanOrEqual(y - 0.02);
+      y = h;
+    }
+    expect(y).toBeCloseTo(EXLEY_Y, 5);
+    expect(p.z).toBeGreaterThan(EXLEY_GAP.z0 + 5);
+    const q = walk({ x: EXLEY_GAP.x0 + 1, z: SHANK_DOOR.z }, { x: SHANK_DOOR.x - 1, z: SHANK_DOOR.z }); // you can't get to its door: the fence
+    expect(q.x).toBeLessThan(SHANK_FENCE.x0);
+    expect(PLACES.find((r) => r.id === 'shanklin')).toBeDefined();
+  });
+
+});
+
+describe('Casper Life Sciences, across Church Street from Allbritton', () => {
+  it('east of Shanklin\'s fence, across from Allbritton, clear of High Street; solid', () => {
+    expect(SCI_PLAZA.x0).toBeGreaterThan(SHANK_FENCE.x1);
+    expect(SCI_WALK.x0).toBeLessThan(ALLBRITTON.x1); expect(SCI_WALK.x1).toBeGreaterThan(ALLBRITTON.x0); // its walk across from Allbritton
+    expect(SCI.x1).toBeLessThan(ROAD.x0 - 8);
+    expect(SCI.z0).toBeGreaterThan(CHURCH_WALK_S.z1 + 6);
+    expect(blockedAt({ x: (SCI.x0 + SCI.x1) / 2, z: (SCI.z0 + SCI.z1) / 2 }, stops)).toBe(true);
+  });
+  it('from Church Street down its walk, across the plaza, to the lobby doors under the glass', () => {
+    let p = walk({ x: (SCI_WALK.x0 + SCI_WALK.x1) / 2, z: CHURCH_WALK_S.z0 + 0.5 }, { x: (SCI_WALK.x0 + SCI_WALK.x1) / 2, z: SCI_DOOR.z - 6 });
+    p = walk(p, { x: SCI_DOOR.x - 3, z: SCI_DOOR.z - 6 });
+    p = walk(p, { x: SCI_DOOR.x + 1, z: SCI_DOOR.z - 6 });
+    expect(p.x).toBeLessThan(SCI.x0 + 0.1 + 20);
+    const q = walk({ x: SCI_DOOR.x - 6, z: SCI_DOOR.z + 6.5 }, { x: SCI_DOOR.x + 2, z: SCI_DOOR.z + 6.5 }); // under the glass overhang, up to the stone
+    expect(q.x).toBeLessThan(SCI.x0);
+    expect(southEndNear({ x: SCI.x0 - 4, z: 150 })).toBe('Casper Life Sciences');
+    expect(PLACES.find((r) => r.id === 'sci')).toBeDefined();
+    // and its entrance on the long side to Church Street, up its paver walk from the sidewalk
+    const n = walk({ x: SCI_NDOOR.x, z: SCI_NWALK.z0 + 0.3 }, { x: SCI_NDOOR.x, z: SCI_NDOOR.z + 1 });
+    expect(n.z).toBeGreaterThan(SCI_NDOOR.z - 1); expect(n.z).toBeLessThan(SCI_NDOOR.z);
+    expect(SCI_NWALK.z0).toBe(CHURCH_WALK_S.z1);
   });
 });

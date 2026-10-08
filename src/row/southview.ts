@@ -6,6 +6,9 @@ import { BoxBank, Facing, WindowBank, block, brickMap, hipRoof, lambert, prism, 
 import { buildPruzan } from './pruzanview';
 import { buildOlin } from './olinview';
 import { buildClark } from './clarkview';
+import { buildExley } from './exleyview';
+import { buildShanklin } from './shanklinview';
+import { buildSci } from './sciview';
 import { buildChurch } from './churchview';
 import { allbrittonRear } from './allbview';
 import { BACK_PATH } from './layout';
@@ -13,7 +16,7 @@ import { noise2, rng } from './noise';
 import {
   ALLB_FORECOURT, ALLB_WELLS, ALLBRITTON, ALLBRITTON_DOOR, BERM, BOLLARDS, CHEEK, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_DOOR, FRANK_LINK, LANDING,
   CLASS_TAKEN, FRANK_ROOMS, FRANK_WINDOWS, GRAND_STAIR, LINK_DOOR, LOUNGE, LOUNGE_SEATS, LOUNGE_TABLES, LINK_DOOR_S, LINK_WALK, MAIN_ENTRY, MULCH, classroom, PLAZA_BENCHES, PLAZA_BIN, PLAZA_F, PLAZA_TABLES, SIGN, STAIRS,
-  STAIRS_E, OLIN_WALK, OLIN_LAWN, OLIN_SITE, CLARK_SITE, BANK_FLIGHTS, FRANK_NICHE_W, FRANK_NICHE_N, PRUZAN_LINK_N, PRUZAN_ENTRY, STAIRS_W, SYCAMORE, SYCAMORE2, TERRACE_Y, UTILITY_BOX, groundY, plazaChairs, terrainY,
+  STAIRS_E, OLIN_WALK, OLIN_LAWN, OLIN_SITE, CLARK_SITE, EXLEY_SITE, SHANK_SITE, SCI, SCI_PLAZA, SCI_WALK, BANK_FLIGHTS, FRANK_NICHE_W, FRANK_NICHE_N, PRUZAN_LINK_N, PRUZAN_ENTRY, STAIRS_W, SYCAMORE, SYCAMORE2, TERRACE_Y, UTILITY_BOX, groundY, plazaChairs, terrainY,
 } from './southend';
 
 // ─── The south end of Andrus Field: draws what southend.ts lays out ────
@@ -115,6 +118,9 @@ export function buildSouthEnd(k: Kit) {
   allbritton(k);
   allbrittonRear(k); // its back onto Church Street, the rear door, the lot (allbview.ts)
   far(k, { x0: CLARK_SITE.x0, x1: CLARK_SITE.x1, z0: CLARK_SITE.z0, z1: CLARK_SITE.z1 }, buildClark); // Clark Hall, west of Olin (clarkview.ts)
+  far(k, { x0: EXLEY_SITE.x0, x1: EXLEY_SITE.x1, z0: EXLEY_SITE.z0, z1: EXLEY_SITE.z1 }, buildExley); // Exley Science Center, across Church Street (exleyview.ts)
+  far(k, { x0: SHANK_SITE.x0, x1: SHANK_SITE.x1, z0: SHANK_SITE.z0, z1: SHANK_SITE.z1 }, buildShanklin); // Shanklin Hall and Hall-Atwater, east of Exley (shanklinview.ts)
+  far(k, { x0: SCI_PLAZA.x0, x1: SCI.x1, z0: SCI_WALK.z0, z1: SCI_PLAZA.z1 }, buildSci); // the new science building, across from Allbritton (sciview.ts)
   buildChurch(k); // Church Street, and the walkway down the bank to it (churchview.ts)
 }
 
