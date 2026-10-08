@@ -231,7 +231,7 @@ function stairs(k: Kit) {
   flat(g, W.x0, W.x1, W.z0, W.z1, TERRACE_Y + 0.03, new MeshLambertMaterial({ map: slabs }));
   flight(k, STAIRS, '+z');
   flight(k, STAIRS_E, '-x');
-  flight(k, STAIRS_W, '+z'); // down the bank in front of the Pruzan's gallery block
+  flight(k, STAIRS_W, '+z', TERRACE_Y, false); // down the bank in front of the Pruzan's gallery block (no rails)
   for (const f of BANK_FLIGHTS) flight(k, f, '+z', groundY((f.x0 + f.x1) / 2, f.z1 + 0.05), false); // and along Olin's drum, and at the fence's west end (no rails: Olin's steps have none)
   const brown = lambert(0x553a2a);
   for (const p of BOLLARDS) {

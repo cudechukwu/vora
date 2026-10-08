@@ -516,6 +516,13 @@ function northLawn(k: Kit) {
     }
   };
   for (const [x0, x1] of balustradeRuns()) run(x0, x1); // (open at each flight of stairs down the bank)
+  // and at its east end, a short run back to the Frank Center's corner, joining them (the user)
+  const zl = FRANK.z0 - B.z, zc = (B.z + FRANK.z0) / 2, ex = B.x1 - 0.2;
+  box.add(ex, Y + 0.12, zc, 0.42, 0.24, zl, marble);
+  box.add(ex, Y + 0.9, zc, 0.4, 0.12, zl, marble);
+  for (let z = B.z + 0.25; z < FRANK.z0 - 0.1; z += 0.28) box.add(ex, Y + 0.56, z, 0.12, 0.56, 0.12, 0xe2dfd6);
+  box.add(ex, Y + 0.55, B.z, 0.5, 1.1, 0.5, marble);
+  urn(k, ex, Y + 1.1, B.z);
   // the terrace behind it, between the fence and the buildings: interlocking pavers, no grass (the user); the tar by Clark runs onto it
   ground(g, [{ x: OLIN.x0 + 4, z: B.z + 0.25 }, { x: B.x1, z: B.z + 0.25 }, { x: B.x1, z: 24 }, { x: OLIN.x0 + 4, z: 24 }], Y + 0.026, paverMat());
   bench(k, LAWN_BENCH_N, 0xe6e3dc);

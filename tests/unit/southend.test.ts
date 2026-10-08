@@ -739,6 +739,9 @@ describe('the fence along the top of the bank, and the stairs down to Andrus', (
     const runs = balustradeRuns();
     expect(runs[0][0]).toBe(BALUSTRADE.x0);
     expect(runs[runs.length - 1][1]).toBe(BALUSTRADE.x1);
+    // and it's joined to the Frank Center: you can't slip round its east end
+    const q = walk({ x: FRANK.x0 - 2, z: BALUSTRADE.z + 1.5 }, { x: FRANK.x0 + 2, z: BALUSTRADE.z + 1.5 });
+    expect(q.x).toBeLessThan(FRANK.x0 - 0.2);
     expect(runs.length).toBe(BANK_FLIGHTS.length + 2); // (one run either side of each opening, the flights and the Pruzan's stairs)
   });
   it('stairs come down from it at intervals (and at its west end); each climbs only up, to the ground at its top', () => {

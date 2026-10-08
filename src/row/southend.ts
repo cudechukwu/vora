@@ -716,6 +716,7 @@ export function southObstacles(pad = 0.3): Box[] {
     b(STAIRS.x0 - CHEEK / 2, nz, CHEEK / 2, nh), b(STAIRS.x1 + CHEEK / 2, nz, CHEEK / 2, nh),
     b(STAIRS_W.x0 - CHEEK / 2, wz, CHEEK / 2, wh), b(STAIRS_W.x1 + CHEEK / 2, wz, CHEEK / 2, wh),
     ...balustradeRuns().map(([x0, x1]) => bal(x0, x1)), // (open at each flight of stairs)
+    b(BALUSTRADE.x1 - 0.2, (BALUSTRADE.z + FRANK.z0) / 2, 0.2, (FRANK.z0 - BALUSTRADE.z) / 2), // and the short run joining it to the Frank Center
     ...BANK_FLIGHTS.flatMap((f) => [f.x0 - CHEEK / 2, f.x1 + CHEEK / 2].map((x) => b(x, (f.z0 + f.z1) / 2, CHEEK / 2, (f.z1 - f.z0) / 2))),
     ...NCOURT_TABLES.map((t) => b(t.x, t.z, 0.6, 0.6)),
     ...[...NCOURT_TREES, LAWN_TREE].map((t) => b(t.x, t.z, 0.2, 0.2)),
