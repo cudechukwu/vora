@@ -25,3 +25,20 @@ test('jump anywhere from the map: pick Usdan, Go, and you are there — even fro
   await expect.poll(async () => { const s = await state(page); return Math.hypot(s.x - -65.3, s.z - -170.4) < 2; }, { timeout: 20_000 }).toBe(true); // by Usdan's walkway entrance
   await expect(page.locator('#passing .v')).toHaveText('Usdan University Center', { timeout: 20_000 });
 });
+
+test('the map turns the way you look: the full map to the nearest of N/E/S/W, the compass flips it north up', async ({ page }) => {
+  await open(page, 't=13&yaw=1.5707963'); // looking west, at the field
+  await page.locator('#minimap').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.mapUp)).toBe('W');
+  await expect(page.locator('#mapfull .sub')).toContainText('west is up');
+  // turned sideways it opens zoomed in on you; the slider on the right zooms back out to the whole campus
+  expect(Number(await page.locator('#mapfull .zoom').inputValue())).toBeGreaterThan(0.5);
+  await page.locator('#mapfull .zoom').fill('0');
+  expect(Number(await page.locator('#mapfull .zoom').inputValue())).toBe(0);
+  await page.locator('#mapfull .compass').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__vora.mapUp)).toBe('N');
+  await expect(page.locator('#mapfull .sub')).toContainText('north is up');
+  await page.locator('#mapfull .close').click();
+  // the mini map turns too: looking west, it's turned a quarter (west up)
+  await expect.poll(() => page.evaluate(() => Math.abs((window as any).__vora.miniRot - Math.PI / 2) < 0.1)).toBe(true);
+});

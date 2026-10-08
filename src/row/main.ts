@@ -45,7 +45,7 @@ import type { Place } from './map';
 import { Sound } from './audio';
 import { falloff, honkNow, mixAt } from './soundscape';
 import { leavesMark, surfaceAt } from './surface';
-import { ITEMS, SITTERS, chairs } from './plaza';
+import { FOOTBALL, ITEMS, SITTERS, chairs } from './plaza';
 import { UsdanView } from './usdan/view';
 import { CasperView } from './casper/view';
 import { CDoor, CLANES, CPEOPLE, FH as CASPER_FH, casperArrive, casperExtra, casperFloorY, casperLevelAt, casperPortalAt, insideCasper, nearCasperDoor } from './casper/plan';
@@ -716,10 +716,10 @@ function goThrough(kind: 'enter' | 'exit') {
 }
 
 // ── the map: a mini map top-right; tap it for the whole campus, pick a place and jump there ──
-const fieldZ = S('Memorial').doorZ;
+const fieldZ = FOOTBALL.z; // (the pitch's centre: fixed, no longer the chapel's)
 const miniMap = new MiniMap(document.querySelector('#minimap canvas') as HTMLCanvasElement, stops, fieldZ);
 const fullMap = new FullMap(document.getElementById('mapfull')!, stops, fieldZ);
-document.getElementById('minimap')!.addEventListener('click', () => fullMap.open(pos, me.heading));
+document.getElementById('minimap')!.addEventListener('click', () => fullMap.open(pos, me.heading, rig.yaw + Math.PI)); // (turned to the way the camera looks)
 fullMap.onGo = (p) => travelTo(p);
 
 /** Jump straight to a place on the map: out of whatever you're in or on, a blink, and you're there. */
@@ -1313,7 +1313,7 @@ function frame(now: number) {
     southLOD(camera.position.x, camera.position.z);
     for (const o of southFolk) o.visible = Math.hypot(o.position.x - camera.position.x, o.position.z - camera.position.z) < 300;
   }
-  if (frames % 6 === 0) miniMap.draw(pos, me.heading);
+  if (frames % 3 === 0) miniMap.draw(pos, me.heading, rig.yaw + Math.PI); // (turned so the way the camera looks is up)
 
   // "now passing"
   const byUsdan = inPoly(pos, USDAN) || distToPoly(pos, USDAN) < 9;
@@ -1358,6 +1358,8 @@ Object.assign(window, {
     get speedo() { return speedo.reading; },
     get marks() { return tyres.count; },
     get mapOpen() { return fullMap.isOpen; },
+    get mapUp() { return fullMap.up; },
+    get miniRot() { return miniMap.rot; },
     mapPick(id: string) { fullMap.pick(id); },
     get sound() { return { started: sound.started, state: sound.state, muted: sound.muted, log: sound.log.slice(-20) }; },
     get hour() { return hour; },

@@ -46,20 +46,82 @@ export const PLACES: Place[] = [
   { id: 'walkway', name: 'Burrito truck', pin: { x: -22, z: walkway.z - 3 }, spawn: { x: -14, z: walkway.z, heading: -Math.PI / 2 } },
 ];
 
-/** The map's view: what part of the world it shows, and how big. North (−z) is up, east (+x) right. */
-export interface View { cx: number; cz: number; scale: number; w: number; h: number }
+/**
+ * The map's view: what part of the world it shows, how big, and which way it's turned. With `rot` 0, north (−z) is
+ * up and east (+x) right; `rot` turns the map clockwise by that much (so `headingUp` puts the way you face at the top).
+ */
+export interface View { cx: number; cz: number; scale: number; w: number; h: number; rot?: number }
 
 /** World → map pixels. */
-export const toMap = (v: View, p: XZ) => ({ x: v.w / 2 + (p.x - v.cx) * v.scale, y: v.h / 2 + (p.z - v.cz) * v.scale });
+export const toMap = (v: View, p: XZ) => {
+  const dx = p.x - v.cx, dz = p.z - v.cz, r = v.rot ?? 0, c = Math.cos(r), s = Math.sin(r);
+  return { x: v.w / 2 + (dx * c - dz * s) * v.scale, y: v.h / 2 + (dx * s + dz * c) * v.scale };
+};
 /** Map pixels → world. */
-export const toWorldXZ = (v: View, m: { x: number; y: number }): XZ => ({ x: v.cx + (m.x - v.w / 2) / v.scale, z: v.cz + (m.y - v.h / 2) / v.scale });
+export const toWorldXZ = (v: View, m: { x: number; y: number }): XZ => {
+  const X = (m.x - v.w / 2) / v.scale, Y = (m.y - v.h / 2) / v.scale, r = v.rot ?? 0, c = Math.cos(r), s = Math.sin(r);
+  return { x: v.cx + X * c + Y * s, z: v.cz - X * s + Y * c };
+};
 
-/** A view that fits the whole campus (all the places, with a margin) into w × h. */
-export function fitAll(w: number, h: number, margin = 30): View {
-  const xs = PLACES.flatMap((p) => [p.pin.x, p.spawn.x]), zs = PLACES.flatMap((p) => [p.pin.z, p.spawn.z]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
-  const scale = Math.min((w - margin * 2) / (x1 - x0), (h - margin * 2) / (z1 - z0));
-  return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, scale, w, h };
+/** The turn that puts the way you're facing (heading: 0 = +z, toward +x as it grows) at the top of the map. */
+export const headingUp = (heading: number) => wrap(heading - Math.PI);
+/** The same, snapped to the nearest of north, east, south or west up: the full map stays square to the campus. */
+export const cardinalUp = (heading: number) => wrap(Math.round(headingUp(heading) / (Math.PI / 2)) * (Math.PI / 2));
+/** Which way is up on a map turned by rot: 'N', 'E', 'S' or 'W' (the nearest). */
+export const upIs = (rot: number) => (['N', 'W', 'S', 'E'] as const)[((Math.round(wrap(rot) / (Math.PI / 2)) % 4) + 4) % 4];
+const wrap = (a: number) => { const t = Math.PI * 2; a = ((a % t) + t) % t; return a > Math.PI + 1e-9 ? a - t : a; };
+
+/** A view that fits the whole campus (all the places, with a margin) into w × h, turned by rot. */
+export function fitAll(w: number, h: number, margin = 30, rot = 0): View {
+  const pts = PLACES.flatMap((p) => [p.pin, p.spawn]);
+  const c = Math.cos(rot), s = Math.sin(rot);
+  const us = pts.map((p) => p.x * c - p.z * s), vs = pts.map((p) => p.x * s + p.z * c);
+  const u0 = Math.min(...us), u1 = Math.max(...us), v0 = Math.min(...vs), v1 = Math.max(...vs);
+  const scale = Math.min((w - margin * 2) / (u1 - u0), (h - margin * 2) / (v1 - v0));
+  const um = (u0 + u1) / 2, vm = (v0 + v1) / 2; // the middle, back in world terms
+  return { cx: um * c + vm * s, cz: -um * s + vm * c, scale, w, h, rot };
+}
+
+/** The names placed first, so they're the last to be left off a crowded map. */
+const BIG = ['olin', 'usdan', 'home', 'field', 'north', 'chapel', 'sci'];
+
+export interface Label { id: string; x: number; y: number; align: 'center' | 'left' | 'right'; shown: boolean }
+/**
+ * Where each place's name goes: above its pin if that's clear, else below, right or left; a name that would land on
+ * another is left off (zoom in and it comes back). `width(name)` measures a name in map pixels; `first` always shows.
+ */
+export function placeLabels(v: View, width: (name: string) => number, lineH: number, gap: number, first?: string): Label[] {
+  const taken: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  const pins = PLACES.map((p) => toMap(v, p.pin));
+  for (const m of pins) taken.push({ x0: m.x - gap * 0.7, x1: m.x + gap * 0.7, y0: m.y - gap * 0.7, y1: m.y + gap * 0.7 });
+  const rank = (id: string) => (id === first ? 0 : BIG.indexOf(id) >= 0 ? 1 + BIG.indexOf(id) : 99); // (the chosen one, then the landmarks)
+  const order = [...PLACES].sort((a, b) => rank(a.id) - rank(b.id));
+  const out = new Map<string, Label>();
+  for (const p of order) {
+    const m = toMap(v, p.pin), wd = width(p.name);
+    const tries: [number, number, Label['align'], number][] = [ // (box left, box top, align, text x)
+      [m.x - wd / 2, m.y - gap - lineH, 'center', m.x],
+      [m.x - wd / 2, m.y + gap, 'center', m.x],
+      [m.x + gap, m.y - lineH / 2, 'left', m.x + gap],
+      [m.x - gap - wd, m.y - lineH / 2, 'right', m.x - gap],
+      [m.x + gap * 0.6, m.y - gap - lineH, 'left', m.x + gap * 0.6],
+      [m.x - gap * 0.6 - wd, m.y - gap - lineH, 'right', m.x - gap * 0.6],
+      [m.x + gap * 0.6, m.y + gap, 'left', m.x + gap * 0.6],
+      [m.x - gap * 0.6 - wd, m.y + gap, 'right', m.x - gap * 0.6],
+    ];
+    let put: Label | null = null;
+    for (const [x0, y0, align, tx] of tries) {
+      const r = { x0, x1: x0 + wd, y0, y1: y0 + lineH };
+      if (r.x0 < 0 || r.x1 > v.w || r.y0 < 0 || r.y1 > v.h) continue;
+      if (taken.some((t) => r.x0 < t.x1 && r.x1 > t.x0 && r.y0 < t.y1 && r.y1 > t.y0)) continue;
+      taken.push(r);
+      put = { id: p.id, x: tx, y: y0 + lineH / 2, align, shown: true };
+      break;
+    }
+    if (!put && p.id === first) put = { id: p.id, x: m.x, y: m.y - gap - lineH / 2, align: 'center', shown: true };
+    out.set(p.id, put ?? { id: p.id, x: m.x, y: m.y - gap - lineH / 2, align: 'center', shown: false });
+  }
+  return PLACES.map((p) => out.get(p.id)!);
 }
 
 /** The place whose pin is nearest a tap (within `reach` map pixels), if any. */

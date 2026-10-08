@@ -118,8 +118,8 @@
 
     /* the mini map (tap for the whole campus) */
     #minimap{position:fixed;right:14px;top:calc(14px + var(--safe-t));width:104px;height:104px;padding:0;z-index:3;
-      border-radius:14px;overflow:hidden;border:1px solid rgba(246,241,230,.35);box-shadow:0 6px 18px rgba(0,0,0,.35);
-      background:#4f7a3a;cursor:pointer;opacity:0;transition:opacity .5s;}
+      border-radius:50%;overflow:hidden;border:2px solid rgba(246,241,230,.55);box-shadow:0 6px 18px rgba(0,0,0,.35);
+      background:#7fa865;cursor:pointer;opacity:0;transition:opacity .5s;}
     #hud.show ~ #minimap{opacity:1;}
     #minimap canvas{width:100%;height:100%;display:block;pointer-events:none;}
     #mapfull{position:fixed;inset:0;z-index:8;background:rgba(10,13,16,.92);display:none;flex-direction:column;
@@ -130,7 +130,19 @@
     #mapfull .sub{font-size:9px;letter-spacing:.2em;color:var(--mute);text-transform:uppercase;margin-top:2px;}
     #mapfull .close{background:none;border:1px solid rgba(246,241,230,.35);color:var(--paper);border-radius:999px;
       padding:7px 14px;font:600 10px 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;}
+    #mapfull .wrap{flex:1;position:relative;min-height:0;display:flex;}
     #mapfull canvas{flex:1;width:100%;min-height:0;border-radius:14px;touch-action:none;}
+    #mapfull .compass{position:absolute;left:10px;top:10px;width:44px;height:44px;border-radius:50%;padding:0;
+      background:rgba(14,18,16,.82);border:1px solid rgba(246,241,230,.35);color:var(--paper);}
+    #mapfull .compass .needle{position:absolute;inset:6px;transform:rotate(var(--north,0rad));transition:transform .35s ease;}
+    #mapfull .compass .needle::before{content:'';position:absolute;left:50%;top:0;margin-left:-4px;border:4px solid transparent;
+      border-bottom:12px solid #ff5a4a;border-top:0;}
+    #mapfull .zoombar{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;
+      align-items:center;gap:6px;padding:10px 0;width:44px;border-radius:22px;background:rgba(14,18,16,.82);
+      border:1px solid rgba(246,241,230,.35);color:var(--paper);font:700 16px 'JetBrains Mono',monospace;}
+    #mapfull .zoom{writing-mode:vertical-lr;direction:rtl;height:min(220px,34vh);width:28px;margin:0;accent-color:var(--accent);touch-action:none;}
+    #mapfull .compass .u{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      font:700 12px 'JetBrains Mono',monospace;padding-top:4px;}
     #mapfull .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;min-height:48px;
       opacity:0;transition:opacity .2s;}
     #mapfull .bar.show{opacity:1;}
@@ -190,7 +202,8 @@
   <button id="minimap" aria-label="Map"><canvas></canvas></button>
   <div id="mapfull" role="dialog" aria-label="Campus map">
     <div class="top"><div><div class="t">Campus</div><div class="sub">tap a place to go there</div></div><button class="close">close</button></div>
-    <canvas></canvas>
+    <div class="wrap"><canvas></canvas><button class="compass" aria-label="Turn the map"><span class="needle"></span><span class="u">N</span></button>
+      <div class="zoombar"><span>+</span><input class="zoom" type="range" min="0" max="3" step="0.01" value="0" aria-label="Zoom"><span>−</span></div></div>
     <div class="bar"><span class="n"></span><button class="go">Go there</button></div>
   </div>
   <button id="brake" class="gbtn" aria-label="Brake / reverse"></button>
