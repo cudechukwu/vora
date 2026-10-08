@@ -7,6 +7,8 @@ import { BoxBank, WindowBank, lambert } from './kit';
 import { buildRow, southLOD } from './buildings';
 import { pruzanNight, pruzanTick } from './pruzanview';
 import { olinNight } from './olinview';
+import { NEAR_WALK } from './frontlawn';
+import { FAR_WALK } from './layout';
 import { churchNight } from './churchview';
 import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, ROW_ENTRY, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
 import { World } from './world';
@@ -806,7 +808,7 @@ function updateFleers(dt: number) {
       p.limp(-Math.PI / 2 * k);
       p.root.position.set(f.x, 0, f.z);
     } else { // run: off the road to the nearest sidewalk, then away down it
-      const curb = f.x > (ROAD.x0 + ROAD.x1) / 2 ? 21.9 : 3;
+      const curb = f.x > (ROAD.x0 + ROAD.x1) / 2 ? (FAR_WALK.x0 + FAR_WALK.x1) / 2 : (NEAR_WALK.x0 + NEAR_WALK.x1) / 2; // (onto the sidewalk on that side)
       const away = Math.sign(f.z - pos.z) || 1;
       const dx = curb - f.x, dirX = Math.abs(dx) > 0.3 ? Math.sign(dx) : 0;
       const dirZ = dirX ? away * 0.35 : away;

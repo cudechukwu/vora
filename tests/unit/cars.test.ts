@@ -115,7 +115,7 @@ describe('getting in and out', () => {
 });
 
 describe('driving', () => {
-  const fresh = (): Car => ({ id: 9, kind: 'car', len: 4.4, color: 0, x: 15.5, z: -100, heading: 0, speed: 0, owner: 'you', cruise: 10, stolen: false });
+  const fresh = (): Car => ({ id: 9, kind: 'car', len: 4.4, color: 0, x: ROAD.x0 + 4.5, z: -100, heading: 0, speed: 0, owner: 'you', cruise: 10, stolen: false });
 
   it('builds speed the longer you hold it — flat out only after a good while', () => {
     const c = fresh();
@@ -321,8 +321,8 @@ describe('cars in the road', () => {
     const g = createGarage();
     const r = carjack(t, g, addVehicle(t, { kind: 'car', lane: 1, z: -50, cruise: 11, len: 4.4, color: 1 }).id)!;
     getOut(g);
-    expect(clearRoad(g, t, { x: 0, z: -50 })).toEqual([]); // you're right there
-    const done = clearRoad(g, t, { x: 0, z: -50 - LEAVE_AFTER - 1 });
+    expect(clearRoad(g, t, { x: ROAD.x0, z: -50 })).toEqual([]); // you're right there
+    const done = clearRoad(g, t, { x: ROAD.x0, z: -50 - LEAVE_AFTER - 1 });
     expect(done[0].fate).toBe('traffic');
     expect(done[0].vehicle!.lane).toBe(1);
     expect(g.cars).not.toContain(r.car);
@@ -343,7 +343,7 @@ describe('cars in the road', () => {
   it('your car left in the road gets towed home', () => {
     const t = emptyRoad();
     const g = createGarage();
-    Object.assign(g.cars[0], { x: 15, z: -100 });
+    Object.assign(g.cars[0], { x: ROAD.x0 + 4, z: -100 });
     const done = clearRoad(g, t, { x: 0, z: 0 });
     expect(done[0].fate).toBe('towed');
     expect(inDriveway(g.cars[0])).toBe(true);
@@ -353,7 +353,7 @@ describe('cars in the road', () => {
     const t = emptyRoad();
     const g = createGarage();
     getIn(g, 1);
-    Object.assign(g.cars[1], { x: 15, z: -100 });
+    Object.assign(g.cars[1], { x: ROAD.x0 + 4, z: -100 });
     expect(clearRoad(g, t, { x: 0, z: 1000 })).toEqual([]);
   });
 
@@ -383,7 +383,7 @@ describe('your car stays where you left it', () => {
   });
 
   it('nothing saved, junk, or left in the road → back in your driveway', () => {
-    for (const raw of [null, '', '{', '{"x":"a"}', JSON.stringify({ x: NaN, z: 0, heading: 0 }), JSON.stringify({ x: 15, z: -100, heading: 0 })]) {
+    for (const raw of [null, '', '{', '{"x":"a"}', JSON.stringify({ x: NaN, z: 0, heading: 0 }), JSON.stringify({ x: ROAD.x0 + 4, z: -100, heading: 0 })]) {
       expect(loadMine(raw)).toBeNull();
     }
     expect(inDriveway(createGarage(null).cars[0])).toBe(true);

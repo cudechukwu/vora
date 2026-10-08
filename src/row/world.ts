@@ -17,6 +17,7 @@ import {
 } from './layout';
 import { noise2, rng } from './noise';
 import { DRIVEWAYS, HOUSE } from './house/plan';
+import { NEAR_WALK, frontBenches, frontTrees, frontWalkDist, frontWalks } from './frontlawn';
 import { ALLBRITTON, BERM, CHURCH, CHURCH_WALK_S, FIELD_ROAD, OLIN_TREES, bankY, groundY, inSouthEnd, southObstacles } from './southend';
 
 // ─── The ground around the row ─────────────────────────────────────────
@@ -52,6 +53,7 @@ export class World {
     this.fz = FOOTBALL.z;
     this.field(this.fz, box);
     this.walks(stops);
+    this.frontLawn(stops, box);
     this.street(box);
     this.backPath(stops);
     this.rearLawn(stops, box);
@@ -363,7 +365,7 @@ export class World {
     let id = 900;
     for (let z = WALK_MIN_Z + 10; z > WALK_MAX_Z - 20; z -= 24) {
       if (Math.abs(z - HOUSE.zc) < 22) { id += 7; continue; } // that lot is yours (house/)
-      const w = 10 + rng(id) * 3, d = 12, h = 6.5 + rng(id + 1) * 2.5, x = 34 + rng(id + 2) * 3;
+      const w = 10 + rng(id) * 3, d = 12, h = 6.5 + rng(id + 1) * 2.5, x = FAR_WALK.x1 + 10.5 + rng(id + 2) * 3;
       box.add(x, h / 2, z, d, h, w, paints[Math.floor(rng(id + 3) * paints.length)]);
       for (const fy of [2, h - 2]) for (const fz of [-w / 4, w / 4]) box.add(x - d / 2 - 0.05, fy, z + fz, 0.1, 1.5, 1, 0x2a3036);
       box.add(x - d / 2 - 0.9, 0.3, z, 1.8, 0.6, 2.4, 0xd8d2c4); // porch step
@@ -445,6 +447,32 @@ export class World {
     });
   }
 
+  /** The lawn in front of the row (frontlawn.ts): the sidewalk along High Street, the walks across, benches beside them. */
+  private frontLawn(stops: RowStop[], box: BoxBank) {
+    const len = WALK_MIN_Z - WALK_MAX_Z + 160, midZ = (WALK_MIN_Z + WALK_MAX_Z) / 2;
+    const side = new Mesh(new PlaneGeometry(NEAR_WALK.x1 - NEAR_WALK.x0, len), lambert(PAL.path));
+    side.rotation.x = -Math.PI / 2;
+    side.position.set((NEAR_WALK.x0 + NEAR_WALK.x1) / 2, 0.03, midZ);
+    side.receiveShadow = true;
+    this.group.add(side);
+    const concrete = lambert(0xc8c4ba);
+    frontWalks(stops).forEach((wk, i) => {
+      const dx = wk.b.x - wk.a.x, dz = wk.b.z - wk.a.z, L = Math.hypot(dx, dz);
+      const m = new Mesh(new PlaneGeometry(wk.w, L + 1.5), concrete);
+      m.rotation.set(-Math.PI / 2, 0, Math.atan2(dx, dz));
+      m.position.set((wk.a.x + wk.b.x) / 2, 0.024 + i * 0.001, (wk.a.z + wk.b.z) / 2);
+      m.receiveShadow = true;
+      this.group.add(m);
+    });
+    for (const b of frontBenches(stops)) { // a slatted wooden bench on iron ends, along the walk
+      const c = Math.cos(b.rot), sn = Math.sin(b.rot);
+      box.add(b.x, 0.46, b.z, 0.5, 0.08, 1.9, PAL.wood, b.rot);
+      box.add(b.x - c * 0.24, 0.78, b.z + sn * 0.24, 0.08, 0.5, 1.9, PAL.wood, b.rot);
+      for (const d of [-0.8, 0.8]) box.add(b.x + sn * d, 0.22, b.z + c * d, 0.5, 0.44, 0.08, PAL.iron, b.rot);
+      this.obstacles.push({ x0: b.x - 0.8, x1: b.x + 0.8, z0: b.z - 0.8, z1: b.z + 0.8 }); // (roughly: it may be turned)
+    }
+  }
+
   private walks(stops: RowStop[]) {
     const len = WALK_MIN_Z - WALK_MAX_Z + 60;
     const midZ = (WALK_MIN_Z + WALK_MAX_Z) / 2;
@@ -495,11 +523,12 @@ export class World {
       if (!nearDoor(zz)) list.push({ x: -9.5 + (rng(id + 3) - 0.5) * 3, z: zz, s: 0.9 + rng(id + 5) * 0.5, id: id++ });
       else id++;
     }
-    // street trees between the walk and High Street — this is what makes it a "walk"
+    // street trees along the walk's lawn edge, and the big old trees out on the lawn between it and High Street
     for (let z = WALK_MIN_Z - 4; z > WALK_MAX_Z; z -= 17) {
-      if (nearDoor(z)) continue;
+      if (nearDoor(z) || frontWalkDist({ x: 6.8, z }, frontWalks(stops), this.crossings) < 3) continue;
       list.push({ x: 6.8 + rng(id) * 1.5, z: z - rng(id + 1) * 4, s: 1.2 + rng(id + 2) * 0.4, id: id++ });
     }
+    for (const t of frontTrees(stops, this.crossings)) list.push({ ...t, id: id++ });
     // lining the field side of the back road, peeking over the rooftops from the walk
     for (let z = FIELD_ROAD.z0 - 3; z > WALK_MAX_Z - 40; z -= 9) { // (the back path stops at the field road)
       if (nearDoor(z)) continue;
@@ -512,9 +541,9 @@ export class World {
     for (let z = WALK_MIN_Z + 20; z > WALK_MAX_Z - 40; z -= 13) {
       const tz = z - rng(id + 1) * 6;
       const yard = Math.max(...DRIVEWAYS.map((d) => Math.max(-d.v0, d.v1))) + 3; // not in your front yard or the driveways
-      if (Math.abs(tz - HOUSE.zc) > yard) list.push({ x: 26 + rng(id) * 4, z: tz, s: 1.3 + rng(id + 2) * 0.6, id });
+      if (Math.abs(tz - HOUSE.zc) > yard) list.push({ x: FAR_WALK.x1 + 2.5 + rng(id) * 4, z: tz, s: 1.3 + rng(id + 2) * 0.6, id });
       id++;
-      list.push({ x: 48 + rng(id + 3) * 20, z: z - rng(id + 4) * 6, s: 1.6 + rng(id + 5) * 0.8, id: id++ });
+      list.push({ x: FAR_WALK.x1 + 24.5 + rng(id + 3) * 20, z: z - rng(id + 4) * 6, s: 1.6 + rng(id + 5) * 0.8, id: id++ });
     }
     for (let x = -240; x < 70; x += 8) {
       list.push({ x: x + rng(id) * 4, z: WALK_MAX_Z - 50 - rng(id + 1) * 20, s: 1.6 + rng(id + 2), id: id++ });

@@ -19,7 +19,7 @@ const AREAS = {
   sound: [/audio\.ts$/, /soundscape\.ts$/, /\/sounds\//],
   map: [/map\.ts$/, /mapview\.ts$/],
   // the shape of the world: you walk into it, so the walking and back-path checks
-  'basics+campus': [/layout\.ts$/, /collide\.ts$/, /world\.ts$/, /buildings\.ts$/, /kit\.ts$/, /backlawn\.ts$/, /zelnick\.ts$/],
+  'basics+campus': [/layout\.ts$/, /frontlawn\.ts$/, /collide\.ts$/, /world\.ts$/, /buildings\.ts$/, /kit\.ts$/, /backlawn\.ts$/, /zelnick\.ts$/],
 };
 const EVERYTHING = [/src\/row\/main\.ts$/, /tests\/e2e\/helpers\.ts$/, /playwright\.config\.ts$/, /vite\.config\.ts$/, /index\.html$/, /package\.json$/];
 

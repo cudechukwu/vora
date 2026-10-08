@@ -1,4 +1,4 @@
-import { CROSSWALK_W, Crossing, WALK_MAX_Z, WALK_MIN_Z } from './layout';
+import { CROSSWALK_W, Crossing, ROAD, WALK_MAX_Z, WALK_MIN_Z } from './layout';
 import type { XZ } from './collide';
 import { rng } from './noise';
 
@@ -16,10 +16,10 @@ export type Light = 'green' | 'yellow' | 'red';
 
 export interface Lane { x: number; dir: 1 | -1; bikes: boolean }
 export const LANES: Lane[] = [
-  { x: 13.6, dir: 1, bikes: false },
-  { x: 17.4, dir: -1, bikes: false },
-  { x: 11.8, dir: 1, bikes: true },
-  { x: 19.2, dir: -1, bikes: true },
+  { x: ROAD.x0 + 2.6, dir: 1, bikes: false },
+  { x: ROAD.x0 + 6.4, dir: -1, bikes: false },
+  { x: ROAD.x0 + 0.8, dir: 1, bikes: true },
+  { x: ROAD.x0 + 8.2, dir: -1, bikes: true },
 ];
 
 export const SIGNAL = { green: 16, yellow: 3, red: 11 } as const;

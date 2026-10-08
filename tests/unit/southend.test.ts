@@ -8,13 +8,14 @@ import {
   CHURCH, CHURCH_WALK_N, CHURCH_WALK_S, CHURCH_XWALK, WALKWAY, WALKWAY_PTS, CHAIN_POSTS, WALKWAY_LAMPS, walkwayAt, walkwayPoint,
   ALLB_TOWER, ALLB_BAY, ALLB_WING, ALLB_WING_DOOR, ALLB_REAR_DOOR, ALLB_LANDING, ALLB_STEPS, ALLB_RAMP, ALLB_LOT, ALLB_DRIVE, ALLB_STALLS, ALLB_PARKED, ALLB_WALL,
 } from '../../src/row/southend';
-import { BACK_PATH, FIELD_X, byId, inPoly, layoutRow } from '../../src/row/layout';
+import { BACK_PATH, ROAD, FIELD_X, byId, inPoly, layoutRow } from '../../src/row/layout';
 import { Extra, blockedAt, resolveMove } from '../../src/row/collide';
 import { FOOTBALL, fenceObstacles, fenceRuns, pathObstacles } from '../../src/row/plaza';
 import { surfaceAt } from '../../src/row/surface';
 import { World } from '../../src/row/world';
 import { PLACES } from '../../src/row/map';
 import { createGarage } from '../../src/row/cars';
+import { FRONT_LAWN, NEAR_WALK, frontBenches, frontTrees, frontWalkDist, frontWalks } from '../../src/row/frontlawn';
 
 const { stops, crossings } = layoutRow();
 const fz = FOOTBALL.z;
@@ -499,7 +500,7 @@ describe('the walkway down Allbritton\'s side to Church Street', () => {
 
 describe('Church Street', () => {
   it('runs along the bottom of the bank, south of Olin\'s lawn and Allbritton, out to High Street; flat, with sidewalks both sides', () => {
-    expect(CHURCH.x1).toBe(11); // High Street's near edge
+    expect(CHURCH.x1).toBe(ROAD.x0); // High Street's near edge
     expect(CHURCH_WALK_N.z0).toBeGreaterThanOrEqual(BERM.z1); // the bank is down by its sidewalk
     expect(CHURCH_WALK_N.z0).toBeGreaterThan(ALLBRITTON.z1);
     expect(CHURCH_WALK_N.z0).toBeGreaterThan(OLIN_LAWN.z1 + 4);
@@ -579,5 +580,39 @@ describe('Allbritton\'s back, onto Church Street', () => {
       expect(c.owner).toBeNull();
       expect(Math.cos(c.heading)).toBeCloseTo(-1, 5);
     }
+  });
+});
+
+describe('the lawn in front of College Row (frontlawn.ts)', () => {
+  const walks = frontWalks(stops);
+  it('is big: High Street is well out past the walk, with a sidewalk on this side', () => {
+    expect(NEAR_WALK.x1).toBe(ROAD.x0);
+    expect(FRONT_LAWN.x1 - FRONT_LAWN.x0).toBeGreaterThan(30);
+  });
+  it('its walks run from the row\'s walk to the High Street sidewalk; the walkways between the buildings carry on across it', () => {
+    for (const w of walks) {
+      for (const p of [w.a, w.b]) { expect(p.x).toBeGreaterThanOrEqual(FRONT_LAWN.x0 - 0.5); expect(p.x).toBeLessThanOrEqual(NEAR_WALK.x0 + 0.5); }
+    }
+    const north = byId(stops, 'north'), v = walks.filter((w) => w.a.z === north.doorZ && w.b.z !== north.doorZ);
+    expect(v).toHaveLength(2); // the V from North College's portico, spreading
+    expect(Math.sign(v[0].b.z - north.doorZ)).toBe(-Math.sign(v[1].b.z - north.doorZ));
+    // you can walk any of them end to end
+    for (const w of walks) {
+      const p = walk({ x: w.a.x + 0.3, z: w.a.z }, w.b);
+      expect(Math.hypot(p.x - w.b.x, p.z - w.b.z)).toBeLessThan(0.6);
+    }
+    // and straight across the lawn along a walkway between the buildings, to its crosswalk
+    const c = crossings[1];
+    const q = walk({ x: 0, z: c.z }, { x: NEAR_WALK.x1 - 0.5, z: c.z });
+    expect(q.x).toBeCloseTo(NEAR_WALK.x1 - 0.5, 1);
+  });
+  it('big old trees out on the lawn, off the walks; benches beside the walks', () => {
+    const trees = frontTrees(stops, crossings);
+    expect(trees.length).toBeGreaterThan(10); expect(trees.length).toBeLessThan(25); // a few, not a wood (the user)
+    for (const t of trees) {
+      expect(frontWalkDist(t, walks, crossings)).toBeGreaterThan(2.5);
+      expect(t.x).toBeGreaterThan(FRONT_LAWN.x0); expect(t.x).toBeLessThan(FRONT_LAWN.x1);
+    }
+    for (const b of frontBenches(stops)) { const d = frontWalkDist(b, walks, []); expect(d).toBeGreaterThan(0.3); expect(d).toBeLessThan(1.5); }
   });
 });

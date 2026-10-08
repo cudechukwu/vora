@@ -176,8 +176,8 @@ export class Traffic {
     const pole = lambert(0x2a2f33);
     const approaches: { x: number; z: number; face: 1 | -1; armTo: number }[] = [
       // far side of the crosswalk, facing oncoming drivers
-      { x: ROAD.x1 + 0.6, z: c.z + CROSSWALK_W / 2 + 1.2, face: -1, armTo: 13.6 }, // for traffic heading +z
-      { x: ROAD.x0 - 0.6, z: c.z - CROSSWALK_W / 2 - 1.2, face: 1, armTo: 17.4 }, // for traffic heading −z
+      { x: ROAD.x1 + 0.6, z: c.z + CROSSWALK_W / 2 + 1.2, face: -1, armTo: ROAD.x0 + 2.6 }, // for traffic heading +z
+      { x: ROAD.x0 - 0.6, z: c.z - CROSSWALK_W / 2 - 1.2, face: 1, armTo: ROAD.x0 + 6.4 }, // for traffic heading −z
     ];
     for (const a of approaches) {
       const g = new Group();

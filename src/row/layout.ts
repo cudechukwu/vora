@@ -32,8 +32,9 @@ export const BACK_PATH = { x0: -58, x1: -50.5 } as const;
 export const FIELD_X = -64; // Andrus Field starts here and runs back (−x)
 
 /** High Street. */
-export const ROAD = { x0: 11, x1: 20 } as const;
-export const FAR_WALK = { x0: 20.3, x1: 23.5 } as const;
+/** (Moved 30 m east on 2026-10-07: the lawn in front of the row is big, the user's photos; it's `frontlawn.ts`.) */
+export const ROAD = { x0: 41, x1: 50 } as const;
+export const FAR_WALK = { x0: 50.3, x1: 53.5 } as const;
 export const CROSSWALK_W = 4;
 
 export type BuildingId =

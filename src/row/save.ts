@@ -38,7 +38,7 @@ export function loadSpot(raw: string | null, now: number, ok: (s: SavedSpot) => 
     if (![s.x, s.z, s.heading, s.at].every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
     if (s.level !== 0 && s.level !== 1) return null;
     if (now - s.at > SPOT_TTL || s.at > now + 60_000) return null;
-    if (s.x < BOUNDS.xMin || s.z < BOUNDS.zMin || s.z > BOUNDS.zMax || s.x > 80) return null;
+    if (s.x < BOUNDS.xMin || s.z < BOUNDS.zMin || s.z > BOUNDS.zMax || s.x > 110) return null;
     const spot: SavedSpot = { where: s.where, x: s.x, z: s.z, heading: s.heading, level: s.level, at: s.at };
     return ok(spot) ? spot : null;
   } catch {

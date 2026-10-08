@@ -3,6 +3,7 @@
 import {
   expect, test, byId, LANES, DRIVEWAYS, open, state, hold, SPAWN_Z, HX0, hw, drv, HZC, stops,
 } from './helpers';
+import { ROAD } from '../../src/row/layout';
 
 test('your car is in your driveway: Drive, go, get out @smoke', async ({ page }) => {
   const errors = await open(page, `${hw(5, -12.8 + 2.4)}&yaw=${-Math.PI / 2}`); // beside it, driver's side
@@ -28,10 +29,10 @@ test('your car is in your driveway: Drive, go, get out @smoke', async ({ page })
 
 test('nothing solid (trees, lamps) stands in either driveway or its mouth', async ({ page }) => {
   await open(page);
-  const blocked = await page.evaluate((drives) => {
+  const blocked = await page.evaluate(([drives, roadX1]) => {
     const v = (window as any).__vora;
-    return drives.filter((d: any) => v.obstacles.some((b: any) => b.x1 > 20 && b.x0 < d.x1 && b.z1 > d.z0 - 1 && b.z0 < d.z1 + 1));
-  }, DRIVEWAYS.map((d) => ({ x1: HX0 + d.u1, z0: HZC + d.v0, z1: HZC + d.v1 })));
+    return (drives as any[]).filter((d: any) => v.obstacles.some((b: any) => b.x1 > (roadX1 as number) && b.x0 < d.x1 && b.z1 > d.z0 - 1 && b.z0 < d.z1 + 1));
+  }, [DRIVEWAYS.map((d) => ({ x1: HX0 + d.u1, z0: HZC + d.v0, z1: HZC + d.v1 })), ROAD.x1] as const); // (the far side of High Street)
   expect(blocked).toEqual([]);
 });
 

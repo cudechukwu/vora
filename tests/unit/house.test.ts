@@ -6,7 +6,7 @@ import {
 } from '../../src/row/house/plan';
 import { ENTER_AT, EXIT_AT, cameraClearance, nearDoor, portalAt } from '../../src/row/house/portal';
 import { EDGES, NODES, OUT, assignments, homecoming, listNames, placeAt, route, walkTo } from '../../src/row/house/routine';
-import { BOUNDS, FAR_WALK, layoutRow } from '../../src/row/layout';
+import { BOUNDS, FAR_WALK, ROAD, layoutRow } from '../../src/row/layout';
 import { rng } from '../../src/row/noise';
 
 const { stops } = layoutRow();
@@ -339,7 +339,7 @@ describe('solid things', () => {
   });
 
   it('if something ever ends up on top of you, you can still walk away (never frozen)', () => {
-    const p = { x: 14, z: -100 }; // out on High Street
+    const p = { x: ROAD.x0 + 3, z: -100 }; // out on High Street
     const car = { x0: p.x - 1, x1: p.x + 1, z0: p.z - 2, z1: p.z + 2 }; // e.g. a car that pulled up into you
     const out = resolveMove(p, { x: p.x - 0.2, z: p.z }, stops, { solids: [car] });
     expect(out.x).toBeCloseTo(p.x - 0.2, 9);

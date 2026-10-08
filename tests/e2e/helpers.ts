@@ -1,5 +1,6 @@
 import { Page, expect, test } from '@playwright/test';
 import { ROW_ENTRY, layoutRow } from '../../src/row/layout';
+import { HOUSE } from '../../src/row/house/plan';
 export { expect, test };
 export type { Page };
 export { ROW_ENTRY, byId, layoutRow } from '../../src/row/layout';
@@ -63,7 +64,7 @@ export const mover = (page: Page) => page.evaluate(() => {
   return { mode: v.mover.mode as string, speed: v.mover.speed as number, riding: v.mover.riding as number | null, running: v.running as boolean, action: v.action as string };
 });
 
-export const HX0 = 28, HZC = -276;
+export const HX0 = HOUSE.x0, HZC = HOUSE.zc; // (the house's front wall, from house/plan.ts)
 export const hw = (u: number, v: number) => `x=${HX0 + u}&z=${HZC + v}`;
 export const house = (page: Page) => page.evaluate(() => {
   const v = (window as any).__vora;
