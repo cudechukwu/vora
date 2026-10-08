@@ -28,6 +28,8 @@ export const IN_UP = { x0: SCI.x0 + 0.45, x1: SCI.x1 - 0.45, z0: SCI.z0 + 0.45, 
 
 /** The atrium: open from the ground floor up through L3's ceiling. */
 export const VOID = { x0: -12, x1: 4, z0: 154, z1: 170 } as const;
+/** On the top floor, a bridge across the atrium from the stair's landing to the south side (the renders). */
+export const BRIDGE = { level: 3, x0: 0.2, x1: 2.6, z0: 157.4, z1: 170.2 } as const;
 
 // ── the doors ──
 export type CDoorId = 'north' | 'west';
@@ -82,10 +84,16 @@ export function flightAt(level: number, p: XZ): Flight | null {
 }
 /** How far up a flight (0 at its foot, 1 at its head) x is. */
 export const flightT = (f: Flight, x: number) => Math.min(1, Math.max(0, f.up === '+x' ? (x - f.x0) / (f.x1 - f.x0) : (f.x1 - x) / (f.x1 - f.x0)));
+/** How far up (0–1 of a floor) you are at `t` along a flight: two runs of steps with a flat landing halfway (the photos). */
+export const LANDING_T = [0.44, 0.56] as const;
+export function flightRise(t: number): number {
+  const [a, b] = LANDING_T;
+  return t < a ? (t / a) * 0.5 : t < b ? 0.5 : 0.5 + ((t - b) / (1 - b)) * 0.5;
+}
 /** Height of the floor under you. */
 export function casperFloorY(level: number, x: number, z: number): number {
   const f = flightAt(level, { x, z });
-  return f ? (f.base + flightT(f, x)) * FH : level * FH;
+  return f ? (f.base + flightRise(flightT(f, x))) * FH : level * FH;
 }
 /** Which floor you're on after moving to (x, z): only the stairs change it. */
 export function casperLevelAt(level: number, x: number, z: number): CLevel {
@@ -107,7 +115,7 @@ function plates(level: number): Box[] {
   if (level === 2) {
     return [...ring, { x0: V.x0 - 0.1, x1: B.x0 + 0.3, z0: B.z0 - 0.4, z1: V.z1 + 0.1 }, { x0: V.x0 - 0.1, x1: C.x0 + 0.3, z0: V.z0 - 0.1, z1: C.z1 + 0.4 }, { ...B }, { ...C }];
   }
-  return [...ring, { x0: C.x1 - 0.3, x1: V.x1 + 0.1, z0: V.z0 - 0.1, z1: C.z1 + 0.4 }, { ...C }];
+  return [...ring, { x0: C.x1 - 0.3, x1: V.x1 + 0.1, z0: V.z0 - 0.1, z1: C.z1 + 0.4 }, { ...C }, { x0: BRIDGE.x0, x1: BRIDGE.x1, z0: BRIDGE.z0, z1: BRIDGE.z1 }];
 }
 
 // ── rooms: what's behind the glass (look-only), and the walls ──
@@ -221,7 +229,10 @@ export const CPEOPLE: CPerson[] = [
   { level: 1, x: -21, z: 156.9, heading: 0, sit: 0.46 }, { level: 1, x: -20, z: 159.1, heading: Math.PI, sit: 0.46 },
   { level: 2, x: -9, z: 171.0, heading: Math.PI, sit: 0.72 }, { level: 2, x: -6.5, z: 171.0, heading: Math.PI, sit: 0.72 },
   { level: 2, x: 12, z: 168, heading: Math.PI / 2, inRoom: true }, { level: 2, x: -26, z: 151.5, heading: 0, sit: 0.46 },
-  { level: 3, x: -4.2, z: 152, heading: -0.5 + Math.PI, sit: 0.42 }, { level: 3, x: 16, z: 160, heading: -Math.PI / 2, inRoom: true },
+  // on the stairs: climbing, and two talking on a landing
+  { level: 0, x: -6.2, z: 155.2, heading: Math.PI / 2 }, { level: 1, x: 0.2, z: 168.6, heading: -Math.PI / 2 }, { level: 1, x: 0.6, z: 167.6, heading: Math.PI / 2 },
+  { level: 3, x: 1.4, z: 162, heading: 0 },
+    { level: 3, x: -4.2, z: 152, heading: -0.5 + Math.PI, sit: 0.42 }, { level: 3, x: 16, z: 160, heading: -Math.PI / 2, inRoom: true },
 ];
 export const CLANES: { level: CLevel; x0: number; x1: number; z: number }[] = [
   { level: 0, x0: -10, x1: 19, z: 150.4 }, { level: 1, x0: -22, x1: 18, z: 153 }, { level: 2, x0: -10, x1: 18, z: 153.2 },

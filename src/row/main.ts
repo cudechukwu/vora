@@ -131,7 +131,7 @@ usdanScene.add(usdanHemi, usdanSun, usdanSun.target, ...pendants, usdan.group);
 const casperScene = new Scene();
 casperScene.background = new Color(0x1c1a17);
 const casper = new CasperView();
-const casperHemi = new HemisphereLight(0xfff6ea, 0x7a7068, 1.75);
+const casperHemi = new HemisphereLight(0xfff6ea, 0xd8cfc2, 1.75); // (a light ground colour: the ceilings are lit from the floors below, not black)
 const casperSun = new DirectionalLight(0xfff2de, 0.8);
 casperSun.position.set(-60, 40, 150);
 casperSun.target.position.set(-5, 0, 162);
@@ -142,7 +142,7 @@ const casperFolk: CInside[] = [];
   let seed = 1400;
   for (const c of CPEOPLE) {
     const p = new Person(randomLook(seed++));
-    p.root.position.set(c.x, c.level * CASPER_FH, c.z);
+    p.root.position.set(c.x, casperFloorY(c.level, c.x, c.z), c.z); // (on a stair, at its height)
     p.face(c.heading);
     if (c.sit !== undefined) p.sit(c.sit);
     casperScene.add(p.root);

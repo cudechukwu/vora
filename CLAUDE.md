@@ -14,7 +14,7 @@ The user is a Wesleyan student, the founder and the designer. They make the prod
 
 ## How to run
 - `npm run dev` → http://localhost:5173/. That's the game (`index.html` → `src/row/main.ts`). The old Pixi Foss Hill greybox was deleted 2026-10-02 (it's in git history before that date); `/row.html` redirects to `/` on Vercel.
-- `npm test`: Vitest unit tests (324, about 10 s). **For world-building changes (buildings, paths, layout), this plus a screenshot is usually enough.**
+- `npm test`: Vitest unit tests (326, about 10 s). **For world-building changes (buildings, paths, layout), this plus a screenshot is usually enough.**
 - Browser tests (Playwright, 58) run against a **built copy** (`vite build` into `dist-e2e/`, served by `vite preview` on port 5189), snapshotted when the run starts. So you **can keep editing source while they run**. They use the installed Google Chrome with SwiftShader WebGL, 2 workers (`-- --workers=1` when the machine is busy). Pages open with `?lite=1` (no shadows, no antialiasing, 1× pixels), which draws much less.
   - Split by area (2026-10-06): `tests/e2e/{basics,mobility,house,cars,campus,hud,sound,map}.spec.ts`, shared helpers in `tests/e2e/helpers.ts`.
   - `npm run test:changed`: only the browser tests for the areas your uncommitted changes touch (`scripts/e2e-changed.mjs` maps source files to areas; `-- --dry` prints the plan). A change to `main.ts`, the helpers or the build config also runs every other area's `@smoke` test. **Use this day to day.**
@@ -143,6 +143,7 @@ From the user's 26 photos (`~/Downloads/casper-ref`) and the architects' renders
   - The café commons under the glass: a planter, white pebble seats, round tables, long tables with green chairs, the café counter with its vertical CAFE sign.
   - Glass-fronted classrooms (green carpet) and teaching labs.
 - **Upper floors:** pale oak, glass balustrades with wood handrails, dark slab edges, angled grey soffits in the void under a wood-slat ceiling and a skylight. Teal tub chairs on topo rugs, green high-backs, a green phone booth, a long counter with teal stools on the void, long tables under the west glass. Glass-walled research labs (C166, C168…) with grey carpet, benches with bottle shelving, fume hoods, desks with monitors; seminar rooms.
+- **Stairs and bridge:** each grand stair has a flat landing halfway (`LANDING_T`, `flightRise`). On the top floor a bridge crosses the atrium (`BRIDGE`). Labs have open grid ceilings with exposed silver ducts. The hemisphere light's ground colour is light so the ceilings aren't black.
 - **Look-only:** the rooms (`ROOMS`) are walled off by their glass with the doors shut; you look in. People sit and stand about (`CPEOPLE`), and a few walk the corridors (`CLANES`).
 - **Plan/view split:** `plan.ts` is pure and tested (`tests/unit/casper.test.ts`); `view.ts` draws, and hides walls on your floor between the camera and you.
 - **Debug:** `?x=&z=` inside the footprint starts you inside; `?level=` (0–3) picks the floor.

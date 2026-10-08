@@ -7,7 +7,7 @@ import { BoxBank, worldUV } from '../kit';
 import { rng } from '../noise';
 import { SCI_DOOR, SCI_NDOOR } from '../southend';
 import { crosses } from '../usdan/view';
-import { CWALLS, FH, FLIGHTS, FURNITURE, Flight, IN_L0, IN_UP, ROOMS, VOID, flightT } from './plan';
+import { BRIDGE, CWALLS, FH, FLIGHTS, FURNITURE, Flight, IN_L0, IN_UP, LANDING_T, ROOMS, VOID } from './plan';
 
 // ─── Inside Casper: draws what plan.ts lays out ────────────────────────
 // From the user's photos and the architects' renders. Ground floor: grey plank-tile floor, warm wood-veneer walls with a
@@ -115,13 +115,13 @@ export class CasperView {
 
   constructor() {
     const T = {
-      plank: plankTile(), oak: oak(), veneer: veneer(), slatDark: slats('#4a4743', '#26231f'), slatPale: slats('#e9e6e0', '#b7b2a9'),
+      plank: plankTile(), oak: oak(), veneer: veneer(), slatDark: slats('#77706a', '#3d3934'), slatPale: slats('#e9e6e0', '#b7b2a9'),
       slatWood: slats('#b8875a', '#5a3f26'), green: carpet(70, 120, 60), grey: carpet(150, 150, 152),
     };
     const lam = (map: Texture | null, color = 0xffffff) => new MeshLambertMaterial({ map, color });
     this.mats = {
       plank: lam(T.plank), oak: lam(T.oak), veneer: lam(T.veneer), slatDark: lam(T.slatDark), slatPale: lam(T.slatPale), slatWood: lam(T.slatWood),
-      green: lam(T.green), grey: lam(T.grey), edge: lam(null, 0x2b2c2e), white: lam(null, 0xf1efea), soffit: lam(null, 0x7d8186),
+      green: lam(T.green), grey: lam(T.grey), edge: lam(null, 0x2b2c2e), wood: lam(null, 0xc29a6a), duct: new MeshPhongMaterial({ color: 0xc9ced2, shininess: 60, specular: 0x666666 }), white: lam(null, 0xf1efea), soffit: lam(null, 0x7d8186),
       glass: new MeshPhongMaterial({ color: 0xcfe0e6, specular: 0xffffff, shininess: 80, transparent: true, opacity: 0.16, depthWrite: false, side: DoubleSide }),
       rail: new MeshPhongMaterial({ color: 0xd8e6ea, transparent: true, opacity: 0.22, depthWrite: false, side: DoubleSide }),
     };
@@ -130,6 +130,7 @@ export class CasperView {
     this.walls();
     this.atrium();
     for (const f of FLIGHTS) this.flight(f);
+    this.bridge();
     this.rooms();
     this.furniture();
     this.corridor();
@@ -299,11 +300,13 @@ export class CasperView {
     for (const level of [1, 3]) {
       const S = level === 1 ? A : C;
       rail(level, V.x0, V.z0, S.x1, V.z0);
-      rail(level, S.x1, A.z1 + 0.4, V.x1, A.z1 + 0.4);
+      if (level === 3) { rail(3, S.x1, A.z1 + 0.4, BRIDGE.x0, A.z1 + 0.4); rail(3, BRIDGE.x1, A.z1 + 0.4, V.x1, A.z1 + 0.4); }
+      else rail(level, S.x1, A.z1 + 0.4, V.x1, A.z1 + 0.4);
       rail(level, V.x0, V.z0, V.x0, V.z1);
       rail(level, V.x1, A.z1 + 0.4, V.x1, level === 1 ? B.z0 : V.z1);
       if (level === 1) rail(1, V.x1, B.z1, V.x1, V.z1);
-      rail(level, V.x0, V.z1, V.x1, V.z1);
+      if (level === 3) { rail(3, V.x0, V.z1, BRIDGE.x0, V.z1); rail(3, BRIDGE.x1, V.z1, V.x1, V.z1); }
+      else rail(level, V.x0, V.z1, V.x1, V.z1);
     }
     rail(2, C.x0, V.z0, V.x1, V.z0);
     rail(2, V.x0, C.z1 + 0.4, C.x0, C.z1 + 0.4);
@@ -311,46 +314,87 @@ export class CasperView {
     rail(2, V.x0, B.z0 - 0.4, B.x0, B.z0 - 0.4);
     rail(2, V.x1, V.z0, V.x1, V.z1);
     rail(2, B.x0, V.z1, V.x1, V.z1);
-    // the angled soffits hanging in the void: grey planes cutting across it, the photos' signature
+    // the angled soffits (the photos' signature): long grey ribbons along the void's edges just under each floor, their
+    // faces tilted, the ends cut on a slant; and two great folded planes crossing high up under the wood ceiling
+    for (const level of [1, 2, 3]) {
+      const y = level * FH - SLAB - 0.05;
+      for (const [x0, z0, x1, z1, tilt] of [[V.x0, V.z0 + 0.4, V.x1, V.z0 + 0.4, 0.55], [V.x0, V.z1 - 0.4, V.x1, V.z1 - 0.4, -0.55], [V.x0 + 0.4, V.z0, V.x0 + 0.4, V.z1, 0.5]] as const) {
+        const alongX = x1 - x0 > 0.5, len = alongX ? x1 - x0 : z1 - z0;
+        // (built along its own axis, tilted about that axis: a face turned toward the void, not a slab end-to-end)
+        const m = alongX ? this.box(-len / 2, len / 2, -0.03, 0.03, -0.42, 0.42, M.soffit) : this.box(-0.42, 0.42, -0.03, 0.03, -len / 2, len / 2, M.soffit);
+        m.position.set((x0 + x1) / 2, y - 0.12, (z0 + z1) / 2);
+        if (alongX) m.rotation.x = tilt; else m.rotation.z = tilt;
+      }
+    }
     const top = 4 * FH - SLAB;
-    for (const [x, z, ry, rz, w] of [[-6, 158, 0.3, 0.6, 9], [-1, 164, -0.5, -0.5, 8], [-9, 167, 0.9, 0.4, 6]] as const) {
-      const m = this.box(-w / 2, w / 2, -0.15, 0.15, -1.6, 1.6, M.soffit);
-      m.position.set(x, top - 2.2, z);
+    for (const [x, z, ry, rz, w] of [[-5, 159, 0.35, 0.5, 13], [-3, 165.5, -0.4, -0.45, 12]] as const) {
+      const m = this.box(-w / 2, w / 2, -0.06, 0.06, -1.5, 1.5, M.soffit);
+      m.position.set(x, top - 1.6, z);
       m.rotation.set(0, ry, rz);
+    }
+    // the ground floor's ceiling over the atrium edge: warm wood slats (the photos), not the corridor's dark ones
+  }
+
+  /**
+   * A grand stair (the photos): two runs of charcoal-carpeted treads with a flat landing between, glass sides on dark
+   * steel stringers with a wood handrail along each, the dark underside following the steps.
+   */
+  private flight(f: Flight) {
+    const M = this.mats, n = 24, run = f.x1 - f.x0, y0 = f.base * FH, w = f.z1 - f.z0, cz = (f.z0 + f.z1) / 2, dir = f.up === '+x' ? 1 : -1;
+    const xAt = (t: number) => (dir > 0 ? f.x0 + t * run : f.x1 - t * run);
+    const [la, lb] = LANDING_T;
+    // the steps: n/2 in each run, the landing flat between
+    for (const [t0, t1, h0] of [[0, la, 0], [lb, 1, 0.5]] as const) {
+      const k = n / 2, tread = ((t1 - t0) * run) / k, rise = (0.5 * FH) / k;
+      for (let i = 0; i < k; i++) {
+        const x = xAt(t0 + ((i + 0.5) / k) * (t1 - t0)), top = y0 + h0 * FH + (i + 1) * rise;
+        this.boxes.add(x, top - 0.04, cz, tread + 0.01, 0.08, w, 0x2b2c2e);
+        this.boxes.add(x - (dir * tread) / 2, top - rise / 2, cz, 0.02, rise, w, 0x1f2022); // riser
+        this.boxes.add(x + dir * (tread / 2 - 0.03), top - 0.01, cz, 0.05, 0.02, w, 0x4d4f52); // nosing
+      }
+    }
+    const lx = xAt((la + lb) / 2), lw = (lb - la) * run;
+    this.boxes.add(lx, y0 + 0.5 * FH - 0.06, cz, lw + 0.02, 0.12, w, 0x2b2c2e); // the landing
+    this.boxes.add(lx, y0 + 0.5 * FH - 0.3, cz, lw, 0.36, w, 0x232426);
+    // sides: glass on a dark stringer, a wood handrail, following each run and the landing
+    const pts = [[0, 0], [la, 0.5], [lb, 0.5], [1, 1]] as const;
+    for (const z of [f.z0, f.z1]) {
+      for (let s2 = 0; s2 < 3; s2++) {
+        const [ta, ha] = pts[s2], [tb, hb] = pts[s2 + 1];
+        const a = new Vector3(xAt(ta), y0 + ha * FH, z), b = new Vector3(xAt(tb), y0 + hb * FH, z), len = a.distanceTo(b), ang = Math.atan2(b.y - a.y, b.x - a.x);
+        const mid = a.clone().add(b).multiplyScalar(0.5);
+        const g = new Mesh(new PlaneGeometry(len, 1.05), M.rail);
+        g.position.set(mid.x, mid.y + 0.55, z);
+        g.rotation.z = ang;
+        g.renderOrder = 2;
+        this.group.add(g);
+        for (const [h, th, d, mat] of [[1.1, 0.06, 0.07, this.mats.wood], [-0.18, 0.42, 0.12, M.edge]] as const) {
+          const m = new Mesh(new BoxGeometry(len, th, d), mat);
+          m.position.set(mid.x, mid.y + h, z);
+          m.rotation.z = ang;
+          this.group.add(m);
+        }
+      }
+    }
+    for (let s2 = 0; s2 < 3; s2 += 2) { // the dark underside of each run
+      const [ta, ha] = pts[s2], [tb, hb] = pts[s2 + 1];
+      const a = new Vector3(xAt(ta), y0 + ha * FH, cz), b = new Vector3(xAt(tb), y0 + hb * FH, cz), len = a.distanceTo(b);
+      const m = new Mesh(new BoxGeometry(len, 0.14, w), M.edge);
+      m.position.copy(a.clone().add(b).multiplyScalar(0.5)).add(new Vector3(0, -0.3, 0));
+      m.rotation.z = Math.atan2(b.y - a.y, b.x - a.x);
+      this.group.add(m);
     }
   }
 
-  /** A grand stair: charcoal treads, glass sides with wood handrails, a dark stringer under it. */
-  private flight(f: Flight) {
-    const M = this.mats, n = 24, run = f.x1 - f.x0, tread = run / n, rise = FH / n, y0 = f.base * FH, w = f.z1 - f.z0, cz = (f.z0 + f.z1) / 2;
-    for (let i = 0; i < n; i++) {
-      const t = (i + 0.5) / n, x = f.up === '+x' ? f.x0 + t * run : f.x1 - t * run, top = y0 + (i + 1) * rise;
-      this.boxes.add(x, top - 0.04, cz, tread + 0.01, 0.08, w, 0x2a2b2d);
-      this.boxes.add(x - (f.up === '+x' ? tread / 2 : -tread / 2), top - rise / 2, cz, 0.02, rise, w, 0x1d1e20); // riser
-      this.boxes.add(x + (f.up === '+x' ? tread / 2 - 0.03 : -tread / 2 + 0.03), top - 0.01, cz, 0.05, 0.02, w, 0x55575a); // the nosing
-    }
-    const lo = new Vector3(f.up === '+x' ? f.x0 : f.x1, y0, 0), hi = new Vector3(f.up === '+x' ? f.x1 : f.x0, y0 + FH, 0), len = lo.distanceTo(hi);
-    const ang = Math.atan2(FH, run) * (f.up === '+x' ? 1 : -1);
-    for (const z of [f.z0, f.z1]) {
-      const g = new Mesh(new PlaneGeometry(len, 1.05), M.rail);
-      g.position.set((lo.x + hi.x) / 2, (lo.y + hi.y) / 2 + 0.55, z);
-      g.rotation.z = ang;
+  /** The top floor's bridge across the atrium: a slim deck with a dark edge, glass sides with wood handrails. */
+  private bridge() {
+    const Bg = BRIDGE, y = Bg.level * FH, M = this.mats;
+    this.box(Bg.x0, Bg.x1, y - 0.45, y, Bg.z0, Bg.z1, [M.edge, M.edge, M.oak, M.slatWood, M.edge, M.edge], 3);
+    for (const x of [Bg.x0, Bg.x1]) {
+      const g = this.plane(x, y + 0.55, (Bg.z0 + Bg.z1) / 2, Bg.z1 - Bg.z0, 1.05, Math.PI / 2, M.rail);
       g.renderOrder = 2;
-      this.group.add(g);
-      const r = new Mesh(new BoxGeometry(len, 0.06, 0.07), new MeshLambertMaterial({ color: 0xc29a6a }));
-      r.position.set((lo.x + hi.x) / 2, (lo.y + hi.y) / 2 + 1.1, z);
-      r.rotation.z = ang;
-      this.group.add(r);
-      const s = new Mesh(new BoxGeometry(len, 0.4, 0.12), M.edge); // the stringer
-      s.position.set((lo.x + hi.x) / 2, (lo.y + hi.y) / 2 - 0.15, z);
-      s.rotation.z = ang;
-      this.group.add(s);
+      this.boxes.add(x, y + 1.1, (Bg.z0 + Bg.z1) / 2, 0.07, 0.06, Bg.z1 - Bg.z0, 0xc29a6a);
     }
-    const under = new Mesh(new BoxGeometry(len, 0.12, w), M.edge); // its dark underside
-    under.position.set((lo.x + hi.x) / 2, (lo.y + hi.y) / 2 - 0.25, cz);
-    under.rotation.z = ang;
-    this.group.add(under);
-    void flightT;
   }
 
   // ── the rooms behind the glass: classrooms (green carpet), teaching labs, research labs (grey carpet), seminar rooms ──
@@ -396,6 +440,11 @@ export class CasperView {
         }
         for (const s of [-1, 1]) for (let x = x0 + 0.8; x < x1; x += 1.6) B.add(x, y + 0.5, z + s * 1.0, 0.45, 0.06, 0.45, 0x3a6f9e); // stools/chairs
       }
+      // the open grid ceiling (the photos): grey slats both ways, exposed silver ducts and pipes over them
+      for (let x = r.x0 + 0.6; x < r.x1; x += 0.6) B.add(x, y + CEIL - 0.15, cz, 0.05, 0.12, d, 0x9c9fa2);
+      for (let z = r.z0 + 1.5; z < r.z1; z += 1.5) B.add(cx, y + CEIL - 0.1, z, w, 0.06, 0.05, 0x8d9093);
+      for (const dz of [-d / 4, d / 4]) { const duct = new Mesh(new CylinderGeometry(0.28, 0.28, w - 1, 12), this.mats.duct); duct.rotation.z = Math.PI / 2; duct.position.set(cx, y + CEIL + 0.2, cz + dz); this.group.add(duct); }
+      for (const dz of [-1, 1]) B.add(cx, y + CEIL + 0.05, cz + dz * 0.6, w - 1, 0.08, 0.08, 0x5b6a74);
       B.add(r.x1 - 0.6, y + 1.2, r.z0 + 0.6, 1.0, 2.4, 0.9, 0xeeeeea); // the fume hood…
       this.glow.add(r.x1 - 0.6, y + 1.3, r.z0 + 1.06, 0.8, 0.7, 0.02, 0xe4eef2); // …its lit sash
       for (let z = r.z0 + 1.4; z < r.z1 - 0.6; z += 2.4) { // desks along the glass: white, a monitor, a blue chair

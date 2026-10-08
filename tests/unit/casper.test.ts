@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveMove } from '../../src/row/collide';
 import { layoutRow } from '../../src/row/layout';
 import {
-  CDOORS, CPEOPLE, FH, FLIGHTS, FURNITURE, IN_L0, ROOMS, VOID, casperArrive, casperExtra, casperFloorY, casperLevelAt, casperPortalAt,
+  BRIDGE, CDOORS, CPEOPLE, FH, FLIGHTS, FURNITURE, IN_L0, ROOMS, VOID, casperArrive, casperExtra, casperFloorY, casperLevelAt, casperPortalAt,
   flightT, insideCasper, nearCasperDoor,
 } from '../../src/row/casper/plan';
 import { SCI } from '../../src/row/southend';
@@ -105,6 +105,28 @@ describe('Casper: rooms, furniture, people', () => {
       expect(FLIGHTS.some((s) => (f.level === s.base || f.level === s.base + 1) && f.x > s.x0 && f.x < s.x1 && f.z > s.z0 && f.z < s.z1)).toBe(false);
       if (f.level > 0) expect(f.x > VOID.x0 && f.x < VOID.x1 && f.z > VOID.z0 && f.z < VOID.z1).toBe(false);
     }
-    for (const c of CPEOPLE.filter((q) => !q.inRoom && q.level > 0)) expect(c.x > VOID.x0 && c.x < VOID.x1 && c.z > VOID.z0 && c.z < VOID.z1).toBe(false);
+    const onStairOrBridge = (c: { level: number; x: number; z: number }) => FLIGHTS.some((f) => (c.level === f.base || c.level === f.base + 1) && c.x > f.x0 && c.x < f.x1 && c.z > f.z0 && c.z < f.z1)
+      || (c.level === BRIDGE.level && c.x > BRIDGE.x0 && c.x < BRIDGE.x1 && c.z > BRIDGE.z0 && c.z < BRIDGE.z1);
+    for (const c of CPEOPLE.filter((q) => !q.inRoom && q.level > 0 && !onStairOrBridge(q))) expect(c.x > VOID.x0 && c.x < VOID.x1 && c.z > VOID.z0 && c.z < VOID.z1).toBe(false);
+  });
+});
+
+describe('Casper: the landings and the bridge', () => {
+  it('each flight has a flat landing halfway; the floor only rises along it', () => {
+    for (const f of FLIGHTS) {
+      const z = (f.z0 + f.z1) / 2, at = (t: number) => (f.up === '+x' ? f.x0 + t * (f.x1 - f.x0) : f.x1 - t * (f.x1 - f.x0));
+      expect(casperFloorY(f.base, at(0.47), z)).toBeCloseTo((f.base + 0.5) * FH, 5);
+      expect(casperFloorY(f.base, at(0.53), z)).toBeCloseTo((f.base + 0.5) * FH, 5);
+      let y = -1;
+      for (let t = 0; t <= 1; t += 0.01) { const h = casperFloorY(f.base, at(t), z); expect(h).toBeGreaterThanOrEqual(y - 1e-9); y = h; }
+    }
+  });
+  it('on the top floor you can walk the bridge across the atrium; on the floor below there\'s no bridge', () => {
+    const x = (BRIDGE.x0 + BRIDGE.x1) / 2;
+    const r = walk({ x, z: 156 }, { x, z: 172 }, 3);
+    expect(r.p.z).toBeGreaterThan(VOID.z1 + 0.5); // across, onto the south side (up to the seminar room's glass)
+    expect(r.level).toBe(3);
+    const q = walk({ x: VOID.x1 + 1, z: 162 }, { x, z: 162 }, 2);
+    expect(q.p.x).toBeGreaterThan(VOID.x1);
   });
 });
