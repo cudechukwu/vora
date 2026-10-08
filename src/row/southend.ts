@@ -1,6 +1,6 @@
 import type { Box, XZ } from './collide';
 import { zelnickY } from './zelnick';
-import { BACK_PATH, distToPoly, inPoly } from './layout';
+import { BACK_PATH, ROAD, distToPoly, inPoly } from './layout';
 
 // ─── The south end of Andrus Field (pure data) ─────────────────────────
 // From the user's photos, the architects' photos of the Frank Center and
@@ -32,7 +32,7 @@ export const FIELD_ROAD = { x0: -190, x1: BACK_PATH.x0, z0: -4.2, z1: 2.8 } as c
 export const TERRACE_Y = 2;
 
 /** The bank: flat on top, sloping down to its edges here (the north slope, to the road, is longer). */
-export const BERM = { x0: -180, x1: -73, z0: 3.4, z1: 88 } as const;
+export const BERM = { x0: -184, x1: -73, z0: 3.4, z1: 122.5 } as const; // (on south under Olin's lawn, down to Church Street's sidewalk)
 const SLOPE = 5, SLOPE_N = 6;
 
 type Rect = { x0: number; x1: number; z0: number; z1: number };
@@ -139,11 +139,58 @@ export function plazaChairs(t: XZ): { x: number; z: number; heading: number }[] 
 /** Who's out at the tables (table, chair). */
 export const PLAZA_SITTERS: [number, number][] = [[0, 0], [0, 2], [1, 1], [2, 3]];
 
-/** Olin Library, a good way west: a block, with a half drum on its north side facing the field. */
-/** (Moved 8 m west on 2026-10-07 to make room for the Pruzan Art Center between it and the Frank Center.) */
-export const OLIN = { cx: -149, cz: 28, r: 14, x0: -172, x1: -126, z1: 82, h: 13, name: 'Olin Library' } as const;
-/** Olin's front door, on its east side, at the end of the walk from the east stairs; a limestone portico of four columns stands out over it. */
-export const OLIN_DOOR = { x: OLIN.x1, z: (STAIRS_E.z0 + STAIRS_E.z1) / 2, out: 2.6, half: 4 } as const;
+/**
+ * Olin Memorial Library (the user's photos, 2026-10-07: "Olin is what makes Wesleyan"). The old building is a brick
+ * block on a high white marble base, its front to the south: a portico of six Ionic columns under a pediment, up a broad
+ * flight of marble steps, onto a big lawn with an X of walks. Its back is the newer half drum of tall arched windows
+ * facing the field (`r` round `cx`, `cz`). It stands on raised grounds (`OLIN_SITE`, `OLIN_RISE` higher than the bank):
+ * the walk from the Pruzan climbs a small flight (`STAIRS_O`) to reach them.
+ * (Moved 8 m west on 2026-10-07 for the Pruzan; its front brought north to z1 the same day, in line with the Frank Center's.)
+ */
+export const OLIN = { cx: -149, cz: 28, r: 14, x0: -172, x1: -126, z1: 62, h: 13, name: 'Olin Library' } as const;
+export const OLIN_RISE = 0.9;
+export const OLIN_Y = TERRACE_Y + OLIN_RISE;
+/**
+ * The raised grounds: the building, the walk along its front, the lawn. Grass slopes up to them all round; on the
+ * Pruzan side (east) the slope is as long as the small stairs set into it (the user: no wall, just grass that slopes).
+ */
+export const OLIN_SITE = { x0: OLIN.x0 - 4, x1: OLIN.x1, z0: OLIN.cz - 2, z1: 117 } as const;
+/** The small stairs up from the walk from the Pruzan onto Olin's grounds (rising toward −x), and the walk on along Olin's front. */
+export const STAIRS_O = { x0: OLIN.x1 - 4.5, x1: OLIN.x1, z0: OLIN_WALK.z0, z1: OLIN_WALK.z1, steps: 5 } as const;
+export const OLIN_FRONT_WALK = { x0: OLIN.x0 - 2, x1: STAIRS_O.x0, z0: OLIN_WALK.z0, z1: OLIN_WALK.z1 } as const;
+/** The portico: its marble floor (`y`), stood out from the front wall; the six columns along its front edge. */
+export const PORTICO_O = { x0: OLIN.cx - 9.6, x1: OLIN.cx + 9.6, z0: OLIN.z1, z1: OLIN.z1 + 4.6, y: OLIN_Y + 1.8 } as const;
+export const OLIN_COLUMNS: XZ[] = [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5].map((k) => ({ x: OLIN.cx + k * 3.3, z: PORTICO_O.z1 - 0.7 }));
+/** The broad marble steps from the walk up to the portico (descending toward +z), the door at the top. */
+export const OLIN_STEPS = { x0: PORTICO_O.x0, x1: PORTICO_O.x1, z0: PORTICO_O.z1, z1: OLIN_WALK.z0, steps: 10 } as const;
+export const OLIN_DOOR = { x: OLIN.cx, z: OLIN.z1, half: 1.3 } as const;
+/** The lawn in front, and its walks: two straight out from the steps side by side, and an X of diagonals corner to corner. */
+export const OLIN_LAWN = { x0: OLIN.cx - 19, x1: OLIN.cx + 19, z0: OLIN_WALK.z1, z1: OLIN_SITE.z1 - 1.5 } as const;
+export const LAWN_WALKS: { a: XZ; b: XZ; w: number }[] = [
+  { a: { x: OLIN.cx - 2.4, z: OLIN_LAWN.z0 }, b: { x: OLIN.cx - 2.4, z: OLIN_LAWN.z1 }, w: 1.8 },
+  { a: { x: OLIN.cx + 2.4, z: OLIN_LAWN.z0 }, b: { x: OLIN.cx + 2.4, z: OLIN_LAWN.z1 }, w: 1.8 },
+  { a: { x: OLIN_LAWN.x0 + 2, z: OLIN_LAWN.z0 }, b: { x: OLIN_LAWN.x1 - 2, z: OLIN_LAWN.z1 }, w: 2 },
+  { a: { x: OLIN_LAWN.x1 - 2, z: OLIN_LAWN.z0 }, b: { x: OLIN_LAWN.x0 + 2, z: OLIN_LAWN.z1 }, w: 2 },
+];
+/** How far (x, z) is from the nearest of the lawn's walks' centre lines. */
+export function lawnWalkDist(p: XZ): number {
+  let best = Infinity;
+  for (const w of LAWN_WALKS) {
+    const dx = w.b.x - w.a.x, dz = w.b.z - w.a.z, t = Math.max(0, Math.min(1, ((p.x - w.a.x) * dx + (p.z - w.a.z) * dz) / (dx * dx + dz * dz)));
+    best = Math.min(best, Math.hypot(p.x - (w.a.x + dx * t), p.z - (w.a.z + dz * t)) - w.w / 2);
+  }
+  return best;
+}
+/** Big old trees on the lawn (the photos: two flanking the steps, more out across it), benches by the walks, lamps at the foot of the steps, the sign. */
+export const OLIN_TREES: XZ[] = [
+  { x: OLIN.cx - 8, z: 80 }, { x: OLIN.cx + 8, z: 80 }, { x: OLIN.cx - 17, z: 92 }, { x: OLIN.cx + 17, z: 92 },
+  { x: OLIN.cx - 18, z: 104 }, { x: OLIN.cx + 18, z: 104 }, { x: OLIN.cx - 7, z: 111 }, { x: OLIN.cx + 7, z: 111 },
+];
+export const OLIN_BENCHES = [
+  { x: OLIN.cx - 5, z: 86, rot: Math.PI / 2 }, { x: OLIN.cx + 5, z: 86, rot: -Math.PI / 2 },
+] as const;
+export const OLIN_LAMPS: XZ[] = [{ x: PORTICO_O.x0 - 1.2, z: OLIN_WALK.z1 + 0.6 }, { x: PORTICO_O.x1 + 1.2, z: OLIN_WALK.z1 + 0.6 }];
+export const OLIN_SIGN: XZ = { x: OLIN.cx + 6.5, z: OLIN_LAWN.z0 + 2.5 };
 /**
  * The Pruzan Art Center's tall limestone block of galleries, against Olin's east side (the user's photos, 2026-10-07).
  * It stops short of the Frank Center: a paved courtyard runs between them (`NCOURT`). Its north end, to the field,
@@ -302,12 +349,122 @@ export const ALLB_FORECOURT = { x0: ALLBRITTON.x0 + 3, x1: ALLBRITTON.x1 - 3, z0
 export const LINK_DOOR_S = { x: -80.5, z: FRANK_LINK.z1 } as const;
 export const LINK_WALK = { x0: LINK_DOOR_S.x - 1.4, x1: LINK_DOOR_S.x + 1.4, z0: FRANK_LINK.z1, z1: OLIN_WALK.z0 } as const;
 
+/**
+ * Church Street (the user's street views, 2026-10-07): the road along the bottom of the bank, south of Olin's lawn and
+ * Allbritton, two lanes and a double yellow line, curbs and sidewalks both sides; it meets High Street at a T. Across it
+ * (not built yet): the Exley Science Center and the rest.
+ */
+export const CHURCH = { x0: -200, x1: ROAD.x0, z0: 125, z1: 133 } as const;
+export const CHURCH_WALK_N = { x0: -190, x1: ROAD.x0, z0: 122.6, z1: CHURCH.z0 } as const;
+export const CHURCH_WALK_S = { x0: -190, x1: ROAD.x0, z0: CHURCH.z1, z1: 135.4 } as const;
+
+/**
+ * Allbritton's back, onto Church Street (the user's street views, 2026-10-07). Not one flat wall but three parts, on a
+ * tall base of rough granite: on the west, the old block under its copper hip roof, a stone-trimmed bay standing out
+ * from it (`ALLB_BAY`); in the middle, a wide plain brick stair tower standing well out and up past the roof
+ * (`ALLB_TOWER`, its grey door on its face); on the east, a block of its own come forward toward the street, with a flat
+ * roof, a parapet and a little room on top, arched windows along its top floor (`ALLB_WING`, a door in its base). Along
+ * the tower and that block, a long landing at the doors' level (`ALLB_LANDING`) with a railing, steps down off its west
+ * end (`ALLB_STEPS`), a ramp down from its east end to the sidewalk (`ALLB_RAMP`, 1 in 12). The rest is a small parking
+ * lot (`ALLB_LOT`) off the street (`ALLB_DRIVE` crosses the sidewalk): the two accessible spaces at the west end by a low
+ * concrete wall (`ALLB_WALL`), more nose-in to the landing; the black "Allbritton Hall" sign at the foot of the steps.
+ */
+export const ALLB_BAY = { x0: -64, x1: -58.2, z0: ALLBRITTON.z1, z1: ALLBRITTON.z1 + 1.2 } as const;
+export const ALLB_TOWER = { x0: -57.2, x1: -51.6, z0: ALLBRITTON.z1, z1: ALLBRITTON.z1 + 3, h: ALLBRITTON.h + 2.4 } as const;
+export const ALLB_WING = { x0: ALLB_TOWER.x1, x1: ALLBRITTON.x1, z0: ALLBRITTON.z1 - 8, z1: ALLBRITTON.z1 + 2.5, h: ALLBRITTON.h + 1.2 } as const;
+export const ALLB_REAR_DOOR = { x: (ALLB_TOWER.x0 + ALLB_TOWER.x1) / 2, z: ALLB_TOWER.z1 } as const;
+export const ALLB_WING_DOOR = { x: ALLB_WING.x0 + 4.2, z: ALLB_WING.z1 } as const;
+export const ALLB_LANDING = { x0: ALLB_TOWER.x0 - 2.2, x1: ALLB_WING.x1 - 0.4, z0: ALLBRITTON.z1, z1: ALLB_TOWER.z1 + 1.6, h: 0.5 } as const;
+export const ALLB_STEPS = { x0: ALLB_LANDING.x0 - 2.1, x1: ALLB_LANDING.x0, z0: ALLB_BAY.z1 + 0.2, z1: ALLB_LANDING.z1, steps: 4 } as const; // (up toward +x)
+export const ALLB_RAMP = { x0: ALLB_LANDING.x1 - 2.2, x1: ALLB_LANDING.x1, z0: ALLB_LANDING.z1, z1: ALLB_LANDING.z1 + ALLB_LANDING.h * 12 } as const; // (down toward +z)
+export const ALLB_LOT = { x0: -71.5, x1: ALLBRITTON.x1 + 2, z0: ALLBRITTON.z1, z1: CHURCH_WALK_N.z0 } as const;
+export const ALLB_DRIVE = { x0: -66.5, x1: -58.5 } as const;
+export const ALLB_WALL = { x0: ALLB_LOT.x0 - 0.3, x1: ALLB_LOT.x0, z0: ALLB_LOT.z0, z1: ALLB_LOT.z1 - 1.5 } as const;
+/** The stalls: where each car parks (its middle), nose to the building or the landing; the first two accessible. */
+export const ALLB_STALLS: (XZ & { w: number; len: number; accessible: boolean })[] = [
+  ...[0, 1, 2].map((i) => ({ x: ALLB_LOT.x0 + 0.2 + 1.35 + i * 2.7 + (i >= 2 ? 1.4 : 0), z: ALLB_BAY.z1 + 0.1 + 2.5, w: 2.7, len: 5, accessible: i < 2 })),
+  ...[0, 1, 2].map((i) => ({ x: ALLB_TOWER.x0 + 1.3 + i * 2.6, z: ALLB_LANDING.z1 + 0.25 + 2.3, w: 2.6, len: 4.6, accessible: false })),
+];
+/** Which stalls have a car in, and what colour. */
+export const ALLB_PARKED: [number, number][] = [[0, 0x1d1f24], [2, 0xe9e9e9], [3, 0x5a5f66], [5, 0x2148a8]];
+export const ALLB_SIGN: XZ = { x: ALLB_STEPS.x0 + 1.2, z: ALLB_LANDING.z1 + 0.5 };
+
+/**
+ * The walkway to Church Street (the user's street views, and where they stood to show it, 2026-10-07): it carries on from
+ * the south end of the plaza by the Frank Center, down Allbritton's west side, to the street. Slimmer than the back path
+ * and coal tar like it, in a gentle S; planted either side (the bank rising on its west, stepped back here to make room:
+ * `bankEast`), short posts with chains slung between them in a W along both edges (`CHAIN_POSTS`; they keep you on it),
+ * bronze lamp posts; at the foot a hydrant and a crossing sign, a crosswalk over the street. Level, like the plaza and
+ * the street.
+ */
+const WALKWAY_CTRL: XZ[] = [
+  { x: -70, z: 81 }, { x: -73.3, z: 90 }, { x: -76.3, z: 100 }, { x: -77.3, z: 110 }, { x: -76, z: 118 }, { x: -75.3, z: CHURCH_WALK_N.z0 + 0.8 },
+];
+/** Its centre line, a smooth curve through those points, every half metre or so. */
+export const WALKWAY_PTS: XZ[] = (() => {
+  const c = WALKWAY_CTRL, out: XZ[] = [];
+  for (let i = 0; i < c.length - 1; i++) {
+    const p0 = c[Math.max(0, i - 1)], p1 = c[i], p2 = c[i + 1], p3 = c[Math.min(c.length - 1, i + 2)];
+    const n = Math.ceil(Math.hypot(p2.x - p1.x, p2.z - p1.z) / 0.5);
+    for (let k = 0; k < n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      const f = (a: number, b: number, cc: number, d: number) => 0.5 * (2 * b + (-a + cc) * t + (2 * a - 5 * b + 4 * cc - d) * t2 + (-a + 3 * b - 3 * cc + d) * t3);
+      out.push({ x: f(p0.x, p1.x, p2.x, p3.x), z: f(p0.z, p1.z, p2.z, p3.z) });
+    }
+  }
+  out.push(c[c.length - 1]);
+  return out;
+})();
+const WALKWAY_S: number[] = WALKWAY_PTS.reduce((acc, p, i) => (i ? [...acc, acc[i - 1] + Math.hypot(p.x - WALKWAY_PTS[i - 1].x, p.z - WALKWAY_PTS[i - 1].z)] : [0]), [] as number[]);
+export const WALKWAY = { w: 3.2, len: WALKWAY_S[WALKWAY_S.length - 1], chains: 2.1, beds: 4.4 } as const; // (widened from 2.4 m at the user's ask) // (chains: how far out the posts stand; beds: how far the planting runs)
+/** The nearest point of the walkway's centre line to p: how far, how far along, which way it runs there. */
+export function walkwayAt(p: XZ): { d: number; s: number; x: number; z: number; dx: number; dz: number } {
+  let best = { d: Infinity, s: 0, x: 0, z: 0, dx: 0, dz: 1 };
+  for (let i = 1; i < WALKWAY_PTS.length; i++) {
+    const a = WALKWAY_PTS[i - 1], b = WALKWAY_PTS[i], ex = b.x - a.x, ez = b.z - a.z, l2 = ex * ex + ez * ez;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * ex + (p.z - a.z) * ez) / l2));
+    const x = a.x + ex * t, z = a.z + ez * t, d = Math.hypot(p.x - x, p.z - z);
+    if (d < best.d) { const l = Math.sqrt(l2); best = { d, s: WALKWAY_S[i - 1] + l * t, x, z, dx: ex / l, dz: ez / l }; }
+  }
+  return best;
+}
+/** The point s metres along the walkway, and which way it runs there. */
+export function walkwayPoint(s: number) {
+  let i = 1;
+  while (i < WALKWAY_S.length - 1 && WALKWAY_S[i] < s) i++;
+  const a = WALKWAY_PTS[i - 1], b = WALKWAY_PTS[i], l = WALKWAY_S[i] - WALKWAY_S[i - 1] || 1, t = Math.max(0, Math.min(1, (s - WALKWAY_S[i - 1]) / l));
+  return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, dx: (b.x - a.x) / l, dz: (b.z - a.z) / l };
+}
+/** The posts along both edges (from just past the plaza to the sidewalk), `side` −1 west / +1 east. */
+export const CHAIN_POSTS: (XZ & { side: number; s: number })[] = (() => {
+  const out: (XZ & { side: number; s: number })[] = [], s0 = 3, s1 = WALKWAY.len - 1.2, n = Math.round((s1 - s0) / 2.4);
+  for (let k = 0; k <= n; k++) {
+    const s = s0 + ((s1 - s0) * k) / n, p = walkwayPoint(s);
+    for (const side of [-1, 1]) out.push({ x: p.x + side * p.dz * WALKWAY.chains, z: p.z - side * p.dx * WALKWAY.chains, side, s }); // (side +1: the east edge)
+  }
+  return out;
+})();
+/** Bronze lamp posts along it, either side in turn, outside the chains. */
+export const WALKWAY_LAMPS: XZ[] = [8, 22, 36].map((s, i) => { const p = walkwayPoint(s), side = i % 2 ? 1 : -1; return { x: p.x + side * p.dz * 3.0, z: p.z - side * p.dx * 3.0 }; });
+/** At its foot: the hydrant in the planting, the crossing sign at the curb, and the crosswalk over the street. */
+const FOOT = WALKWAY_CTRL[WALKWAY_CTRL.length - 1];
+export const HYDRANT: XZ = { x: FOOT.x + 2.6, z: CHURCH_WALK_N.z0 - 0.9 };
+export const XING_SIGN: XZ = { x: FOOT.x + 3.4, z: CHURCH.z0 - 0.4 };
+export const CHURCH_XWALK = { x0: FOOT.x - 1.9, x1: FOOT.x + 1.9 } as const;
+/** Lamps along Church Street's north sidewalk. */
+export const CHURCH_LAMPS: XZ[] = [-170, -140, -110, -50, -20, 4].map((x) => ({ x, z: CHURCH_WALK_N.z0 + 0.4 }));
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const inRect = (p: XZ, b: Rect, pad = 0) => p.x > b.x0 - pad && p.x < b.x1 + pad && p.z > b.z0 - pad && p.z < b.z1 + pad;
 
+/** The bank's east edge (x) at z: along the plaza, then stepped back west past its south end, for the walkway down Allbritton's side. */
+export function bankEast(z: number): number {
+  const t = clamp01((z - 77) / 7);
+  return BERM.x1 - 9 * t * t * (3 - 2 * t);
+}
+
 /** The bank's height, ignoring the stairs and landing cut into it. */
 export function bankY(x: number, z: number): number {
-  const a = Math.min((x - BERM.x0) / SLOPE, (BERM.x1 - x) / SLOPE, (z - BERM.z0) / SLOPE_N, (BERM.z1 - z) / SLOPE);
+  const a = Math.min((x - BERM.x0) / SLOPE, (bankEast(z) - x) / SLOPE, (z - BERM.z0) / SLOPE_N, (BERM.z1 - z) / SLOPE);
   const t = clamp01(a);
   return TERRACE_Y * t * t * (3 - 2 * t);
 }
@@ -319,7 +476,29 @@ export function groundY(x: number, z: number): number {
   if (inRect(p, STAIRS)) return TERRACE_Y * clamp01((z - STAIRS.z0) / (STAIRS.z1 - STAIRS.z0));
   if (inRect(p, STAIRS_E)) return TERRACE_Y * clamp01((STAIRS_E.x1 - x) / (STAIRS_E.x1 - STAIRS_E.x0));
   if (inRect(p, STAIRS_W)) return TERRACE_Y * clamp01((z - STAIRS_W.z0) / (STAIRS_W.z1 - STAIRS_W.z0));
-  return bankY(x, z) || zelnickY(x, z); // (and up the steps and ramp at Zelnick's back entrance)
+  if (inRect(p, ALLB_LANDING)) return ALLB_LANDING.h;
+  if (inRect(p, ALLB_STEPS)) return ALLB_LANDING.h * clamp01((x - ALLB_STEPS.x0) / (ALLB_STEPS.x1 - ALLB_STEPS.x0));
+  if (inRect(p, ALLB_RAMP)) return ALLB_LANDING.h * clamp01((ALLB_RAMP.z1 - z) / (ALLB_RAMP.z1 - ALLB_RAMP.z0));
+  if (inRect(p, STAIRS_O)) return TERRACE_Y + OLIN_RISE * clamp01((STAIRS_O.x1 - x) / (STAIRS_O.x1 - STAIRS_O.x0));
+  if (inRect(p, OLIN_STEPS)) return OLIN_Y + (PORTICO_O.y - OLIN_Y) * clamp01((OLIN_STEPS.z1 - z) / (OLIN_STEPS.z1 - OLIN_STEPS.z0));
+  if (inRect(p, PORTICO_O)) return PORTICO_O.y;
+  return (bankY(x, z) + oliny(x, z)) || zelnickY(x, z); // (and up the steps and ramp at Zelnick's back entrance)
+}
+
+/** The ground itself, under anything built on it (Olin's steps and portico, the small stairs): for drawing the grass. */
+export function terrainY(x: number, z: number): number {
+  const p = { x, z };
+  if (inRect(p, OLIN_STEPS) || inRect(p, PORTICO_O)) return bankY(x, z) + oliny(x, z);
+  return groundY(x, z);
+}
+
+/** How much higher Olin's grounds are at (x, z): grass slopes up all round; on the east, a long straight one beside the small stairs. */
+function oliny(x: number, z: number): number {
+  const S = OLIN_SITE, R = 2;
+  if (x >= S.x1) return 0;
+  const t = clamp01(Math.min((x - S.x0 + R) / R, (z - S.z0 + R) / R, (S.z1 + R - z) / R));
+  const east = clamp01((S.x1 - x) / (STAIRS_O.x1 - STAIRS_O.x0)); // (rising just as the stairs do)
+  return OLIN_RISE * Math.min(t * t * (3 - 2 * t), east);
 }
 
 /** Too steep or high for a car: anywhere up the bank (or on the stairs). */
@@ -327,12 +506,13 @@ export const offRoadForCars = (p: XZ) =>
   !inRect(p, LANDING) && (inRect(p, STAIRS) || inRect(p, STAIRS_E) || inRect(p, STAIRS_W) || bankY(p.x, p.z) > 0.12);
 
 const FRANK_PARTS: Rect[] = [FRANK, FRANK_LINK, FRANK_ADD];
+const ALLB_PARTS: Rect[] = [ALLBRITTON, ALLB_TOWER, ALLB_WING, ALLB_BAY];
 const PRUZAN_PARTS: Rect[] = [PRUZAN, PRUZAN_ENTRY, PRUZAN_LINK_N, ...PRUZAN_PIERS];
 const inBlock = (p: XZ, pad: number) => inPoly(p, OLIN_LINK_POLY) || (pad > 0 && distToPoly(p, OLIN_LINK_POLY) < pad);
 
 /** Inside (or within `pad` of) one of the buildings down here? */
 export function inSouthEnd(p: XZ, pad = 0): boolean {
-  return [...FRANK_PARTS, ...PRUZAN_PARTS, ALLBRITTON].some((b) => inRect(p, b, pad)) || inBlock(p, pad)
+  return [...FRANK_PARTS, ...PRUZAN_PARTS, ...ALLB_PARTS].some((b) => inRect(p, b, pad)) || inBlock(p, pad)
     || inPoly(p, OLIN_POLY) || (pad > 0 && distToPoly(p, OLIN_POLY) < pad);
 }
 
@@ -340,8 +520,9 @@ export function inSouthEnd(p: XZ, pad = 0): boolean {
 export function southEndNear(p: XZ, reach = 8): string | null {
   if (PRUZAN_PARTS.some((b) => inRect(p, b, 4)) || inBlock(p, 4) || inRect(p, PRUZAN_COURT, 3) || inRect(p, NCOURT)) return PRUZAN.name; // (first: it's between the other two)
   if (FRANK_PARTS.some((b) => inRect(p, b, reach))) return FRANK.name;
-  if (inPoly(p, OLIN_POLY) || distToPoly(p, OLIN_POLY) < reach) return OLIN.name;
-  if (inRect(p, ALLBRITTON, reach)) return ALLBRITTON.name;
+  if (inPoly(p, OLIN_POLY) || distToPoly(p, OLIN_POLY) < reach || inRect(p, OLIN_LAWN) || inRect(p, PORTICO_O, 2)) return OLIN.name;
+  if (inRect(p, ALLBRITTON, reach) || inRect(p, ALLB_LOT)) return ALLBRITTON.name;
+  if (p.x > CHURCH.x0 && p.x < CHURCH.x1 && p.z > CHURCH_WALK_N.z0 && p.z < CHURCH_WALK_S.z1) return 'Church Street';
   return null;
 }
 
@@ -363,8 +544,17 @@ export const SYCAMORE2: XZ = { x: -59.4, z: 31 };
 export const MULCH = { x0: STAIRS.x1 + 0.5, x1: FRANK_ADD.x1 + 2, z1: FRANK_ADD.z0 } as const;
 export const FLAGPOLE: XZ = { x: OLIN_LINK.x1 - 2.5, z: 15.2 };
 export const CHEEK = 0.35; // stair cheek wall thickness
-/** The portico's four columns, standing out from Olin's front, either side of the walk. */
-export const OLIN_COLUMNS: XZ[] = [-1, -1 / 3, 1 / 3, 1].map((k) => ({ x: OLIN_DOOR.x + OLIN_DOOR.out - 0.4, z: OLIN_DOOR.z + k * OLIN_DOOR.half }));
+
+/** Points every 0.35 m along one edge's chain, post to post: they're solid, so you stay on the walkway. */
+function chainLine(side: number): XZ[] {
+  const posts = CHAIN_POSTS.filter((p) => p.side === side), out: XZ[] = [];
+  for (let i = 1; i < posts.length; i++) {
+    const a = posts[i - 1], b = posts[i], n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.35);
+    for (let k = 0; k < n; k++) out.push({ x: a.x + ((b.x - a.x) * k) / n, z: a.z + ((b.z - a.z) * k) / n });
+  }
+  out.push(posts[posts.length - 1]);
+  return out;
+}
 
 /** Things to bump into: the stair cheek walls, bollard lights, the sign, the trees, the flagpole, the Pruzan's fountain, the plaza's tables and benches. Padded by a walker's radius. */
 export function southObstacles(pad = 0.3): Box[] {
@@ -385,7 +575,22 @@ export function southObstacles(pad = 0.3): Box[] {
     b(SIGN.x, SIGN.z, 0.1, 0.1),
     b(SYCAMORE.x, SYCAMORE.z, 0.75, 0.75), b(SYCAMORE2.x, SYCAMORE2.z, 0.7, 0.7),
     b(FLAGPOLE.x, FLAGPOLE.z, 0.08, 0.08), b(PRUZAN_BIRCH.x, PRUZAN_BIRCH.z, 0.3, 0.3),
-    ...OLIN_COLUMNS.map((c) => b(c.x, c.z, 0.35, 0.35)),
+    ...OLIN_COLUMNS.map((c) => b(c.x, c.z, 0.5, 0.5)),
+    // Olin's grounds: the cheeks of its grand steps, the trees, benches, lamps, sign
+    ...[PORTICO_O.x0 - 0.35, PORTICO_O.x1 + 0.35].map((x) => b(x, (PORTICO_O.z0 + OLIN_STEPS.z1) / 2, 0.35, (OLIN_STEPS.z1 - PORTICO_O.z0) / 2)),
+    ...OLIN_TREES.map((t) => b(t.x, t.z, 0.45, 0.45)),
+    ...OLIN_BENCHES.map((t) => b(t.x, t.z, 0.35, 1.0)),
+    ...[...OLIN_LAMPS, OLIN_SIGN].map((t) => b(t.x, t.z, 0.12, 0.12)),
+    // Allbritton's back: the railing along the landing's front (open at the ramp) and round the steps; both sides of the
+    // ramp; the concrete wall at the lot's west end; the sign
+    b((ALLB_LANDING.x0 + ALLB_RAMP.x0) / 2, ALLB_LANDING.z1, (ALLB_RAMP.x0 - ALLB_LANDING.x0) / 2, 0.05),
+    ...[ALLB_STEPS.z0, ALLB_STEPS.z1].map((z) => b((ALLB_STEPS.x0 + ALLB_STEPS.x1) / 2, z, (ALLB_STEPS.x1 - ALLB_STEPS.x0) / 2, 0.05)),
+    ...[ALLB_RAMP.x0, ALLB_RAMP.x1].map((x) => b(x, (ALLB_RAMP.z0 + ALLB_RAMP.z1) / 2, 0.05, (ALLB_RAMP.z1 - ALLB_RAMP.z0) / 2)),
+    b((ALLB_WALL.x0 + ALLB_WALL.x1) / 2, (ALLB_WALL.z0 + ALLB_WALL.z1) / 2, (ALLB_WALL.x1 - ALLB_WALL.x0) / 2, (ALLB_WALL.z1 - ALLB_WALL.z0) / 2),
+    b(ALLB_SIGN.x, ALLB_SIGN.z, 0.45, 0.1),
+    // the walkway down to Church Street: its lamps, the hydrant, the sign, and the chains along both edges (posts and all)
+    ...[...WALKWAY_LAMPS, HYDRANT, XING_SIGN, ...CHURCH_LAMPS].map((t) => b(t.x, t.z, 0.15, 0.15)),
+    ...chainLine(-1).map((t) => b(t.x, t.z, 0.08, 0.08)), ...chainLine(1).map((t) => b(t.x, t.z, 0.08, 0.08)),
     b(MAIN_ENTRY.x + MAIN_ENTRY.out / 2, MAIN_ENTRY.z, MAIN_ENTRY.out / 2, MAIN_ENTRY.half), // the entry bay
     b((POOL.x0 + POOL.x1) / 2, (POOL.z0 + POOL.z1) / 2, (POOL.x1 - POOL.x0) / 2 + 0.3, (POOL.z1 - POOL.z0) / 2 + 0.3), // the fountain (and its drain round it)
     ...ALLB_WELLS.map((w) => b((w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2, (w.x1 - w.x0) / 2 + 0.2, (w.z1 - w.z0) / 2 + 0.2)), // Allbritton's basement wells

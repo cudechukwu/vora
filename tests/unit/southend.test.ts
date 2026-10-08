@@ -4,6 +4,9 @@ import {
   southEndNear, southObstacles, MAIN_ENTRY, PRUZAN, PRUZAN_PIERS, PRUZAN_GLASS, PRUZAN_ENTRY, PRUZAN_DOOR, PRUZAN_COURT, POOL, POOL_BED,
   POOL_SITTERS, GALLERY, GALLERY_SOFAS, PRUZAN_BIRCH, pruzanSoffit, pruzanPaveEdge, PRUZAN_FRANK_BED, FRANK_NICHE_W,
   OLIN_LINK_POLY, NCOURT, NCOURT_TABLES, NCOURT_BED, NWALK, PRUZAN_LINK_N, PRUZAN_DOOR_N, STAIRS_W, BALUSTRADE, FLAGPOLE, FRANK_NICHE_N, ALLB_WELLS, ALLBRITTON_DOOR, LINK_DOOR_S, LINK_WALK, OLIN_WALK, OLIN_DOOR, PLAZA_TABLES,
+  OLIN_Y, OLIN_RISE, OLIN_SITE, STAIRS_O, terrainY, PORTICO_O, OLIN_STEPS, OLIN_COLUMNS, OLIN_LAWN, LAWN_WALKS, OLIN_TREES, OLIN_BENCHES, lawnWalkDist,
+  CHURCH, CHURCH_WALK_N, CHURCH_WALK_S, CHURCH_XWALK, WALKWAY, WALKWAY_PTS, CHAIN_POSTS, WALKWAY_LAMPS, walkwayAt, walkwayPoint,
+  ALLB_TOWER, ALLB_BAY, ALLB_WING, ALLB_WING_DOOR, ALLB_REAR_DOOR, ALLB_LANDING, ALLB_STEPS, ALLB_RAMP, ALLB_LOT, ALLB_DRIVE, ALLB_STALLS, ALLB_PARKED, ALLB_WALL,
 } from '../../src/row/southend';
 import { BACK_PATH, FIELD_X, byId, inPoly, layoutRow } from '../../src/row/layout';
 import { Extra, blockedAt, resolveMove } from '../../src/row/collide';
@@ -11,6 +14,7 @@ import { FOOTBALL, fenceObstacles, fenceRuns, pathObstacles } from '../../src/ro
 import { surfaceAt } from '../../src/row/surface';
 import { World } from '../../src/row/world';
 import { PLACES } from '../../src/row/map';
+import { createGarage } from '../../src/row/cars';
 
 const { stops, crossings } = layoutRow();
 const fz = FOOTBALL.z;
@@ -99,10 +103,8 @@ describe('the Frank Center and Olin, up on their bank', () => {
     // the walk at the top runs straight on west to Olin's front door
     expect(OLIN_WALK.x1).toBe(STAIRS_E.x0);
     expect(OLIN_WALK.x0).toBe(OLIN.x1);
-    expect(OLIN_DOOR.x).toBe(OLIN.x1);
-    expect(OLIN_DOOR.z).toBeGreaterThan(OLIN_WALK.z0);
-    expect(OLIN_DOOR.z).toBeLessThan(OLIN_WALK.z1);
-    expect(OLIN_DOOR.z + OLIN_DOOR.half).toBeLessThan(OLIN.z1); // on Olin's east face
+    expect(OLIN_DOOR.z).toBe(OLIN.z1); // Olin's door is on its south front (the user: the columns faced the wrong way)
+    expect(OLIN_DOOR.x).toBe(OLIN.cx);
     expect(OLIN_WALK.z0).toBeGreaterThan(FRANK.z1); // passing the Frank Center's south end
   });
 
@@ -130,19 +132,81 @@ describe('the Frank Center and Olin, up on their bank', () => {
     expect(p.z).toBeGreaterThan(STAIRS.z1);
   });
 
-  it('…and up the east stairs from the plaza, along the walk on top, under the portico to Olin\'s front door', () => {
-    const z = OLIN_DOOR.z;
+  it('…and up the east stairs from the plaza, along the walk past the Pruzan, up the small stairs, along Olin\'s front, up its steps to the door', () => {
+    const z = (OLIN_WALK.z0 + OLIN_WALK.z1) / 2;
     let p = { x: PLAZA_F.x0 + 3, z };
     let y = -1;
-    for (let i = 0; i < 700; i++) {
-      p = resolveMove(p, { x: p.x - 0.1, z: p.z }, stops, all);
+    const step = (to: { x: number; z: number }) => {
+      const d = Math.hypot(to.x - p.x, to.z - p.z);
+      p = resolveMove(p, d < 0.1 ? to : { x: p.x + ((to.x - p.x) / d) * 0.1, z: p.z + ((to.z - p.z) / d) * 0.1 }, stops, all);
       const h = groundY(p.x, p.z);
-      expect(h).toBeGreaterThanOrEqual(y - 0.02); // (a centimetre's give where the bottom step meets the bank)
+      expect(h).toBeGreaterThanOrEqual(y - 0.02); // only ever up (a centimetre's give where a bottom step meets the ground)
       y = h;
+    };
+    for (let i = 0; i < 900 && p.x > OLIN_DOOR.x + 0.05; i++) step({ x: OLIN_DOOR.x, z });
+    expect(p.x).toBeCloseTo(OLIN_DOOR.x, 1);
+    expect(y).toBeCloseTo(OLIN_Y, 5); // up on Olin's grounds
+    for (let i = 0; i < 200; i++) step({ x: OLIN_DOOR.x, z: OLIN_DOOR.z - 1 }); // up the steps, across the portico
+    expect(y).toBeCloseTo(PORTICO_O.y, 5);
+    expect(p.z).toBeLessThan(OLIN_DOOR.z + 1); // right up to the door (your radius from it)
+    expect(p.z).toBeGreaterThan(OLIN_DOOR.z);
+  });
+
+  it('Olin\'s grounds stand higher than the bank: grass slopes up to them (no wall), the small stairs set into the slope', () => {
+    expect(OLIN_RISE).toBeGreaterThan(0.5);
+    expect(groundY(OLIN.cx, OLIN_LAWN.z0 + 10)).toBeCloseTo(OLIN_Y, 5); // the lawn
+    expect(groundY(OLIN_SITE.x1 + 1, OLIN_LAWN.z0 + 10)).toBe(TERRACE_Y); // past the foot of the slope, the bank
+    expect(STAIRS_O.x1).toBe(OLIN_SITE.x1);
+    expect(STAIRS_O.z0).toBe(OLIN_WALK.z0);
+    // beside the stairs the grass rises just as they do, gently (1 in 5); you can walk straight up it
+    for (const dz of [-1.5, 1.5]) {
+      const z = dz < 0 ? STAIRS_O.z0 + dz : STAIRS_O.z1 + dz;
+      for (let x = STAIRS_O.x1; x >= STAIRS_O.x0; x -= 0.5) expect(groundY(x, z)).toBeCloseTo(groundY(x, (STAIRS_O.z0 + STAIRS_O.z1) / 2), 5);
     }
-    expect(y).toBeCloseTo(TERRACE_Y, 5);
-    expect(p.x).toBeLessThan(OLIN_DOOR.x + 1); // right up to the door (your radius from it)
-    expect(p.x).toBeGreaterThan(OLIN_DOOR.x);
+    expect(OLIN_RISE / (STAIRS_O.x1 - STAIRS_O.x0)).toBeLessThan(0.25);
+    const q = walk({ x: OLIN_SITE.x1 + 4, z: OLIN_LAWN.z0 + 10 }, { x: OLIN_SITE.x1 - 6, z: OLIN_LAWN.z0 + 10 });
+    expect(q.x).toBeCloseTo(OLIN_SITE.x1 - 6, 1);
+    // the grass is drawn under the steps, never over them (the user saw it over the small stairs)
+    for (let x = STAIRS_O.x0 + 0.05; x < STAIRS_O.x1; x += 0.25) {
+      const i = Math.floor((STAIRS_O.x1 - x) / ((STAIRS_O.x1 - STAIRS_O.x0) / STAIRS_O.steps)); // which step (its top: one rise more than the last)
+      expect(terrainY(x, (STAIRS_O.z0 + STAIRS_O.z1) / 2)).toBeLessThanOrEqual(TERRACE_Y + (OLIN_RISE * (i + 1)) / STAIRS_O.steps + 1e-9);
+    }
+    for (let z = OLIN_STEPS.z0 + 0.05; z < OLIN_STEPS.z1; z += 0.25) expect(terrainY(OLIN.cx, z)).toBeLessThanOrEqual(OLIN_Y + 1e-9);
+    expect(terrainY(OLIN.cx, (PORTICO_O.z0 + PORTICO_O.z1) / 2)).toBeLessThan(PORTICO_O.y - 1);
+    // the slopes on its far sides are gentle grass too
+    expect(groundY(OLIN_SITE.x0 - 1, 60)).toBeGreaterThan(TERRACE_Y);
+    expect(groundY(OLIN_SITE.x0 - 1, 60)).toBeLessThan(OLIN_Y);
+  });
+
+  it('the portico: six columns along its front edge, the steps as wide as it, the door in the middle', () => {
+    expect(OLIN_COLUMNS).toHaveLength(6);
+    for (const c of OLIN_COLUMNS) { expect(c.x).toBeGreaterThan(PORTICO_O.x0); expect(c.x).toBeLessThan(PORTICO_O.x1); expect(c.z).toBeLessThan(PORTICO_O.z1); }
+    expect(OLIN_STEPS.x0).toBe(PORTICO_O.x0);
+    expect(OLIN_STEPS.x1).toBe(PORTICO_O.x1);
+    expect(OLIN_STEPS.z0).toBe(PORTICO_O.z1);
+    expect(PORTICO_O.y - OLIN_Y).toBeGreaterThan(1.5); // a proper flight
+    expect((OLIN_STEPS.z1 - OLIN_STEPS.z0) / OLIN_STEPS.steps).toBeGreaterThan(0.3); // treads you can stand on
+    expect((OLIN_COLUMNS[0].x + OLIN_COLUMNS[5].x) / 2).toBeCloseTo(OLIN_DOOR.x, 5);
+    // you can't step off the portico's side, nor walk between the columns into them
+    const p = walk({ x: OLIN.cx, z: (PORTICO_O.z0 + PORTICO_O.z1) / 2 }, { x: PORTICO_O.x1 + 4, z: (PORTICO_O.z0 + PORTICO_O.z1) / 2 });
+    expect(p.x).toBeLessThan(PORTICO_O.x1);
+  });
+
+  it('the lawn: two walks straight out from the steps, an X of diagonals, trees and benches off the walks', () => {
+    expect(LAWN_WALKS).toHaveLength(4);
+    for (const w of LAWN_WALKS.slice(0, 2)) { expect(w.a.x).toBe(w.b.x); expect(w.a.x).toBeGreaterThan(OLIN_STEPS.x0); expect(w.a.x).toBeLessThan(OLIN_STEPS.x1); }
+    const [, , d1, d2] = LAWN_WALKS; // corner to corner, crossing
+    expect(Math.sign(d1.b.x - d1.a.x)).toBe(-Math.sign(d2.b.x - d2.a.x));
+    expect((d1.a.x + d1.b.x) / 2).toBeCloseTo((d2.a.x + d2.b.x) / 2, 5);
+    for (const t of OLIN_TREES) {
+      expect(lawnWalkDist(t)).toBeGreaterThan(1.5);
+      expect(t.x).toBeGreaterThan(OLIN_LAWN.x0); expect(t.x).toBeLessThan(OLIN_LAWN.x1);
+      expect(t.z).toBeGreaterThan(OLIN_LAWN.z0); expect(t.z).toBeLessThan(OLIN_LAWN.z1);
+    }
+    for (const b of OLIN_BENCHES) { expect(lawnWalkDist(b)).toBeGreaterThan(0.6); expect(lawnWalkDist(b)).toBeLessThan(2.5); } // beside a walk
+    expect(OLIN_LAWN.z1).toBeLessThanOrEqual(OLIN_SITE.z1);
+    expect(OLIN_LAWN.z1).toBeLessThanOrEqual(BERM.z1 - 5); // the bank's flat top runs on under it
+    expect(southEndNear({ x: OLIN.cx, z: OLIN_LAWN.z0 + 20 })).toBe('Olin Library');
   });
 
   it('from the top of the east stairs, north along the bank to the medallion door', () => {
@@ -189,12 +253,14 @@ describe('the Frank Center and Olin, up on their bank', () => {
     expect(southEndNear({ x: OLIN.cx, z: 12 })).toBe('Olin Library');
     expect(southEndNear({ x: -54, z: ALLBRITTON.z0 - 3 })).toBe('Allbritton Center');
     expect(southEndNear({ x: -186, z: 0 })).toBeNull();
-    for (const id of ['frank', 'olin']) {
-      const s = PLACES.find((p) => p.id === id)!.spawn;
-      expect(groundY(s.x, s.z)).toBe(0);
-      expect(s.z).toBeGreaterThan(FIELD_ROAD.z0);
-      expect(s.z).toBeLessThan(FIELD_ROAD.z1);
-    }
+    const f = PLACES.find((p) => p.id === 'frank')!.spawn; // on the road at the foot of its stairs
+    expect(groundY(f.x, f.z)).toBe(0);
+    expect(f.z).toBeGreaterThan(FIELD_ROAD.z0);
+    expect(f.z).toBeLessThan(FIELD_ROAD.z1);
+    const o = PLACES.find((p) => p.id === 'olin')!.spawn; // on its lawn, facing the portico
+    expect(groundY(o.x, o.z)).toBeCloseTo(OLIN_Y, 5);
+    expect(blockedAt(o, stops)).toBe(false);
+    expect(o.heading).toBe(Math.PI);
   });
 });
 
@@ -270,7 +336,6 @@ describe('the Pruzan Art Center, between Olin and the Frank Center', () => {
     expect(OLIN_WALK.z0 - PRUZAN_DOOR.z).toBeGreaterThan(18);
     expect(OLIN_WALK.z0 - POOL.z1).toBeGreaterThan(10); // a big courtyard
     expect(STAIRS_E.z1).toBeLessThan(BERM.z1 - 6); // still on the flat top of the bank's east side
-    expect(OLIN_DOOR.z + OLIN_DOOR.half).toBeLessThan(OLIN.z1);
   });
 
   it('its canopy sags: highest at the piers, lowest in the middle, always well over your head', () => {
@@ -389,5 +454,130 @@ describe('the back of the Pruzan, on the field side', () => {
     expect(p.z).toBeGreaterThan(BALUSTRADE.z);
     const q = walk({ x: (STAIRS_W.x0 + STAIRS_W.x1) / 2, z: 14 }, { x: (STAIRS_W.x0 + STAIRS_W.x1) / 2, z: 2 });
     expect(q.z).toBeLessThan(STAIRS_W.z0); // down the stairs
+  });
+});
+
+describe('the walkway down Allbritton\'s side to Church Street', () => {
+  const top = WALKWAY_PTS[0], foot = WALKWAY_PTS[WALKWAY_PTS.length - 1];
+  it('carries on from the south end of the plaza, down Allbritton\'s west side, onto Church Street\'s sidewalk (the user showed where)', () => {
+    expect(top.z).toBeLessThan(PLAZA_F.z1); expect(top.x).toBeGreaterThan(PLAZA_F.x0); // it starts on the plaza
+    expect(foot.z).toBeGreaterThan(CHURCH_WALK_N.z0); expect(foot.z).toBeLessThan(CHURCH_WALK_N.z1);
+    expect(foot.x).toBeGreaterThan(CHURCH_XWALK.x0); expect(foot.x).toBeLessThan(CHURCH_XWALK.x1); // straight onto the crosswalk
+    for (let s = 0; s < WALKWAY.len; s += 1) { // alongside Allbritton, close by, west of it
+      const p = walkwayPoint(s);
+      if (p.z > ALLBRITTON.z0 && p.z < ALLBRITTON.z1) { expect(p.x).toBeLessThan(ALLBRITTON.x0 - 3); expect(p.x).toBeGreaterThan(ALLBRITTON.x0 - 9); }
+    }
+    for (const p of WALKWAY_PTS) expect(inSouthEnd(p, 1.3)).toBe(false); // clear of every building
+  });
+
+  it('is level (like the plaza and the street), with room beside it: the bank steps back west past the plaza\'s end', () => {
+    for (let s = 0; s <= WALKWAY.len; s += 0.5) { const p = walkwayPoint(s); expect(groundY(p.x, p.z)).toBe(0); }
+    for (let s = 3; s <= WALKWAY.len - 2; s += 1) { // the planted bed on its west side is level too, before the bank rises
+      const p = walkwayPoint(s), x = p.x - p.dz * WALKWAY.beds, z = p.z + p.dx * WALKWAY.beds;
+      expect(groundY(x, z)).toBeLessThan(0.05);
+    }
+    expect(groundY((STAIRS_E.x0 + STAIRS_E.x1) / 2 - 3, (STAIRS_E.z0 + STAIRS_E.z1) / 2)).toBe(TERRACE_Y); // (still up by the east stairs)
+    // walk it from the plaza to the street
+    let p = { ...top };
+    for (let s = 0.5; s <= WALKWAY.len; s += 0.5) p = resolveMove(p, walkwayPoint(s), stops, all);
+    expect(Math.hypot(p.x - foot.x, p.z - foot.z)).toBeLessThan(0.6);
+  });
+
+  it('chains on posts along both edges keep you on it: step off sideways and you\'re stopped', () => {
+    expect(CHAIN_POSTS.filter((p) => p.side < 0).length).toBeGreaterThan(12);
+    for (const p of CHAIN_POSTS) expect(walkwayAt(p).d).toBeCloseTo(WALKWAY.chains, 1); // just off the tar
+    for (const s of [12, 25, WALKWAY.len - 8]) {
+      const c = walkwayPoint(s);
+      for (const side of [-1, 1]) {
+        const p = walk(c, { x: c.x + side * c.dz * 6, z: c.z - side * c.dx * 6 });
+        expect(walkwayAt(p).d).toBeLessThan(WALKWAY.chains);
+      }
+    }
+    for (const l of WALKWAY_LAMPS) expect(walkwayAt(l).d).toBeGreaterThan(WALKWAY.chains + 0.5); // lamps outside the chains
+  });
+});
+
+describe('Church Street', () => {
+  it('runs along the bottom of the bank, south of Olin\'s lawn and Allbritton, out to High Street; flat, with sidewalks both sides', () => {
+    expect(CHURCH.x1).toBe(11); // High Street's near edge
+    expect(CHURCH_WALK_N.z0).toBeGreaterThanOrEqual(BERM.z1); // the bank is down by its sidewalk
+    expect(CHURCH_WALK_N.z0).toBeGreaterThan(ALLBRITTON.z1);
+    expect(CHURCH_WALK_N.z0).toBeGreaterThan(OLIN_LAWN.z1 + 4);
+    expect(CHURCH_WALK_N.z1).toBe(CHURCH.z0);
+    expect(CHURCH_WALK_S.z0).toBe(CHURCH.z1);
+    for (const x of [-180, -100, -78, -40, 0]) for (const z of [CHURCH_WALK_N.z0 + 0.2, (CHURCH.z0 + CHURCH.z1) / 2, CHURCH_WALK_S.z1 - 0.2]) expect(groundY(x, z)).toBe(0);
+    expect(southEndNear({ x: -60, z: (CHURCH.z0 + CHURCH.z1) / 2 })).toBe('Church Street');
+    // you can walk across it to the far sidewalk, and cars can drive it
+    const p = walk({ x: -78, z: CHURCH_WALK_N.z0 + 0.5 }, { x: -78, z: CHURCH_WALK_S.z0 + 1 });
+    expect(p.z).toBeCloseTo(CHURCH_WALK_S.z0 + 1, 1);
+    expect(offRoadForCars({ x: -60, z: (CHURCH.z0 + CHURCH.z1) / 2 })).toBe(false);
+  });
+});
+
+describe('Allbritton\'s back, onto Church Street', () => {
+  it('three parts, not a flat wall: the bay on the west, the stair tower standing well out, the east block come forward', () => {
+    for (const b of [ALLB_BAY, ALLB_TOWER, ALLB_WING]) expect(b.z1).toBeGreaterThan(ALLBRITTON.z1);
+    expect(ALLB_TOWER.z1).toBeGreaterThan(ALLB_WING.z1); // the tower stands out furthest…
+    expect(ALLB_WING.z1).toBeGreaterThan(ALLB_BAY.z1); // …then the east block, then the bay
+    expect(ALLB_BAY.x1).toBeLessThan(ALLB_TOWER.x0); // west, middle, east
+    expect(ALLB_WING.x0).toBe(ALLB_TOWER.x1);
+    expect(ALLB_WING.x1).toBe(ALLBRITTON.x1);
+    expect(ALLB_TOWER.h).toBeGreaterThan(ALLB_WING.h); // the tower up past everything
+    expect(ALLB_WING.h).toBeGreaterThan(ALLBRITTON.h);
+    for (const b of [ALLB_BAY, ALLB_TOWER, ALLB_WING]) expect(blockedAt({ x: (b.x0 + b.x1) / 2, z: b.z1 - 0.3 }, stops)).toBe(true);
+    expect(ALLB_REAR_DOOR.z).toBe(ALLB_TOWER.z1);
+    expect(ALLB_WING_DOOR.z).toBe(ALLB_WING.z1);
+    for (const d of [ALLB_REAR_DOOR, ALLB_WING_DOOR]) expect(groundY(d.x, d.z + 0.5)).toBe(ALLB_LANDING.h); // both on the landing
+  });
+
+  it('from the lot up the steps onto the landing, along it to the tower\'s door; or up the long ramp (1 in 12) from the sidewalk', () => {
+    const sz = (ALLB_STEPS.z0 + ALLB_STEPS.z1) / 2;
+    let p = { x: ALLB_STEPS.x0 - 1.5, z: sz }, y = 0;
+    for (let i = 0; i < 60; i++) {
+      p = resolveMove(p, { x: p.x + 0.1, z: p.z }, stops, all);
+      const h = groundY(p.x, p.z);
+      expect(h).toBeGreaterThanOrEqual(y - 0.02);
+      y = h;
+    }
+    expect(y).toBe(ALLB_LANDING.h);
+    p = walk(p, { x: ALLB_REAR_DOOR.x, z: sz });
+    p = walk(p, { x: ALLB_REAR_DOOR.x, z: ALLB_REAR_DOOR.z - 1 });
+    expect(p.z).toBeLessThan(ALLB_REAR_DOOR.z + 1); // right up to the door
+    expect(groundY(p.x, p.z)).toBe(ALLB_LANDING.h);
+    expect(ALLB_LANDING.h / (ALLB_RAMP.z1 - ALLB_RAMP.z0)).toBeCloseTo(1 / 12, 5);
+    expect(ALLB_RAMP.z1).toBe(CHURCH_WALK_N.z0); // it comes down to the sidewalk
+    let q = { x: (ALLB_RAMP.x0 + ALLB_RAMP.x1) / 2, z: CHURCH_WALK_N.z0 + 1 };
+    for (let i = 0; i < 100; i++) q = resolveMove(q, { x: q.x, z: q.z - 0.1 }, stops, all);
+    expect(groundY(q.x, q.z)).toBe(ALLB_LANDING.h); // up on the landing
+    // the railing along its front: you can't step off it straight down into the lot
+    const r = walk({ x: ALLB_REAR_DOOR.x, z: ALLB_LANDING.z1 - 0.8 }, { x: ALLB_REAR_DOOR.x, z: ALLB_LANDING.z1 + 3 });
+    expect(r.z).toBeLessThan(ALLB_LANDING.z1);
+  });
+
+  it('the lot: stalls apart, clear of the building, the steps, ramp and drive; two accessible; cars in some', () => {
+    expect(ALLB_LOT.z0).toBe(ALLBRITTON.z1);
+    expect(ALLB_LOT.z1).toBe(CHURCH_WALK_N.z0);
+    expect(ALLB_STALLS.filter((s) => s.accessible)).toHaveLength(2);
+    const box = (s: (typeof ALLB_STALLS)[number]) => ({ x0: s.x - s.w / 2, x1: s.x + s.w / 2, z0: s.z - s.len / 2, z1: s.z + s.len / 2 });
+    const overlap = (a: { x0: number; x1: number; z0: number; z1: number }, b: typeof a) => a.x0 < b.x1 - 0.01 && b.x0 < a.x1 - 0.01 && a.z0 < b.z1 - 0.01 && b.z0 < a.z1 - 0.01;
+    ALLB_STALLS.forEach((s, i) => {
+      const b = box(s);
+      expect(b.x0).toBeGreaterThanOrEqual(ALLB_LOT.x0); expect(b.x1).toBeLessThanOrEqual(ALLB_LOT.x1);
+      expect(b.z0).toBeGreaterThanOrEqual(ALLB_LOT.z0); expect(b.z1).toBeLessThan(ALLB_LOT.z1);
+      for (const r of [ALLB_LANDING, ALLB_STEPS, ALLB_RAMP, ALLB_TOWER, ALLB_BAY, ALLB_WING]) expect(overlap(b, r)).toBe(false);
+      ALLB_STALLS.forEach((o, j) => { if (j !== i) expect(overlap(b, box(o))).toBe(false); });
+      expect(groundY(s.x, s.z)).toBe(0);
+      expect(offRoadForCars(s)).toBe(false);
+    });
+    expect(ALLB_DRIVE.x0).toBeGreaterThan(ALLB_LOT.x0); expect(ALLB_DRIVE.x1).toBeLessThan(ALLB_LOT.x1);
+    expect(ALLB_WALL.x1).toBe(ALLB_LOT.x0);
+    // the parked cars are real ones (a stranger's: yours to take), in their stalls, nose to the building
+    const g = createGarage();
+    for (const [i, color] of ALLB_PARKED) {
+      const c = g.cars.find((x) => x.color === color && Math.hypot(x.x - ALLB_STALLS[i].x, x.z - ALLB_STALLS[i].z) < 0.01)!;
+      expect(c).toBeDefined();
+      expect(c.owner).toBeNull();
+      expect(Math.cos(c.heading)).toBeCloseTo(-1, 5);
+    }
   });
 });

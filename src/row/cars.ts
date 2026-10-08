@@ -1,5 +1,5 @@
 import { Box, Extra, XZ, blockedAt, inBox } from './collide';
-import { offRoadForCars } from './southend';
+import { ALLB_PARKED, ALLB_STALLS, offRoadForCars } from './southend';
 import { ROAD, RowStop } from './layout';
 import { LANES, TrafficState, Vehicle, addVehicle, laneX, removeVehicle } from './traffic';
 import { DRIVEWAYS, RoommateId, toWorld } from './house/plan';
@@ -73,10 +73,16 @@ export function drivewaySpot(owner: 'you' | RoommateId) {
 const mkCar = (id: number, owner: Owner, color: number, at: { x: number; z: number; heading: number }): Car =>
   ({ id, kind: 'car', len: 4.4, color, ...at, speed: 0, owner, cruise: 10.5, stolen: false });
 
-/** Your car + kofi's, each in its driveway (yours wherever you last left it, if saved). */
+/**
+ * Your car + kofi's, each in its driveway (yours wherever you last left it, if saved); and strangers' cars parked nose-in
+ * in the lot behind Allbritton (anyone's to take, like any stranger's car).
+ */
 export function createGarage(saved: SavedCar | null = null): Garage {
   return {
-    cars: [mkCar(0, 'you', YOUR_PAINT, saved ?? drivewaySpot('you')), mkCar(1, 'kofi', KOFI_PAINT, drivewaySpot('kofi'))],
+    cars: [
+      mkCar(0, 'you', YOUR_PAINT, saved ?? drivewaySpot('you')), mkCar(1, 'kofi', KOFI_PAINT, drivewaySpot('kofi')),
+      ...ALLB_PARKED.map(([stall, color], i) => mkCar(2 + i, null, color, { x: ALLB_STALLS[stall].x, z: ALLB_STALLS[stall].z, heading: Math.PI })),
+    ],
     driving: null,
   };
 }

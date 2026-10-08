@@ -9,6 +9,7 @@ import { BuildingId, CHAPEL_PORCH, FRONT_X, JUDD_PORCH, PORTICO, RowStop, SOUTH_
 import { rearDoorZ } from './backlawn';
 import { DOORS, Door, VESTIBULE } from './usdan/plan';
 import { buildSouthEnd } from './southview';
+export { southLOD } from './southview';
 import { FORECOURT, REAR_ENTRY, ZEL, ZEL_BENCH, ZEL_LAMP, ZEL_PARTS } from './zelnick';
 
 // ─── College Row buildings ─────────────────────────────────────────────

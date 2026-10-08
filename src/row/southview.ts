@@ -4,12 +4,15 @@ import {
 } from 'three';
 import { BoxBank, Facing, WindowBank, block, brickMap, hipRoof, lambert, prism, seeGlass, stoneMap } from './kit';
 import { buildPruzan } from './pruzanview';
+import { buildOlin } from './olinview';
+import { buildChurch } from './churchview';
+import { allbrittonRear } from './allbview';
 import { BACK_PATH } from './layout';
 import { noise2, rng } from './noise';
 import {
-  ALLB_FORECOURT, ALLB_WELLS, ALLBRITTON, ALLBRITTON_DOOR, BERM, BOLLARDS, CHEEK, FIELD_ROAD, FLAGPOLE, FRANK, FRANK_ADD, FRANK_DOOR, FRANK_LINK, LANDING,
-  CLASS_TAKEN, FRANK_ROOMS, FRANK_WINDOWS, GRAND_STAIR, LINK_DOOR, LOUNGE, LOUNGE_SEATS, LOUNGE_TABLES, LINK_DOOR_S, LINK_WALK, MAIN_ENTRY, MULCH, classroom, OLIN, OLIN_LINK, PLAZA_BENCHES, PLAZA_BIN, PLAZA_F, PLAZA_TABLES, SIGN, STAIRS,
-  STAIRS_E, OLIN_WALK, OLIN_DOOR, OLIN_COLUMNS, FRANK_NICHE_W, FRANK_NICHE_N, PRUZAN_LINK_N, PRUZAN_ENTRY, STAIRS_W, SYCAMORE, SYCAMORE2, TERRACE_Y, UTILITY_BOX, groundY, plazaChairs,
+  ALLB_FORECOURT, ALLB_WELLS, ALLBRITTON, ALLBRITTON_DOOR, BERM, BOLLARDS, CHEEK, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_DOOR, FRANK_LINK, LANDING,
+  CLASS_TAKEN, FRANK_ROOMS, FRANK_WINDOWS, GRAND_STAIR, LINK_DOOR, LOUNGE, LOUNGE_SEATS, LOUNGE_TABLES, LINK_DOOR_S, LINK_WALK, MAIN_ENTRY, MULCH, classroom, PLAZA_BENCHES, PLAZA_BIN, PLAZA_F, PLAZA_TABLES, SIGN, STAIRS,
+  STAIRS_E, OLIN_WALK, OLIN_LAWN, OLIN_SITE, FRANK_NICHE_W, FRANK_NICHE_N, PRUZAN_LINK_N, PRUZAN_ENTRY, STAIRS_W, SYCAMORE, SYCAMORE2, TERRACE_Y, UTILITY_BOX, groundY, plazaChairs, terrainY,
 } from './southend';
 
 // ─── The south end of Andrus Field: draws what southend.ts lays out ────
@@ -78,7 +81,25 @@ function signTexture(text: string, w = 512, h = 64): CanvasTexture {
   return t;
 }
 
+/**
+ * Groups that only need drawing when you're near enough to see them: the fog is solid by 330 m, so past `FAR` m from
+ * their outline they're hidden (`southLOD`). From your house, up High Street, that saves a couple of hundred draw calls.
+ */
+const FAR = 300;
+const LODS: { g: Group; x0: number; x1: number; z0: number; z1: number }[] = [];
+function far(k: Kit, r: { x0: number; x1: number; z0: number; z1: number }, build: (k: Kit) => void) {
+  const g = new Group();
+  k.g.add(g);
+  build({ ...k, g });
+  LODS.push({ g, ...r });
+}
+/** Show or hide the far groups for a camera at (x, z). Cheap: call every few frames. */
+export function southLOD(x: number, z: number) {
+  for (const l of LODS) l.g.visible = Math.hypot(Math.max(l.x0 - x, 0, x - l.x1), Math.max(l.z0 - z, 0, z - l.z1)) < FAR;
+}
+
 export function buildSouthEnd(k: Kit) {
+  LODS.length = 0;
   road(k);
   bank(k);
   stairs(k);
@@ -88,9 +109,11 @@ export function buildSouthEnd(k: Kit) {
   frankLink(k);
   frankAddition(k);
   plaza(k);
-  olin(k);
-  buildPruzan(k); // the art center in the gap between them (its gallery block, against Olin, is in there too)
+  far(k, { x0: OLIN_SITE.x0 - 2, x1: OLIN_SITE.x1 + 1, z0: 0, z1: OLIN_SITE.z1 + 2 }, buildOlin); // Olin Library, its portico, steps and lawn (olinview.ts)
+  far(k, { x0: OLIN_SITE.x1, x1: FRANK.x0, z0: 9, z1: OLIN_WALK.z0 }, buildPruzan); // the art center in the gap between them (its gallery block, against Olin, is in there too)
   allbritton(k);
+  allbrittonRear(k); // its back onto Church Street, the rear door, the lot (allbview.ts)
+  buildChurch(k); // Church Street, and the walkway down the bank to it (churchview.ts)
 }
 
 /** Coal-tar road between the field and the bank, granite curbs, a storm grate at the corner. */
@@ -119,12 +142,13 @@ function bank({ g, box }: Kit) {
   const a = new Color(0x5a9834), b = new Color(0x7cb247), mulch = new Color(MULCH_C), c = new Color();
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
-    pos.setY(i, groundY(x, z) + 0.012);
+    pos.setY(i, terrainY(x, z) + 0.012); // (under Olin's steps, the grass stays at the lawn's height)
     const n = noise2(x / 9, z / 9);
     const bed = (x > MULCH.x0 && z < 10.5) // round the sycamore, east of the stairs
       || (x > FRANK.x1 + 1 && z > FRANK_LINK.z1 && z < STAIRS_E.z0 - 1.5); // down the slope to the plaza
     if (bed) c.copy(mulch).multiplyScalar(0.85 + n * 0.3);
     else c.copy(a).lerp(b, n);
+    if (!bed && x > OLIN_LAWN.x0 && x < OLIN_LAWN.x1 && z > OLIN_LAWN.z0 && z < OLIN_LAWN.z1) c.multiplyScalar(Math.floor((x - OLIN_LAWN.x0) / 3) % 2 ? 1.06 : 0.95); // Olin's lawn, mown in stripes
     cols.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new Float32BufferAttribute(cols, 3));
@@ -622,74 +646,6 @@ function plaza({ g, box }: Kit) {
   box.add(PLAZA_BIN.x, 0.55, PLAZA_BIN.z, 0.7, 1.1, 0.7, 0x1c1e20);
 }
 
-/** Olin Library: a brick block on a limestone base, its north side bowed out into a drum of tall arched windows facing the field. */
-function olin({ g, win, box }: Kit) {
-  const Y = TERRACE_Y, { cx, cz, r, h, x0, x1, z1 } = OLIN;
-  const brick = lambert(0x9a4636, brickMap(), 'frank');
-  const lime = lambert(LIME);
-  const base = 3; // limestone ground floor
-  const bw = x1 - x0, bd = z1 - cz, bcx = (x0 + x1) / 2, bcz = (cz + z1) / 2;
-  mesh(g, block(bw, h, bd), brick, bcx, Y, bcz);
-  box.add(bcx, Y + base / 2, bcz, bw + 0.3, base, bd + 0.3, LIME);
-  box.add(bcx, Y + 3.9, bcz, bw + 0.4, 0.25, bd + 0.4, LIME); // band
-  box.add(bcx, Y + h - 0.2, bcz, bw + 0.8, 0.8, bd + 0.8, LIME); // cornice
-  for (let x = x0 + 1; x < x1 - 0.5; x += 0.5) box.add(x, Y + h + 0.45, cz - 0.1, 0.12, 0.5, 0.12, 0xd8d2c4); // balustrade along the top
-  box.add(bcx, Y + h + 0.75, cz - 0.1, bw - 0.6, 0.12, 0.25, LIME);
-  box.add(bcx, Y + h + 0.25, bcz, bw - 0.4, 0.1, bd - 0.4, 0x55595c);
-  for (const [px, pz] of [[x0, cz], [x1, cz], [x0, z1], [x1, z1]]) box.add(px, Y + h / 2, pz, 1.2, h, 1.2, LIME); // corners
-  const tall = (x: number, z: number, f: number | Facing) => win.add('arch', x, Y + 7.6, z, 2, 6.6, f);
-  for (let x = x0 + 3; x < x1 - 1.5; x += 4.2) {
-    if (Math.abs(x - cx) > r + 1.6) tall(x, cz - 0.03, '-z'); // either side of the drum
-    tall(x, z1 + 0.03, '+z');
-  }
-  for (let z = cz + 3; z < z1 - 1.5; z += 4.2) {
-    tall(x0 - 0.03, z, '-x');
-    if (z > OLIN_LINK.z1 + 2 && Math.abs(z - OLIN_DOOR.z) > OLIN_DOOR.half + 0.5) tall(x1 + 0.03, z, '+x'); // (the connector to the Frank Center is against the rest; the portico)
-  }
-  // the drum: half a cylinder, bricks wrapped round it
-  const drum = new CylinderGeometry(r, r, h, 48, 1, true, Math.PI / 2, Math.PI);
-  const pos = drum.getAttribute('position'), uv = drum.getAttribute('uv');
-  for (let i = 0; i < pos.count; i++) uv.setXY(i, (Math.atan2(pos.getX(i), pos.getZ(i)) * r) / 2, (pos.getY(i) + h / 2) / 2);
-  mesh(g, drum, brick, cx, Y + h / 2, cz);
-  mesh(g, new CylinderGeometry(r + 0.15, r + 0.15, base, 48, 1, true, Math.PI / 2, Math.PI), lime, cx, Y + base / 2, cz);
-  mesh(g, new CylinderGeometry(r + 0.4, r + 0.4, 0.8, 48, 1, false, Math.PI / 2, Math.PI), lime, cx, Y + h - 0.2, cz); // cornice + roof
-  mesh(g, new CylinderGeometry(r + 0.2, r + 0.2, 0.25, 48, 1, false, Math.PI / 2, Math.PI), lime, cx, Y + 3.9, cz); // band
-  const n = 9;
-  for (let i = 0; i < n; i++) {
-    const a = Math.PI / 2 + 0.22 + (i / (n - 1)) * (Math.PI - 0.44);
-    const at = (rr: number) => ({ x: cx + rr * Math.sin(a), z: cz + rr * Math.cos(a) });
-    const p = at(r + 0.04), q = at(r + 0.2), s = at(r + 0.12), b = at(r + 0.19);
-    win.add('arch', p.x, Y + 7.6, p.z, 2.0, 6.6, a);
-    box.add(q.x, Y + 4.2, q.z, 2.4, 0.18, 0.35, LIME, a); // sill
-    box.add(s.x, Y + 11.05, s.z, 0.5, 0.6, 0.2, LIME, a); // keystone
-    win.add('rect', b.x, Y + 1.6, b.z, 1.2, 1.1, a); // small windows in the base
-  }
-  // the front door on the east side, at the end of the walk up from the plaza: a limestone portico of four columns under
-  // a pediment, against the brick; tall doors in a stone surround
-  const D = OLIN_DOOR, colH = 8.4, px = D.x + D.out / 2;
-  box.add(D.x + 0.12, Y + 2.3, D.z, 0.24, 4.6, 3.4, LIME); // the door surround
-  for (const dz of [-D.half, D.half]) box.add(D.x + 0.1, Y + colH / 2, D.z + dz, 0.2, colH, 0.9, LIME); // pilasters behind the end columns
-  box.add(D.x + 0.32, Y + 1.7, D.z, 0.08, 3.4, 2.4, 0x2a2420); // the doors…
-  box.add(D.x + 0.36, Y + 1.7, D.z, 0.04, 3.4, 0.06, 0x8a7a62);
-  win.add('arch', D.x + 0.03, Y + 6.6, D.z, 2.0, 3.0, '+x'); // …and a tall arched window over them
-  box.add(px, Y + 0.08, D.z, D.out + 0.6, 0.16, D.half * 2 + 1.6, 0xcfc8b8); // the porch floor
-  for (const c of OLIN_COLUMNS) {
-    const col = mesh(g, new CylinderGeometry(0.34, 0.4, colH, 14).translate(0, colH / 2, 0), lime, c.x, Y + 0.16, c.z);
-    col.castShadow = true;
-    box.add(c.x, Y + 0.3, c.z, 0.95, 0.3, 0.95, LIME); // base
-    box.add(c.x, Y + colH + 0.05, c.z, 0.95, 0.3, 0.95, LIME); // capital
-  }
-  box.add(px, Y + colH + 0.75, D.z, D.out + 0.6, 1.1, D.half * 2 + 1.6, LIME); // entablature
-  const ped = mesh(g, prism(D.half * 2 + 1.6, 2.2, D.out + 0.6), lime, px, Y + colH + 1.3, D.z);
-  ped.rotation.y = Math.PI / 2; // (the pediment's gable faces the walk)
-  // the flagpole, out front between Olin and the Frank Center
-  const F = FLAGPOLE;
-  mesh(g, new CylinderGeometry(0.05, 0.08, 11, 6).translate(0, 5.5, 0), lambert(0xe8e8e4), F.x, Y, F.z);
-  box.add(F.x, Y + 11.05, F.z, 0.22, 0.22, 0.22, 0xd4af37); // gilt finial
-  box.add(F.x, Y + 10.3, F.z - 0.8, 0.04, 0.9, 1.5, 0xb22234); // the flag, hanging still
-  box.add(F.x, Y + 10.5, F.z - 0.45, 0.05, 0.45, 0.65, 0x3c3b6e);
-}
-
 /**
  * Allbritton Center (from the user's photos): two floors of pale limestone, two of red brick between stone pilasters,
  * a deep cornice, a red tiled hip roof with an ornate brick gable over the middle and two chimneys; an arched entrance
@@ -704,6 +660,7 @@ function allbritton({ g, win, box }: Kit) {
   box.add(cx, stoneH + 0.15, cz, w + 0.3, 0.3, d + 0.3, 0xd9cfbb); // band
   box.add(cx, h - 0.3, cz, w + 1.2, 0.8, d + 1.2, 0xe2d9c6); // cornice
   mesh(g, hipRoof(w + 1, 4.2, d + 1), lambert(0x8a3a2c), cx, h + 0.1, cz);
+  box.add(cx, h + 0.16, cz, w + 1.5, 0.14, d + 1.5, 0x5d8c78); // its green copper eaves (the user's street views)
   // the gable over the middle of the front, and two chimneys
   const gab = mesh(g, prism(10, 4.6, 3.2), lambert(0x9e4a36, brickMap(), 'allb'), cx, h + 0.1, z0 + 1.2);
   gab.castShadow = true;
@@ -716,8 +673,7 @@ function allbritton({ g, win, box }: Kit) {
     ys.forEach((y, i) => {
       if (mid && i < 2) return; // the entrance
       if (mid && i === 2) { win.add('arch', x, y + 0.6, z0 - 0.03, 1.8, 3.6, '-z'); return; }
-      win.add('rect', x, y, z0 - 0.03, 1.9, 2.3, '-z');
-      win.add('rect', x, y, z1 + 0.03, 1.9, 2.3, '+z');
+      win.add('rect', x, y, z0 - 0.03, 1.9, 2.3, '-z'); // (the back, onto Church Street, is allbview.ts's)
     });
     box.add(x0 + b * pitch, (stoneH + h) / 2, z0 - 0.12, 0.6, h - stoneH, 0.24, 0xe2d9c6);
   }

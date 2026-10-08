@@ -4,8 +4,10 @@ import {
 } from 'three';
 import { Sky, moodAt } from './sky';
 import { BoxBank, WindowBank, lambert } from './kit';
-import { buildRow } from './buildings';
+import { buildRow, southLOD } from './buildings';
 import { pruzanNight, pruzanTick } from './pruzanview';
+import { olinNight } from './olinview';
+import { churchNight } from './churchview';
 import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, ROW_ENTRY, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
 import { World } from './world';
 import { along, quadX } from './backlawn';
@@ -282,6 +284,7 @@ for (const [x, z, h, k] of [[STAIRS.x0 + 0.8, 6.9, Math.PI, 0], [STAIRS.x0 + 1.5
   sitAt(p, x, z, h, 0.06);
   p.root.position.y = groundY(x, z);
 }
+const southFrom = scene.children.length; // (everyone added from here to the plaza's tables is down at the south end)
 // inside the Frank Center, seen through its glass: a class in session behind the windows across from Judd, people on
 // the grand stair behind the entry, and the lounge in the glass connector
 const indoors = (p: Person, x: number, y: number, z: number, heading: number) => {
@@ -334,6 +337,8 @@ PLAZA_SITTERS.forEach(([t, c], k) => {
   const at = plazaChairs(PLAZA_TABLES[t])[c];
   sitAt(new Person(randomLook(730 + k)), at.x, at.z, at.heading, 0.46);
 });
+// the people down there, hidden with its buildings when they're out past the fog (each is a dozen draw calls)
+const southFolk = scene.children.slice(southFrom);
 // hangs on the grass
 const circles: [number, number, number][] = [
   [-7, S('Judd').doorZ + 8, 3], [-7, S('South').doorZ - 6, 3], [-7, S('Boger').z0 - 12, 3], [5.5, S('North').doorZ, 3],
@@ -545,6 +550,8 @@ function applyMood(h: number) {
   windows.paint(glass, m.night);
   world.setNight(m.night);
   pruzanNight(m.night);
+  olinNight(m.night);
+  churchNight(m.night);
   sun.userData.dir = m.sunDir;
   clockBtn.innerHTML = `${formatHour(h)}<small>${periodOf(h)}</small>`;
 }
@@ -1223,6 +1230,10 @@ function frame(now: number) {
   fill.position.set(pos.x, pos.y + 2.6, pos.z).addScaledVector(fwd, -1.5);
 
   if (frames % 15 === 0 && where === 'out') world.lightNear(pos);
+  if (frames % 10 === 0) { // Olin, the Pruzan and the people down there, when they're out past the fog
+    southLOD(camera.position.x, camera.position.z);
+    for (const o of southFolk) o.visible = Math.hypot(o.position.x - camera.position.x, o.position.z - camera.position.z) < 300;
+  }
   if (frames % 6 === 0) miniMap.draw(pos, me.heading);
 
   // "now passing"

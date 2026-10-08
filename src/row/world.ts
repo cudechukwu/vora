@@ -17,7 +17,7 @@ import {
 } from './layout';
 import { noise2, rng } from './noise';
 import { DRIVEWAYS, HOUSE } from './house/plan';
-import { ALLBRITTON, BERM, FIELD_ROAD, bankY, groundY, inSouthEnd, southObstacles } from './southend';
+import { ALLBRITTON, BERM, CHURCH, CHURCH_WALK_S, FIELD_ROAD, OLIN_TREES, bankY, groundY, inSouthEnd, southObstacles } from './southend';
 
 // ─── The ground around the row ─────────────────────────────────────────
 // Lawn in front of the buildings, the walk, a tree line along the field
@@ -335,7 +335,12 @@ export class World {
     road.position.set(cx, 0.025, midZ);
     road.receiveShadow = true;
     this.group.add(road);
-    for (const x of [ROAD.x0, ROAD.x1]) box.add(x, 0.08, midZ, 0.25, 0.16, len, PAL.curb);
+    box.add(ROAD.x1, 0.08, midZ, 0.25, 0.16, len, PAL.curb);
+    { // the near curb, open where Church Street comes in
+      const z0 = midZ - len / 2, z1 = midZ + len / 2;
+      box.add(ROAD.x0, 0.08, (z0 + CHURCH.z0) / 2, 0.25, 0.16, CHURCH.z0 - z0, PAL.curb);
+      box.add(ROAD.x0, 0.08, (CHURCH.z1 + z1) / 2, 0.25, 0.16, z1 - CHURCH.z1, PAL.curb);
+    }
     const onCrosswalk = (z: number) => this.crossings.some((c) => Math.abs(c.z - z) < CROSSWALK_W / 2 + 1.5);
     for (let z = WALK_MIN_Z + 70; z > WALK_MAX_Z - 70; z -= 6) if (!onCrosswalk(z)) box.add(cx, 0.035, z, 0.14, 0.02, 3, 0xe8c14a);
     // bike lane lines
@@ -513,14 +518,15 @@ export class World {
     }
     for (let x = -240; x < 70; x += 8) {
       list.push({ x: x + rng(id) * 4, z: WALK_MAX_Z - 50 - rng(id + 1) * 20, s: 1.6 + rng(id + 2), id: id++ });
-      list.push({ x: x + rng(id + 3) * 4, z: WALK_MIN_Z + 45 + rng(id + 4) * 20, s: 1.6 + rng(id + 5), id: id++ });
+      list.push({ x: x + rng(id + 3) * 4, z: CHURCH_WALK_S.z1 + 6 + rng(id + 4) * 20, s: 1.6 + rng(id + 5), id: id++ }); // (across Church Street)
     }
 
     // along the field road's south verge, west of the bank; and a few up on the bank round the Frank Center and Olin
     for (let x = BERM.x0 - 4; x > FIELD_ROAD.x0 + 6; x -= 13) list.push({ x: x - rng(id) * 4, z: FIELD_ROAD.z1 + 3 + rng(id + 1) * 3, s: 1.5 + rng(id + 2) * 0.6, id: id++ });
     // the open lawn south of Judd, past the walkway, beside Allbritton
     for (const [x, z, s] of [[-18, 50, 1.6], [-28, 56, 1.8], [-14, 62, 1.5], [-30, 47, 1.3]]) list.push({ x, z, s, id: id++ });
-    for (const [x, z, s] of [[-101, 40, 1.9], [-101, 58, 1.7], [-66, 56, 1.4], [-158, 30, 1.6], [-158, 50, 1.8]]) list.push({ x, z, s, id: id++ });
+    for (const [x, z, s] of [[-101, 40, 1.9], [-101, 58, 1.7], [-66, 56, 1.4]]) list.push({ x, z, s, id: id++ });
+    for (const [i, t] of OLIN_TREES.entries()) list.push({ x: t.x, z: t.z, s: 2.0 + (i % 3) * 0.25, id: id++ }); // the big old trees on Olin's lawn
 
     const clear = (t: T) => inUsdan(t, 3) || inPlaza(t) || inSouthEnd(t, 3) || onQuadX(t, stops, 1.6) || zelnickSolids(2).some((b) => t.x > b.x0 && t.x < b.x1 && t.z > b.z0 && t.z < b.z1)
       || (t.z > FIELD_ROAD.z0 - 1.5 && t.z < FIELD_ROAD.z1 + 1.5 && t.x < FIELD_ROAD.x1 + 8) // not in the road

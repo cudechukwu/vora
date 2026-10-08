@@ -1,7 +1,7 @@
 import { BACK_PATH, FAR_WALK, FIELD_X, PATH_HALF, PLAZA, PLAZA_GAP, ROAD, RowStop, USDAN, XZ } from './layout';
 import { DRIVEWAYS, HOUSE, toWorld } from './house/plan';
 import { PLACES, Place, View, fitAll, placeAt, toMap } from './map';
-import { ALLBRITTON, BERM, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_LINK, OLIN_LINK_POLY, OLIN_POLY, OLIN_WALK, PLAZA_F, POOL, PRUZAN, PRUZAN_COURT, PRUZAN_ENTRY, PRUZAN_LINK_N, NCOURT, NWALK } from './southend';
+import { ALLBRITTON, BERM, FIELD_ROAD, FRANK, FRANK_ADD, FRANK_LINK, OLIN_LINK_POLY, OLIN_POLY, OLIN_WALK, PLAZA_F, POOL, PRUZAN, PRUZAN_COURT, PRUZAN_ENTRY, PRUZAN_LINK_N, NCOURT, NWALK, CHURCH, CHURCH_WALK_N, CHURCH_WALK_S, WALKWAY_PTS, ALLB_LOT, ALLB_TOWER } from './southend';
 
 // ─── Drawing the map ───────────────────────────────────────────────────
 // One flat, quiet drawing of campus (grass, roads, paths, buildings), used
@@ -47,6 +47,12 @@ export function drawCampus(g: CanvasRenderingContext2D, v: View, stops: RowStop[
   for (const r of [PRUZAN_COURT, NCOURT, NWALK]) rect(r.x0, r.x1, r.z0, r.z1, COL.path);
   for (const b of [FRANK, FRANK_LINK, FRANK_ADD, PRUZAN, PRUZAN_ENTRY, PRUZAN_LINK_N, ALLBRITTON]) rect(b.x0, b.x1, b.z0, b.z1, COL.building);
   poly(OLIN_LINK_POLY, COL.building);
+  rect(ALLB_LOT.x0, ALLB_LOT.x1, ALLB_LOT.z0, ALLB_LOT.z1, COL.tar); rect(ALLB_TOWER.x0, ALLB_TOWER.x1, ALLB_TOWER.z0, ALLB_TOWER.z1, COL.building); // Allbritton's lot and tower
+  rect(CHURCH.x0, CHURCH.x1, CHURCH.z0, CHURCH.z1, COL.tar); // Church Street…
+  for (const w of [CHURCH_WALK_N, CHURCH_WALK_S]) rect(w.x0, w.x1, w.z0, w.z1, COL.path);
+  g.strokeStyle = COL.tar; g.lineWidth = Math.max(1, 2.4 * v.scale); g.beginPath(); // …and the walkway down to it
+  WALKWAY_PTS.forEach((p, i) => { const m = toMap(v, p); if (i) g.lineTo(m.x, m.y); else g.moveTo(m.x, m.y); });
+  g.stroke();
   rect(POOL.x0, POOL.x1, POOL.z0, POOL.z1, '#3d4a52'); // the Pruzan's fountain
   poly(OLIN_POLY, COL.usdan);
   for (const d of DRIVEWAYS) { const a = toWorld(d.u0, d.v0), b = toWorld(d.u1, d.v1); rect(a.x, b.x, a.z, b.z, COL.path); }
