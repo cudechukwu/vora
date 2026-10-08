@@ -5,7 +5,8 @@ import {
 import { lambert, PAL } from './kit';
 import { CROSSWALK_W, Crossing, ROAD } from './layout';
 import { Person, randomLook } from './people';
-import { LANES, Light, TrafficState, Vehicle, lightAt } from './traffic';
+import { CHURCH_LANES, JUNCTION, LANES, Light, TrafficState, Vehicle, churchLightAt, lightAt, vehicleXZ } from './traffic';
+import { CHURCH } from './southend';
 import type { Car, Garage, Pedals } from './cars';
 import { SPEC } from './cars';
 import { Surface, leavesMark } from './surface';
@@ -48,13 +49,20 @@ export class Traffic {
   private night = 0;
   private lastLight: Light | null = null;
 
-  constructor(private state: TrafficState) {
+  /** `signals`: draw the crosswalk signals (High Street's view does; Church Street's has none of its own). */
+  constructor(private state: TrafficState, signals = true) {
     const tex = glowTexture();
     this.beamMat = new MeshBasicMaterial({ map: tex, color: 0xffe6b0, blending: AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
     this.haloMat = new SpriteMaterial({ map: tex, color: 0xfff0d0, blending: AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
     this.tailHaloMat = new SpriteMaterial({ map: tex, color: 0xff3020, blending: AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
     for (const v of state.vehicles) this.drawn.push(this.build(v));
-    for (const c of state.crossings) this.signal(c);
+    if (signals) for (const c of state.crossings) this.signal(c);
+  }
+
+  /** Which way a vehicle in this lane faces (rotation about y): along +z is 0. */
+  private yaw(v: Vehicle) {
+    const d = this.state.lanes[v.lane].dir;
+    return this.state.axis === 'z' ? (d > 0 ? 0 : Math.PI) : d > 0 ? Math.PI / 2 : -Math.PI / 2;
   }
 
   private lights(root: Group, halfW: number, front: number, back: number, y: number) {
@@ -83,7 +91,8 @@ export class Traffic {
 
   private build(v: Vehicle): Drawn {
     const { root, wheels, rider } = this.body(v.kind, v.color, v.len, 700 + v.id);
-    root.rotation.y = LANES[v.lane].dir > 0 ? 0 : Math.PI;
+    root.rotation.order = 'YXZ';
+    root.rotation.y = this.yaw(v);
     this.group.add(root);
     return { v, root, rider, wheels };
   }
@@ -111,7 +120,8 @@ export class Traffic {
     lit(root, true);
     alarm(root, false, this.head);
     this.drawn.push({ v, root, wheels: root.userData.wheels ?? [] });
-    root.rotation.set(0, LANES[v.lane].dir > 0 ? 0 : Math.PI, 0);
+    root.rotation.order = 'YXZ';
+    root.rotation.set(0, this.yaw(v), 0);
     this.group.add(root);
   }
 
@@ -217,8 +227,15 @@ export class Traffic {
 
   /** Sync meshes to the simulation. */
   update(dt: number) {
+    const flat = this.state.axis === 'z';
     for (const d of this.drawn) {
-      d.root.position.set(LANES[d.v.lane].x, 0, d.v.z);
+      const p = vehicleXZ(this.state, d.v);
+      if (flat) d.root.position.set(p.x, 0, p.z);
+      else { // Church Street climbs west: sit on it, nose tipped with the slope
+        const h = d.v.len / 2, y0 = groundY(p.x - h, p.z), y1 = groundY(p.x + h, p.z), dir = this.state.lanes[d.v.lane].dir;
+        d.root.position.set(p.x, (y0 + y1) / 2, p.z);
+        d.root.rotation.set(-Math.atan2((y1 - y0) * dir, d.v.len), this.yaw(d.v), 0);
+      }
       for (const w of d.wheels) w.rotation.x += (d.v.speed * dt) / 0.34;
       if (d.rider) d.rider.ride(dt, d.v.speed);
     }
@@ -231,6 +248,67 @@ export class Traffic {
       this.sig[l].color.set(base[l]).multiplyScalar(l === light ? 1 : dim);
     }
     this.walkSig.color.set(light === 'red' ? 0xf4f4f0 : 0xff8a1c).multiplyScalar(light === 'red' ? 1 : 0.8);
+  }
+}
+
+/**
+ * The signals where Church Street meets High Street: a mast arm over each High Street approach, and one over Church
+ * Street's mouth on the far corner (green in High Street's red), with stop lines painted on the road.
+ */
+export class JunctionSignals {
+  readonly group = new Group();
+  private high: Record<Light, MeshBasicMaterial> = { red: new MeshBasicMaterial(), yellow: new MeshBasicMaterial(), green: new MeshBasicMaterial() };
+  private church: Record<Light, MeshBasicMaterial> = { red: new MeshBasicMaterial(), yellow: new MeshBasicMaterial(), green: new MeshBasicMaterial() };
+  private last = '';
+  private night = 0;
+
+  constructor() {
+    const pole = lambert(0x2a2f33), headMat = lambert(0x1c1f22), white = lambert(0xf2f0ea);
+    /** A post at (x, z), an arm out to (hx, hz), the head there facing (fx, fz) — toward the drivers it's for. */
+    const mast = (x: number, z: number, hx: number, hz: number, fx: number, fz: number, mats: Record<Light, MeshBasicMaterial>) => {
+      const g = new Group();
+      const post = new Mesh(new CylinderGeometry(0.12, 0.15, 6.2, 8).translate(0, 3.1, 0), pole);
+      post.position.set(x, 0, z);
+      const len = Math.hypot(hx - x, hz - z);
+      const arm = new Mesh(new BoxGeometry(0.12, 0.12, len), pole);
+      arm.position.set((x + hx) / 2, 5.9, (z + hz) / 2);
+      arm.rotation.y = Math.atan2(hx - x, hz - z);
+      const head = new Mesh(new BoxGeometry(0.4, 1.25, 0.4), headMat);
+      head.position.set(hx, 5.2, hz);
+      g.add(post, arm, head);
+      (['red', 'yellow', 'green'] as Light[]).forEach((l, i) => {
+        const lamp = new Mesh(new BoxGeometry(0.28, 0.28, 0.04), mats[l]);
+        lamp.position.set(hx + fx * 0.21, 5.6 - i * 0.38, hz + fz * 0.21);
+        lamp.rotation.y = Math.atan2(fx, fz);
+        g.add(lamp);
+      });
+      g.traverse((o) => { if ((o as Mesh).isMesh) o.castShadow = true; });
+      this.group.add(g);
+    };
+    const S = JUNCTION.highStop;
+    // High Street: heading +z (from the north) stops at S.s, its signal across the junction; heading −z stops at S.n
+    mast(ROAD.x1 + 0.6, S.n + 1, LANES[0].x, S.n + 1, 0, -1, this.high);
+    mast(ROAD.x0 - 0.6, S.s - 1, LANES[1].x, S.s - 1, 0, 1, this.high);
+    // Church Street, heading +x: over its mouth from the far side of High Street
+    mast(ROAD.x1 + 0.6, S.n + 1, ROAD.x1 + 0.6, CHURCH_LANES[0].x, -1, 0, this.church); // (the same post as the one for High Street)
+    // the stop lines
+    const bar = (cx: number, cz: number, w: number, d: number) => { const m = new Mesh(new BoxGeometry(w, 0.02, d), white); m.position.set(cx, 0.037, cz); this.group.add(m); };
+    bar((ROAD.x0 + (ROAD.x0 + ROAD.x1) / 2) / 2, S.s, (ROAD.x1 - ROAD.x0) / 2, 0.4);
+    bar((ROAD.x1 + (ROAD.x0 + ROAD.x1) / 2) / 2, S.n, (ROAD.x1 - ROAD.x0) / 2, 0.4);
+    bar(JUNCTION.churchStop, (JUNCTION.z + CHURCH.z1) / 2, 0.4, CHURCH.z1 - JUNCTION.z);
+  }
+
+  setNight(night: number) { this.night = night; this.last = ''; }
+
+  update(t: number) {
+    const hl = lightAt(t), cl = churchLightAt(t), key = hl + cl;
+    if (key === this.last) return;
+    this.last = key;
+    const dim = 0.12 + this.night * 0.05, base: Record<Light, number> = { red: 0xff2a1a, yellow: 0xffb81c, green: 0x3dff8a };
+    for (const l of ['red', 'yellow', 'green'] as Light[]) {
+      this.high[l].color.set(base[l]).multiplyScalar(l === hl ? 1 : dim);
+      this.church[l].color.set(base[l]).multiplyScalar(l === cl ? 1 : dim);
+    }
   }
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LANES, PED_GAP, SIGNAL, SIGNAL_CYCLE, TrafficState, Vehicle, createTraffic, lightAt, stepTraffic, stopLineZ,
+  CHURCH_LANES, JUNCTION, Turn, churchLightAt, createChurchTraffic, stepJunction, vehicleXZ,
 } from '../../src/row/traffic';
 import { layoutRow } from '../../src/row/layout';
 import type { XZ } from '../../src/row/collide';
@@ -174,5 +175,57 @@ describe('impatient drivers', () => {
     const t = createTraffic(layoutRow().crossings);
     for (let i = 0; i < 60 * 60; i++) stepTraffic(t, 1 / 60, []);
     expect(t.vehicles.every((v) => (v.waited ?? 0) === 0)).toBe(true);
+  });
+});
+
+describe('Church Street and the junction with High Street', () => {
+  const runBoth = (seconds: number, check: (h: TrafficState, c: TrafficState, turns: Turn[]) => void, people: () => XZ[] = () => []) => {
+    const h = createTraffic(crossings), c = createChurchTraffic();
+    let i = 0;
+    while (h.t < seconds) {
+      const dt = 0.005 + rng(i++) * 0.045;
+      stepTraffic(h, dt, people()); stepTraffic(c, dt, people());
+      check(h, c, stepJunction(h, c));
+    }
+    return { h, c };
+  };
+
+  it('never shows green both ways at once', () => {
+    for (let t = 0; t < SIGNAL_CYCLE * 2; t += 0.05) expect(lightAt(t) !== 'red' && churchLightAt(t) !== 'red').toBe(false);
+    const greens = Array.from({ length: 600 }, (_, k) => churchLightAt(k * 0.05)).filter((l) => l === 'green').length;
+    expect(greens).toBeGreaterThan(80); // (it does get a green)
+  });
+
+  it('cars turn both ways, none run the light, none overlap, and none are lost (10 minutes)', () => {
+    let into = 0, outOf = 0, rounds = 0;
+    const count = createTraffic(crossings).vehicles.length + createChurchTraffic().vehicles.length;
+    const prevFront = new Map<number, number>();
+    runBoth(600, (h, c, turns) => {
+      for (const t of turns) { if (t.to === 'church' && t.from === 'high') into++; else if (t.to === 'high') outOf++; else rounds++; if (t.to === 'church') prevFront.delete(t.vehicle.id); }
+      expect(h.vehicles.length + c.vehicles.length).toBe(count);
+      for (const v of c.vehicles) {
+        const d = c.lanes[v.lane].dir, f = v.z + (d * v.len) / 2, was = prevFront.get(v.id);
+        if (d > 0 && was !== undefined && churchLightAt(c.t) === 'red' && was <= JUNCTION.churchStop - 0.01) expect(f).toBeLessThanOrEqual(JUNCTION.churchStop + 0.01);
+        prevFront.set(v.id, f);
+      }
+      for (const li of [0, 1]) {
+        const vs = c.vehicles.filter((v) => v.lane === li).sort((a, b) => a.z - b.z);
+        for (let k = 1; k < vs.length; k++) expect(vs[k].z - vs[k - 1].z).toBeGreaterThanOrEqual((vs[k].len + vs[k - 1].len) / 2 - 0.01);
+      }
+    });
+    expect(into).toBeGreaterThan(3); expect(outOf).toBeGreaterThan(3); expect(rounds).toBeGreaterThan(1);
+  });
+
+  it('High Street stops at the junction on red; Church Street cars stop for someone in the road', () => {
+    const c = createChurchTraffic();
+    const me = { x: -160, z: CHURCH_LANES[1].x }; // standing in the westbound lane
+    run(c, 120, (s) => {
+      for (const v of s.vehicles) if (v.lane === 1 && v.z > me.x) expect(v.z - v.len / 2 - me.x).toBeGreaterThan(PED_GAP - 0.6);
+    }, () => [me]);
+    const h = createTraffic(crossings);
+    expect(h.stops.some((sl) => sl.at === JUNCTION.highStop.s && sl.dir === 1)).toBe(true);
+    expect(h.stops.some((sl) => sl.at === JUNCTION.highStop.n && sl.dir === -1)).toBe(true);
+    expect(vehicleXZ(c, c.vehicles[0]).z).toBe(CHURCH_LANES[c.vehicles[0].lane].x); // (Church runs along x)
+    expect(c.vehicles.every((v) => v.kind !== 'bike')).toBe(true); // (no bike lane on Church)
   });
 });

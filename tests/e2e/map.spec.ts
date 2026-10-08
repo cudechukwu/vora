@@ -33,8 +33,10 @@ test('the map turns the way you look: the full map to the nearest of N/E/S/W, th
   await expect(page.locator('#mapfull .sub')).toContainText('west is up');
   // turned sideways it opens zoomed in on you; the slider on the right zooms back out to the whole campus
   expect(Number(await page.locator('#mapfull .zoom').inputValue())).toBeGreaterThan(0.5);
-  await page.locator('#mapfull .zoom').fill('0');
+  for (let k = 0; k < 4; k++) await page.locator('#mapfull .zout').click();
   expect(Number(await page.locator('#mapfull .zoom').inputValue())).toBe(0);
+  await page.locator('#mapfull .zin').click();
+  expect(Number(await page.locator('#mapfull .zoom').inputValue())).toBeCloseTo(0.5, 2);
   await page.locator('#mapfull .compass').click();
   await expect.poll(() => page.evaluate(() => (window as any).__vora.mapUp)).toBe('N');
   await expect(page.locator('#mapfull .sub')).toContainText('north is up');

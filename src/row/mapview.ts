@@ -145,12 +145,22 @@ export class FullMap {
     root.querySelector('.close')!.addEventListener('click', () => this.close());
     root.querySelector('.go')!.addEventListener('click', () => { if (this.chosen) { const p = this.chosen; this.close(); this.onGo(p); } });
     root.querySelector('.compass')?.addEventListener('click', () => { this.mode = this.mode === 'facing' ? 'north' : 'facing'; this.startZoom(); this.draw(); });
-    // the slider on the right: up to magnify, down to see the whole campus (it moves with pinches and scrolls too)
-    const zs = root.querySelector('.zoom') as HTMLInputElement | null;
-    zs?.addEventListener('input', () => {
+    // the zoom on the right: + and −, or drag along it (up to magnify, down to see the whole campus); it follows pinches too
+    const zs = root.querySelector('.zoom') as HTMLInputElement | null, track = root.querySelector('.zoombar .track') as HTMLElement | null;
+    const setZoom = (val: number) => {
       const v = this.view;
-      if (v) this.zoomAt(2 ** Number(zs.value) / this.zoom, { x: v.w / 2, y: v.h / 2 });
-    });
+      if (!zs || !v) return;
+      zs.value = String(Math.max(0, Math.min(3, val)));
+      this.zoomAt(2 ** Number(zs.value) / this.zoom, { x: v.w / 2, y: v.h / 2 });
+    };
+    zs?.addEventListener('input', () => setZoom(Number(zs.value)));
+    root.querySelector('.zin')?.addEventListener('click', () => setZoom(Math.log2(this.zoom) + 0.5));
+    root.querySelector('.zout')?.addEventListener('click', () => setZoom(Math.log2(this.zoom) - 0.5));
+    if (track) {
+      const at = (e: PointerEvent) => { const r = track.getBoundingClientRect(); setZoom(3 * (1 - (e.clientY - r.top) / r.height)); };
+      track.addEventListener('pointerdown', (e) => { track.setPointerCapture?.(e.pointerId); at(e); });
+      track.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') at(e); });
+    }
     addEventListener('resize', () => { if (this.isOpen) this.draw(); });
   }
 
@@ -289,7 +299,8 @@ export class FullMap {
     drawYou(g, v, this.you, this.you.heading, 8 * dpr);
     // the compass: its needle points north; the letter says which way is up
     const zs = this.root.querySelector('.zoom') as HTMLInputElement | null;
-    if (zs && document.activeElement !== zs) zs.value = String(Math.log2(this.zoom));
+    if (zs) zs.value = String(Math.log2(this.zoom));
+    (this.root.querySelector('.zoombar') as HTMLElement | null)?.style.setProperty('--z', `${(Math.log2(this.zoom) / 3) * 100}%`);
     const cmp = this.root.querySelector('.compass') as HTMLElement | null;
     if (cmp) {
       cmp.style.setProperty('--north', `${v.rot ?? 0}rad`);

@@ -90,3 +90,18 @@ test('the field road: up the stairs onto the bank to the Frank Center; down the 
   expect(await page.evaluate(() => (window as any).__vora.sample())).toBeGreaterThan(20);
   expect(errors).toEqual([]);
 });
+
+test('Church Street has traffic (turning at the signal with High Street), and professors and students walking about', async ({ page }) => {
+  await open(page, 't=13&x=-150&z=118&yaw=0');
+  const first = await page.evaluate(() => (window as any).__vora.churchTraffic.vehicles.map((v: any) => v.z));
+  expect(first.length).toBeGreaterThanOrEqual(3);
+  await expect.poll(async () => {
+    const now = await page.evaluate(() => (window as any).__vora.churchTraffic.vehicles.map((v: any) => v.z));
+    return now.some((z: number, i: number) => Math.abs(z - first[i]) > 5);
+  }, { timeout: 30_000 }).toBe(true);
+  const light = await page.evaluate(() => [(window as any).__vora.light, (window as any).__vora.churchLight]);
+  expect(light[0] !== 'red' && light[1] !== 'red').toBe(false); // never green both ways
+  const folk = await page.evaluate(() => (window as any).__vora.southWalkers);
+  expect(folk.filter((w: any) => w.who === 'prof').length).toBeGreaterThanOrEqual(5);
+  expect(folk.filter((w: any) => w.out).length).toBeGreaterThan(5);
+});

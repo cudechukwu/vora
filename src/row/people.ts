@@ -33,6 +33,16 @@ const LEGS = [0x2b2b30, 0x3b4a6b, 0x4a4238, 0x1d2226, 0x6b7a8a, 0xd8cfbd];
 const SHOES = [0x1a1a1a, 0xf1f1ee, 0xf1f1ee, 0x6b2d2a, 0x2b3a66];
 const STYLES: Look['hairStyle'][] = ['short', 'long', 'puff', 'bun', 'cap', 'short', 'long'];
 
+/** A professor: long sleeves in tweed, navy, charcoal, oatmeal or olive, khakis or greys, often grey hair, a leather bag. */
+export function professorLook(seed: number): Look {
+  const pick = <T,>(a: T[], k: number) => a[Math.floor(rng(seed * 11 + k) * a.length) % a.length];
+  return {
+    skin: pick(SKIN, 1), hair: pick([0x9a9690, 0xc9c5bd, 0x6e6a64, 0x2b1d14, 0x3a2516, 0xdedad2], 2), hairStyle: pick(['short', 'short', 'bun', 'long'] as Look['hairStyle'][], 3),
+    top: pick([0x7a6450, 0x24324f, 0x3b3d42, 0xcfc3a8, 0x5a6240, 0x6b2d2a], 4), legs: pick([0xb9a888, 0x5a5d62, 0x2b3346, 0x3b3530], 5),
+    pack: pick([0x5a3b22, 0x6b4a2f, 0x2a2420], 6), sleeves: true,
+  };
+}
+
 export function randomLook(seed: number): Look {
   const pick = <T,>(a: T[], k: number) => a[Math.floor(rng(seed * 7 + k) * a.length) % a.length];
   return {

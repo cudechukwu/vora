@@ -13,7 +13,7 @@ import { churchNight } from './churchview';
 import { BACK_PATH, FIELD_X, FRONT_X, PATH_HALF, ROW_ENTRY, USDAN, USDAN_NAME, WALK_MAX_Z, WALK_MIN_Z, distToPoly, inPoly } from './layout';
 import { World } from './world';
 import { along, quadX } from './backlawn';
-import { CLASS_TAKEN, FIELD_ROAD, FRANK_ROOMS, GALLERY_SITTERS, GALLERY_VISITORS, GRAND_STAIR, LOUNGE_SEATS, NCOURT_SITTERS, NCOURT_TABLES, POOL_SITTERS, PLAZA_SITTERS, TERRACE_Y, classroom, PLAZA_TABLES, ROAD_LANES, ROAD_WALK, STAIRS, groundY, plazaChairs, southEndNear } from './southend';
+import { CHURCH, CLASS_TAKEN, FIELD_ROAD, FRANK_ROOMS, GALLERY_SITTERS, GALLERY_VISITORS, GRAND_STAIR, LOUNGE_SEATS, NCOURT_SITTERS, NCOURT_TABLES, POOL_SITTERS, PLAZA_SITTERS, TERRACE_Y, classroom, PLAZA_TABLES, ROAD_LANES, ROAD_WALK, STAIRS, groundY, plazaChairs, southEndNear } from './southend';
 import { resolveMove } from './collide';
 import {
   SPEED, actionAt, airborne, carry, createMobility, dismount, isRunning, mount, newJump, newMover, startJump, stepJump, stepMover,
@@ -25,8 +25,9 @@ import { homecoming, listNames } from './house/routine';
 import { floorY, houseExtra, levelAt } from './house/collide';
 import { BED_SPOT, FRONT_DOOR, HOME_SPAWN, Level, SEATS, Seat, insideHouse, toLocal, toWorld } from './house/plan';
 import { ENTER_AT, EXIT_AT, Where, cameraClearance, nearDoor as byTheDoor, portalAt } from './house/portal';
-import { LANES, Obstacle, createTraffic, lightAt, stepTraffic } from './traffic';
-import { CarsView, Exhaust, TireMarks, Traffic } from './vehicles';
+import { ROUTES, Route, inChurchRoad, pointAt, routeLength, waitToCross } from './southwalks';
+import { LANES, Obstacle, churchLightAt, createChurchTraffic, createTraffic, lightAt, stepJunction, stepTraffic, vehicleXZ } from './traffic';
+import { CarsView, Exhaust, JunctionSignals, TireMarks, Traffic } from './vehicles';
 import { cartBox, createCart, stepCart } from './cart';
 import { isOpen, newOrder, stepOrder } from './foodtruck';
 import { FoodTruckView, GolfCartView } from './campus';
@@ -35,7 +36,7 @@ import {
   SPEC, loadMine, missing, mph, onRoad, roadBlocks, saveMine, stepPedals,
 } from './cars';
 import { START_HOUR, advance, formatHour, nextPreset, periodOf, wakeFrom, wrapHour } from './clock';
-import { Person, discGeometry, randomLook } from './people';
+import { Person, discGeometry, professorLook, randomLook } from './people';
 import { Knock, OUCH, hits, launch, stepKnock } from './knock';
 import { ICON, IconName } from './icons';
 import { Speedometer } from './hud';
@@ -103,6 +104,11 @@ const world = new World(stops, crossings, details);
 const S = (name: string) => stops.find((s) => s.name.startsWith(name))!;
 const traffic = createTraffic(crossings);
 const trafficView = new Traffic(traffic);
+// Church Street: its own traffic, turning to and from High Street at the signal where they meet
+const churchTraffic = createChurchTraffic();
+const churchView = new Traffic(churchTraffic, false);
+const junction = new JunctionSignals();
+scene.add(churchView.group, junction.group);
 const house = new HouseView(windows); // your wood frame across High Street (adds its windows to the bank)
 scene.add(row, world.group, house.exterior, details.build(), ...windows.build(), trafficView.group);
 
@@ -372,6 +378,29 @@ PLAZA_SITTERS.forEach(([t, c], k) => {
 });
 // the people down there, hidden with its buildings when they're out past the fog (each is a dozen draw calls)
 const southFolk = scene.children.slice(southFrom);
+
+// and walking about down there: professors between Olin, Exley and Casper, students cutting across from the Frank
+// Center, a few up off the field road (southwalks.ts). Into a door at the end of the way, and out again after a while.
+interface SouthWalker { p: Person; r: Route; s: number; dir: 1 | -1; speed: number; inside: number; body: Body }
+const southWalkers: SouthWalker[] = [];
+ROUTES.forEach((r, ri) => {
+  for (let k = 0; k < r.n; k++) {
+    const seed = 940 + ri * 7 + k, prof = r.who === 'prof';
+    const w: SouthWalker = {
+      p: new Person(prof ? professorLook(seed) : randomLook(seed)), r, dir: k % 2 ? -1 : 1,
+      s: routeLength(r) * (0.15 + 0.7 * rng(seed * 3 + 1)), speed: prof ? 0.95 + rng(seed) * 0.25 : 1.1 + rng(seed) * 0.4, inside: 0, body: null!,
+    };
+    w.body = hittable(w.p, null, { land: (x, z) => { // carry on from the nearest point of the way
+      let best = w.s, bd = Infinity;
+      for (let s = 0; s < routeLength(r); s += 0.5) { const q = pointAt(r, s), d = Math.hypot(q.x - x, q.z - z); if (d < bd) { bd = d; best = s; } }
+      w.s = best;
+    } });
+    scene.add(w.p.root);
+    southWalkers.push(w);
+  }
+});
+/** Where they are, for the traffic on Church Street to stop for. */
+const southWalkerSpots = (): Obstacle[] => southWalkers.filter((w) => w.p.root.visible && inChurchRoad(w.p.root.position)).map((w) => ({ x: w.p.root.position.x, z: w.p.root.position.z }));
 // hangs on the grass
 const circles: [number, number, number][] = [
   [-7, S('Judd').doorZ + 8, 3], [-7, S('South').doorZ - 6, 3], [-7, S('Boger').z0 - 12, 3], [5.5, S('North').doorZ, 3],
@@ -565,7 +594,7 @@ function applyMood(h: number) {
   night = m.night;
   fill.intensity = m.night * 22;
   renderer.toneMappingExposure = 1.05 + m.night * 0.3; // let your eyes adjust
-  trafficView.setNight(m.night);
+  trafficView.setNight(m.night); churchView.setNight(m.night); junction.setNight(m.night);
   house.setNight(m.night);
   sky.apply(m);
   (scene.fog as Fog).color.copy(m.horizon);
@@ -681,6 +710,11 @@ function collisions() {
   for (const v of traffic.vehicles) {
     const x = LANES[v.lane].x, hw = VEHICLE_HALF_W[v.kind] + 0.3, hl = v.len / 2 + 0.3;
     const b = { x0: x - hw, x1: x + hw, z0: v.z - hl, z1: v.z + hl };
+    if (near(b)) solids.push(b);
+  }
+  for (const v of churchTraffic.vehicles) { // (Church Street's run along x)
+    const p = vehicleXZ(churchTraffic, v), hw = VEHICLE_HALF_W[v.kind] + 0.3, hl = v.len / 2 + 0.3;
+    const b = { x0: p.x - hl, x1: p.x + hl, z0: p.z - hw, z1: p.z + hw };
     if (near(b)) solids.push(b);
   }
   for (const c of garage.cars) {
@@ -1176,7 +1210,12 @@ function frame(now: number) {
   for (const b of bodies) if (busy(b) && onRoad(b.p.root.position)) inRoad.push(b.p.root.position); // someone lying in the road
   if (garage.driving === null) inRoad.push(pos);
   stepTraffic(traffic, dt, inRoad);
-  // impatient drivers lean on the horn
+  stepTraffic(churchTraffic, dt, [...inRoad, ...southWalkerSpots()]);
+  for (const turn of stepJunction(traffic, churchTraffic)) { // a car turning: its mesh goes with it
+    const fromView = turn.from === 'high' ? trafficView : churchView, toView = turn.to === 'high' ? trafficView : churchView;
+    const mesh = fromView.release(turn.oldId);
+    if (mesh) toView.adopt(turn.vehicle, mesh);
+  }  // impatient drivers lean on the horn
   for (const v of traffic.vehicles) {
     const w = v.waited ?? 0;
     if (w === 0) { honkedAt.delete(v.id); continue; }
@@ -1192,6 +1231,7 @@ function frame(now: number) {
     mixT = 0;
     let busy = 0, people = 0;
     for (const v of traffic.vehicles) { const d = Math.hypot(LANES[v.lane].x - pos.x, v.z - pos.z); if (d < 40) busy += (1 - d / 40) * 0.35; }
+    for (const v of churchTraffic.vehicles) { const p = vehicleXZ(churchTraffic, v), d = Math.hypot(p.x - pos.x, p.z - pos.z); if (d < 40) busy += (1 - d / 40) * 0.35; }
     if (where === 'usdan') people = insiders.length;
     else if (where === 'casper') people = casperFolk.length;
     else if (where === 'in') people = 3;
@@ -1199,13 +1239,15 @@ function frame(now: number) {
     const c = driven(garage), surf = c ? surfaceAt(c, crossings) : 'grass';
     const pd = input.pedals;
     sound.setMix(mixAt({
-      hour, where, roadDist: Math.abs(pos.x - (ROAD.x0 + ROAD.x1) / 2), traffic: busy, people,
+      hour, where, roadDist: Math.min(Math.abs(pos.x - (ROAD.x0 + ROAD.x1) / 2), pos.x < ROAD.x0 ? Math.abs(pos.z - (CHURCH.z0 + CHURCH.z1) / 2) + 15 : Infinity), traffic: busy, people,
       car: c ? c.speed : null, gas: c ? pd.gas : 0, surface: surf,
       skidding: !!c && surf !== 'grass' && leavesMark(surf, c.speed, pd.steer, pd.brake > 0 && c.speed > 0.5),
     }), 0.15);
   }
   sound.tick();
   trafficView.update(dt);
+  churchView.update(dt);
+  junction.update(traffic.t);
   // cars left in the road get moved once you've walked off
   if (frames % 30 === 0) {
     for (const done of clearRoad(garage, traffic, pos)) {
@@ -1248,6 +1290,25 @@ function frame(now: number) {
     w.p.root.position.set(sg.a.x + dx * w.t + ox, 0, sg.a.z + dz * w.t + oz);
     w.p.face(Math.atan2(dx * w.dir, dz * w.dir));
     w.p.walk(dt, w.speed);
+  }
+  const churchCars = churchTraffic.vehicles.map((v) => ({ ...vehicleXZ(churchTraffic, v), speed: v.speed }));
+  for (const w of southWalkers) {
+    const far = Math.hypot(w.p.root.position.x - camera.position.x, w.p.root.position.z - camera.position.z) > 300;
+    if (busy(w.body)) continue;
+    if (w.inside > 0) { // in a building: back out after a while, the other way
+      w.inside -= dt;
+      w.p.root.visible = false;
+      if (w.inside <= 0) w.dir = w.dir > 0 ? -1 : 1;
+      continue;
+    }
+    if (!waitToCross(w.r, w.s, w.dir, churchCars)) w.s += w.dir * w.speed * dt;
+    const L = routeLength(w.r);
+    if (w.s >= L || w.s <= 0) { w.s = Math.min(L, Math.max(0, w.s)); w.inside = 8 + rng(Math.floor(now) + w.speed * 1000) * 25; }
+    const at = pointAt(w.r, w.s);
+    w.p.root.visible = !far;
+    w.p.root.position.set(at.x, groundY(at.x, at.z), at.z);
+    w.p.face(w.dir > 0 ? at.heading : at.heading + Math.PI);
+    if (!far) w.p.walk(dt, waitToCross(w.r, w.s, w.dir, churchCars) ? 0 : w.speed);
   }
   roadWalkers.forEach((w, i) => {
     if (busy(w.body)) return;
@@ -1377,6 +1438,9 @@ Object.assign(window, {
     },
     get night() { return night; },
     get light() { return lightAt(traffic.t); },
+    get churchLight() { return churchLightAt(churchTraffic.t); },
+    churchTraffic,
+    get southWalkers() { return southWalkers.map((w) => ({ id: w.r.id, who: w.r.who, x: w.p.root.position.x, z: w.p.root.position.z, out: w.inside <= 0 })); },
     get frames() { return frames; },
     /** Draw calls + triangles in the last frame (for chasing slow views). */
     get stats() { return { calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; },
