@@ -6,7 +6,7 @@
 
 export interface Listen {
   hour: number;
-  where: 'out' | 'in' | 'usdan';
+  where: 'out' | 'in' | 'usdan' | 'casper';
   /** metres to the middle of High Street */
   roadDist: number;
   /** vehicles on High Street within 40 m, weighted closer = more */
@@ -53,8 +53,8 @@ export function mixAt(l: Listen): Mix {
     crickets: out ? (1 - day) * 0.35 : 0,
     wind: out ? 0.14 : 0,
     road: (0.08 + near * 0.32 + clamp(l.traffic) * 0.3) * indoorsMuffle,
-    crowd: l.where === 'usdan' ? 0.32 + clamp(l.people / 20) * 0.2 : out ? clamp(l.people / 12) * 0.28 : clamp(l.people / 6) * 0.12,
-    room: out ? 0 : l.where === 'usdan' ? 0.12 : 0.06,
+    crowd: l.where === 'usdan' || l.where === 'casper' ? 0.32 + clamp(l.people / 20) * 0.2 : out ? clamp(l.people / 12) * 0.28 : clamp(l.people / 6) * 0.12,
+    room: out ? 0 : l.where === 'usdan' || l.where === 'casper' ? 0.12 : 0.06,
     engine: l.car === null ? 0 : 0.18 + l.gas * 0.12,
     rpm: 38 + (rolling % 9) * 9 + rolling * 2.2 + l.gas * 14, // climbs, drops a little as it "shifts" every ~9 m/s
     tyres: l.car === null ? 0 : clamp(rolling / 14) * (l.surface === 'tar' ? 0.12 : 0.24),

@@ -47,6 +47,8 @@ import { falloff, honkNow, mixAt } from './soundscape';
 import { leavesMark, surfaceAt } from './surface';
 import { ITEMS, SITTERS, chairs } from './plaza';
 import { UsdanView } from './usdan/view';
+import { CasperView } from './casper/view';
+import { CDoor, CLANES, CPEOPLE, FH as CASPER_FH, casperArrive, casperExtra, casperFloorY, casperLevelAt, casperPortalAt, insideCasper, nearCasperDoor } from './casper/plan';
 import {
   AT_DESK, Door, ITEMS as U_ITEMS, SITTERS as U_SITTERS, SOFA_SITTERS, STAFF, WALK_LANES, arriveAt, chairsAt as uChairs,
   insideUsdan, nearUsdanDoor, usdanExtra, usdanPortalAt,
@@ -125,6 +127,34 @@ usdanSun.target.position.set(-80, 0, -205);
 const pendants = [new PointLight(0xffe9c8, 30, 22, 1.3), new PointLight(0xffe9c8, 30, 22, 1.3)];
 pendants[0].position.set(-86, 6.4, -202); pendants[1].position.set(-76, 6.4, -202);
 usdanScene.add(usdanHemi, usdanSun, usdanSun.target, ...pendants, usdan.group);
+// inside Casper: its own world, four floors round the atrium, bright and warm
+const casperScene = new Scene();
+casperScene.background = new Color(0x1c1a17);
+const casper = new CasperView();
+const casperHemi = new HemisphereLight(0xfff6ea, 0x7a7068, 1.75);
+const casperSun = new DirectionalLight(0xfff2de, 0.8);
+casperSun.position.set(-60, 40, 150);
+casperSun.target.position.set(-5, 0, 162);
+casperScene.add(casperHemi, casperSun, casperSun.target, casper.group);
+interface CInside { p: Person; lane?: { x0: number; x1: number; z: number; y: number }; x?: number; dir?: 1 | -1; sit?: boolean }
+const casperFolk: CInside[] = [];
+{
+  let seed = 1400;
+  for (const c of CPEOPLE) {
+    const p = new Person(randomLook(seed++));
+    p.root.position.set(c.x, c.level * CASPER_FH, c.z);
+    p.face(c.heading);
+    if (c.sit !== undefined) p.sit(c.sit);
+    casperScene.add(p.root);
+    casperFolk.push({ p, sit: c.sit !== undefined });
+  }
+  CLANES.forEach((l, i) => {
+    const p = new Person(randomLook(seed++)), x = l.x0 + (l.x1 - l.x0) * (0.3 + i * 0.2);
+    p.root.position.set(x, l.level * CASPER_FH, l.z);
+    casperScene.add(p.root);
+    casperFolk.push({ p, lane: { x0: l.x0, x1: l.x1, z: l.z, y: l.level * CASPER_FH }, x, dir: i % 2 ? 1 : -1 });
+  });
+}
 interface Inside { p: Person; lane?: [number, number, number]; z?: number; dir?: 1 | -1; speed?: number; sit?: boolean }
 const insiders: Inside[] = [];
 {
@@ -160,6 +190,7 @@ const resumed = urlSpot ? null : (() => {
   return loadSpot(raw, Date.now(), (sp) => {
     if (sp.where === 'in') return insideHouse(toLocal(sp.x, sp.z).u, toLocal(sp.x, sp.z).v);
     if (sp.where === 'usdan') return insideUsdan(sp);
+    if (sp.where === 'casper') return insideCasper(sp, sp.level);
     const ok = resolveMove(sp, sp, stops, houseExtra(0, false));
     return ok.x === sp.x && ok.z === sp.z && !insideUsdan(sp);
   });
@@ -167,16 +198,16 @@ const resumed = urlSpot ? null : (() => {
 const atHomeStart = !urlSpot && !resumed;
 const pos = resumed ? new Vector3(resumed.x, 0, resumed.z)
   : new Vector3(parseFloat(params.get('x') ?? String(HOME_SPAWN.x)), 0, parseFloat(params.get('z') ?? String(HOME_SPAWN.z)));
-let level: Level = resumed ? resumed.level : params.get('level') === '1' ? 1 : 0; // which floor you're on (only matters in your house)
-pos.y = floorY(level, pos.x, pos.z);
+let level: number = resumed ? resumed.level : Math.min(3, Math.max(0, parseInt(params.get('level') ?? '0', 10) || 0)); // which floor you're on (your house: 0–1; Casper: 0–3)
+pos.y = floorY(Math.min(1, level) as Level, pos.x, pos.z); // (set properly every frame)
 me.root.position.copy(pos);
 me.face(resumed ? resumed.heading : HOME_SPAWN.heading); // facing +z, up High Street
 scene.add(me.root);
 let sittingOn: Seat | null = null;
 // which world you're in: the street, or inside your house (?x/?z can start you inside)
 let where: Where = resumed ? resumed.where
-  : insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v) ? 'in' : insideUsdan(pos) ? 'usdan' : 'out';
-const sceneFor = (w: Where) => (w === 'in' ? homeScene : w === 'usdan' ? usdanScene : scene);
+  : insideHouse(toLocal(pos.x, pos.z).u, toLocal(pos.x, pos.z).v) ? 'in' : insideUsdan(pos) ? 'usdan' : insideCasper(pos, level) ? 'casper' : 'out';
+const sceneFor = (w: Where) => (w === 'in' ? homeScene : w === 'usdan' ? usdanScene : w === 'casper' ? casperScene : scene);
 
 // ── getting around: walk → run, bikes + scooters in racks and loose on the walk ──
 const mob = createMobility(stops, crossings, ROW_ENTRY);
@@ -488,7 +519,7 @@ clockBtn.addEventListener('click', () => {
 // ── your roommates (on the game clock) ──
 const roommates = new Roommates(hour, labels, () => {
   const l = toLocal(pos.x, pos.z);
-  return { level, indoors: insideHouse(l.u, l.v) };
+  return { level: (where === 'in' ? level : 0) as Level, indoors: insideHouse(l.u, l.v) };
 });
 scene.add(roommates.outdoor);
 homeScene.add(roommates.indoor);
@@ -543,6 +574,9 @@ function applyMood(h: number) {
   hemi.intensity = m.hemiI;
   homeHemi.intensity = 1.7 - m.night * 1.0;
   usdan.setDaylight(m.horizon, m.night);
+  casper.setDaylight(m.horizon, m.night);
+  casperSun.intensity = (1 - m.night) * 0.8;
+  casperHemi.intensity = 1.85 - m.night * 0.45; // Casper stays lit at night
   usdanSun.intensity = (1 - m.night) * 0.9;
   usdanHemi.intensity = 1.7 - m.night * 0.5; // Usdan stays lit at night
   homeDay.intensity = (1 - m.night) * 1.3;
@@ -638,7 +672,8 @@ function sleep() {
 const VEHICLE_HALF_W = { car: 0.95, truck: 1.2, bike: 0.35 } as const;
 function collisions() {
   if (where === 'usdan') return usdanExtra();
-  const base = houseExtra(level, mover.riding !== null || garage.driving !== null);
+  if (where === 'casper') return casperExtra(level);
+  const base = houseExtra(level as Level, mover.riding !== null || garage.driving !== null);
   if (where === 'in') return base;
   const near = (b: { x0: number; x1: number; z0: number; z1: number }) =>
     b.x1 > pos.x - 12 && b.x0 < pos.x + 12 && b.z1 > pos.z - 12 && b.z0 < pos.z + 12;
@@ -722,6 +757,24 @@ function goUsdan(door: Door, kind: 'enter' | 'exit') {
   fade.classList.add('blink');
   setTimeout(() => fade.classList.remove('blink'), 260);
   if (kind === 'enter') toast('Usdan University Center');
+}
+
+/** Through one of Casper's doors: a blink, and you're inside on the ground floor (or back out). */
+function goCasper(door: CDoor, kind: 'enter' | 'exit') {
+  sound.play('glassDoor', 0.8);
+  const at = casperArrive(door, kind);
+  pos.set(at.x, 0, at.z);
+  level = 0;
+  where = kind === 'enter' ? 'casper' : 'out';
+  sceneFor(where).add(me.root, fill);
+  me.face(at.heading);
+  lastDir.set(Math.sin(at.heading), 0, Math.cos(at.heading));
+  mover.speed = 0;
+  rig.snapBehind(at.heading);
+  snapCamera = true;
+  fade.classList.add('blink');
+  setTimeout(() => fade.classList.remove('blink'), 260);
+  if (kind === 'enter') toast('Casper Life Sciences');
 }
 
 /** Walking in: who's home, who's out, and a hello from whoever you'd see first. */
@@ -898,13 +951,20 @@ function currentAction(): Act | null {
       key: ride.kind, icon: ride.kind === 'park' ? 'park' : 'off', label: ride.kind === 'park' ? 'Park in rack' : 'Get off', dist: 0,
       run: () => {
         const off = dismount(mob, mover, pos, me.heading)!;
-        const at = resolveMove(pos, off.standAt, stops, houseExtra(level, false));
+        const at = resolveMove(pos, off.standAt, stops, where === 'casper' ? casperExtra(level) : houseExtra(level as Level, false));
         pos.set(at.x, 0, at.z);
       },
     };
   }
   const options: Act[] = [];
   const lp = toLocal(pos.x, pos.z);
+  const cd = mover.riding === null && garage.driving === null ? nearCasperDoor(where, pos, level) : null;
+  if (cd) {
+    const d = Math.hypot(pos.x - cd.x, pos.z - cd.z);
+    options.push(where === 'out'
+      ? { key: `casper-in-${cd.id}`, icon: 'door', label: 'Go into Casper', dist: d, run: () => goCasper(cd, 'enter') }
+      : { key: `casper-out-${cd.id}`, icon: 'door', label: 'Go outside', dist: d, run: () => goCasper(cd, 'exit') });
+  }
   const ud = mover.riding === null && garage.driving === null ? nearUsdanDoor(where, pos) : null;
   if (ud) {
     const d = Math.hypot(pos.x - ud.x, pos.z - ud.z);
@@ -1003,7 +1063,7 @@ function frame(now: number) {
     if (next.x === pos.x && next.z === pos.z) mover.speed = 0; // hit a wall
     pos.x = next.x;
     pos.z = next.z;
-    level = levelAt(level, pos.x, pos.z);
+    level = where === 'casper' ? casperLevelAt(level, pos.x, pos.z) : levelAt(level as Level, pos.x, pos.z);
     const target = Math.atan2(lastDir.x, lastDir.z);
     const turnRate = mover.mode === 'foot' ? 12 : 6; // bikes carve, feet pivot
     me.face(me.heading + wrap(target - me.heading) * Math.min(1, dt * turnRate));
@@ -1015,7 +1075,7 @@ function frame(now: number) {
   stepJump(jump, dt);
   if (wasAirborne && !airborne(jump)) sound.play('land', 0.7);
   wasAirborne = airborne(jump);
-  pos.y = floorY(level, pos.x, pos.z) + (where === 'out' ? groundY(pos.x, pos.z) : 0); // (up the bank and stairs by Olin)
+  pos.y = where === 'casper' ? casperFloorY(level, pos.x, pos.z) : floorY(level as Level, pos.x, pos.z) + (where === 'out' ? groundY(pos.x, pos.z) : 0); // (up the bank and stairs by Olin)
   me.root.position.copy(pos);
   me.root.position.y += jump.y;
   if (sittingOn) me.sitIdle(dt);
@@ -1060,7 +1120,22 @@ function frame(now: number) {
   if (through) { goThrough(through); local = toLocal(pos.x, pos.z); }
   const ut = mover.riding === null && garage.driving === null && !through ? usdanPortalAt(where, pos) : null;
   if (ut) goUsdan(ut.door, ut.kind);
+  const ct = mover.riding === null && garage.driving === null && !through && !ut ? casperPortalAt(where, pos, level) : null;
+  if (ct) goCasper(ct.door, ct.kind);
   const indoors = where !== 'out';
+  if (where === 'casper') {
+    casper.update(camera.position, pos, level);
+    for (const s of casperFolk) {
+      if (s.lane) { // up and down the corridor
+        s.x! += s.dir! * 1.2 * dt;
+        if (s.x! > s.lane.x1 || s.x! < s.lane.x0) s.dir = s.dir! > 0 ? -1 : 1;
+        s.p.root.position.set(s.x!, s.lane.y, s.lane.z);
+        s.p.face(s.dir! > 0 ? Math.PI / 2 : -Math.PI / 2);
+        s.p.walk(dt, 1.2);
+      } else if (s.sit) s.p.sitIdle(dt);
+      else s.p.walk(dt, 0);
+    }
+  }
   if (where === 'usdan') {
     usdan.update(camera.position, pos);
     for (const s of insiders) {
@@ -1076,7 +1151,7 @@ function frame(now: number) {
   }
   const door = toWorld(0, (FRONT_DOOR.v0 + FRONT_DOOR.v1) / 2);
   const doorOpens = Math.hypot(pos.x - door.x, pos.z - door.z) < 2.4 || roommates.near(door.x, door.z, 2.2);
-  house.update(dt, camera.position, { x: pos.x, z: pos.z, level, inside: where === 'in' }, doorOpens);
+  house.update(dt, camera.position, { x: pos.x, z: pos.z, level: (where === 'in' ? level : 0) as Level, inside: where === 'in' }, doorOpens);
   roommates.update(dt, hour, house.upstairs.visible);
 
   // passers-by
@@ -1118,6 +1193,7 @@ function frame(now: number) {
     let busy = 0, people = 0;
     for (const v of traffic.vehicles) { const d = Math.hypot(LANES[v.lane].x - pos.x, v.z - pos.z); if (d < 40) busy += (1 - d / 40) * 0.35; }
     if (where === 'usdan') people = insiders.length;
+    else if (where === 'casper') people = casperFolk.length;
     else if (where === 'in') people = 3;
     else for (const b of bodies) if (Math.hypot(b.p.root.position.x - pos.x, b.p.root.position.z - pos.z) < 15) people++;
     const c = driven(garage), surf = c ? surfaceAt(c, crossings) : 'grass';
@@ -1193,8 +1269,9 @@ function frame(now: number) {
   // sit a little out over the field (+x) and look back across the facades
   const fast = (1 + Math.min(0.55, Math.max(0, mover.speed - 3) / 26)) * (car ? 1.3 : 1); // pull back a little when you're moving fast
   // indoors: closer and higher, looking down into the room (walls in the way are cut away)
-  const dist = where === 'usdan' ? 6.8 : indoors ? 5.2 : (portrait ? 9 : 8.6) * fast;
+  const dist = where === 'usdan' || where === 'casper' ? 6.8 : indoors ? 5.2 : (portrait ? 9 : 8.6) * fast;
   const up = where === 'usdan' ? Math.min(4.0, 3.3 * (1 + rig.pitch)) // stay under Usdan's ceiling
+    : where === 'casper' ? Math.min(2.9, 2.6 * (1 + rig.pitch)) // and under Casper's (3.45 m)
     : (indoors ? 7.4 : (portrait ? 6 : 4.4) * fast) * (1 + rig.pitch);
   const side = indoors ? 0 : right.x; // +1 when +x is screen-right, −1 when it's screen-left
   want.copy(pos).addScaledVector(fwd, -dist).addScaledVector(right, 2.2 * side).setY(pos.y + up);
@@ -1218,7 +1295,7 @@ function frame(now: number) {
     shake *= Math.exp(-dt * 7);
   }
   // look ahead of you — less so when the camera's had to tuck in close, so you stay on screen
-  const ahead = where === 'usdan' ? 5 : indoors ? 2.5 : 9 * Math.max(0.15, clear);
+  const ahead = where === 'usdan' || where === 'casper' ? 5 : indoors ? 2.5 : 9 * Math.max(0.15, clear);
   lookAt.copy(pos).addScaledVector(fwd, ahead).addScaledVector(right, -1.8 * side * clear).setY(pos.y + 1.1 - rig.pitch * 1.5);
   // the opening shot at home: start on your house, then turn to the street as the camera comes round behind you
   if (atHomeStart && introT < 1) lookAt.lerpVectors(HOUSE_LOOK, lookAt, k);

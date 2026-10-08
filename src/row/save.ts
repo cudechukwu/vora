@@ -6,14 +6,14 @@ import { BOUNDS } from './layout';
 // seconds (and when the page is hidden) we note where you are, and put you
 // back there next time. It lives on your phone (localStorage) — no server.
 
-export type Place = 'out' | 'in' | 'usdan';
+export type Place = 'out' | 'in' | 'usdan' | 'casper';
 
 export interface SavedSpot {
   where: Place;
   x: number;
   z: number;
   heading: number;
-  level: 0 | 1;
+  level: number; // (0–1 in your house, 0–3 in Casper)
   /** when it was saved (ms since epoch) */
   at: number;
 }
@@ -34,9 +34,9 @@ export function loadSpot(raw: string | null, now: number, ok: (s: SavedSpot) => 
   if (!raw) return null;
   try {
     const s = JSON.parse(raw);
-    if (!s || !['out', 'in', 'usdan'].includes(s.where)) return null;
+    if (!s || !['out', 'in', 'usdan', 'casper'].includes(s.where)) return null;
     if (![s.x, s.z, s.heading, s.at].every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
-    if (s.level !== 0 && s.level !== 1) return null;
+    if (![0, 1, 2, 3].includes(s.level) || (s.where !== 'casper' && s.level > 1)) return null;
     if (now - s.at > SPOT_TTL || s.at > now + 60_000) return null;
     if (s.x < BOUNDS.xMin || s.z < BOUNDS.zMin || s.z > BOUNDS.zMax || s.x > 110) return null;
     const spot: SavedSpot = { where: s.where, x: s.x, z: s.z, heading: s.heading, level: s.level, at: s.at };

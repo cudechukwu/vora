@@ -12,6 +12,19 @@ type Kit = { g: Group; win: WindowBank; box: BoxBank };
 
 const STONE = 0xcdbda3, STONE_DARK = 0xa99a83, FRAME = 0x2a2c2e;
 
+/** CASPER LIFE SCIENCES BUILDING, in brushed steel capitals. */
+function lettering(): CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 88;
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, 1024, 88);
+  g.fillStyle = '#5d6266'; g.font = '600 52px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('CASPER LIFE SCIENCES BUILDING', 512, 46);
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
+}
+
 let tex: CanvasTexture | null = null;
 /** Pale tan limestone panels (the photo): big blocks in a loose stacked bond, each a slightly different shade, fine joints. One tile = 1.6 m. */
 function limestone(): CanvasTexture {
@@ -72,26 +85,50 @@ export function buildSci(k: Kit) {
     win.add('rect', strip, B.h / 2, z + (f === '+z' ? 0.08 : -0.08), 1.0, B.h - 1.0, f);
   }
   for (const zz of [B.z0 + 7, B.z1 - 7]) for (const y of [8.3, 12.6]) slot(B.x1, zz, '+x', y, 2.2, 3.0); // the east end: two big windows a floor
-  // the north entrance: a tall recess in the stone, big glass double doors and a transom in dark frames, lit inside, a
-  // slim canopy; interlocking pavers from the sidewalk up to it
-  { const D = SCI_NDOOR, z = D.z - 0.02;
-    box.add(D.x, 2.6, z - 0.05, D.half * 2 + 0.6, 5.2, 0.1, 0x1a1c1e); // the frame
-    box.add(D.x, 2.5, z + 0.02, D.half * 2 - 0.1, 4.9, 0.04, 0xf2dcb4); // the warm lobby seen through
-    for (const o of [-D.half + 0.05, -1.2, 0, 1.2, D.half - 0.05]) box.add(D.x + o, 2.5, z - 0.08, 0.08, 4.9, 0.08, FRAME);
-    box.add(D.x, 3.05, z - 0.08, D.half * 2, 0.1, 0.08, FRAME); // the transom bar
-    win.add('rect', D.x, 4.05, z - 0.04, D.half * 2 - 0.2, 1.8, '-z');
-    for (const o of [-0.7, -0.3, 0.3, 0.7]) box.add(D.x + o, 1.25, z - 0.14, 0.04, 0.9, 0.04, 0xc0c4c6); // pulls
-    box.add(D.x, 5.45, z - 1.1, D.half * 2 + 1.6, 0.18, 2.2, 0x2e3032); // the canopy
-    for (const o of [-1.4, 1.4]) box.add(D.x + o, 5.3, z - 1.1, 0.25, 0.06, 0.25, 0xfff2cc);
+  // the north entrance (the user's photos): silver aluminium-framed glass doors and sidelights, a dark transom over them,
+  // a bronze metal soffit, the dark-blue glass bay rising up the facade above; CASPER LIFE SCIENCES BUILDING in steel
+  // letters on the stone beside it; interlocking pavers in from the sidewalk between beds of grey river rocks
+  { const D = SCI_NDOOR, z = D.z - 0.02, AL = 0x9a9fa3;
+    box.add(D.x, 2.3, z + 0.02, D.half * 2 - 0.1, 4.4, 0.04, 0x9a7a52); // the warm vestibule seen through (wood walls)
+    for (const o of [-D.half + 0.06, -1.25, -0.02, 0.02, 1.25, D.half - 0.06]) box.add(D.x + o, 1.4, z - 0.08, 0.1, 2.8, 0.1, AL); // stiles
+    for (const y of [0.06, 2.8]) box.add(D.x, y, z - 0.08, D.half * 2, 0.12, 0.1, AL); // sill and head
+    win.add('rect', D.x, 3.6, z - 0.04, D.half * 2 - 0.1, 1.5, '-z'); // the transom
+    box.add(D.x, 4.38, z - 0.08, D.half * 2 + 0.2, 0.1, 0.1, AL);
+    for (const o of [-0.62, 0.62]) box.add(D.x + o, 1.15, z - 0.16, 0.04, 0.85, 0.05, 0xc8ccce); // the pulls
+    box.add(D.x + D.half + 0.7, 1.35, z - 0.03, 0.16, 0.16, 0.03, 0x1c1e20); // the card reader
+    box.add(D.x + D.half + 0.9, 2.8, z - 0.06, 0.28, 0.28, 0.08, 0xc8241f); // the fire alarm bell
+    // the soffit: bronze panels, a downlight
+    box.add(D.x, 4.9, z - 1.4, D.half * 2 + 1.4, 0.35, 2.8, 0x2c2a28);
+    box.add(D.x, 4.71, z - 1.4, D.half * 2 + 1.3, 0.04, 2.7, 0x8f6e48);
+    for (let x = D.x - D.half; x <= D.x + D.half + 0.1; x += 1.2) box.add(x, 4.69, z - 1.4, 0.02, 0.01, 2.7, 0x5e4930);
+    box.add(D.x, 4.68, z - 1.4, 0.2, 0.02, 0.2, 0xfff2cc);
+    // the projecting bay of dark-blue glass above it, up to the top
+    const bx0 = D.x - 1.6, bx1 = D.x + 1.6, by0 = 5.1, by1 = B.h - 0.4;
+    box.add(D.x, (by0 + by1) / 2, z - 0.7, bx1 - bx0 + 0.2, by1 - by0, 1.4, 0x1f2b3a);
+    for (let y = by0 + 1.2; y < by1; y += 2.1) for (const x of [D.x - 0.8, D.x + 0.8]) win.add('rect', x, y, z - 1.42, 1.4, 1.95, '-z');
+    for (const x of [bx0, D.x, bx1]) box.add(x, (by0 + by1) / 2, z - 1.42, 0.08, by1 - by0, 0.08, 0x2a3240);
+    // the lettering, in steel, on the stone to the west of the doors
+    const letters = new Mesh(new PlaneGeometry(4.2, 0.36), new MeshBasicMaterial({ map: lettering(), transparent: true }));
+    letters.position.set(D.x - D.half - 2.7, 3.2, z - 0.03);
+    letters.rotation.y = Math.PI;
+    g.add(letters);
+    // the walk in: interlocking pavers, a granite edge, river rocks either side
     const W = SCI_NWALK, t = paverMap().clone();
     t.needsUpdate = true;
     t.repeat.set((W.x1 - W.x0) / PAVER_TILE, (W.z1 - W.z0) / PAVER_TILE);
-    const pv = new Mesh(new PlaneGeometry(W.x1 - W.x0, W.z1 - W.z0), new MeshLambertMaterial({ map: t }));
+    const pv = new Mesh(new PlaneGeometry(W.x1 - W.x0, W.z1 - W.z0), new MeshLambertMaterial({ map: t, color: 0xb8b8b8 }));
     pv.rotation.x = -Math.PI / 2;
     pv.position.set((W.x0 + W.x1) / 2, 0.036, (W.z0 + W.z1) / 2);
     pv.receiveShadow = true;
     g.add(pv);
-    for (const x of [W.x0 - 0.08, W.x1 + 0.08]) box.add(x, 0.05, (W.z0 + W.z1) / 2, 0.16, 0.1, W.z1 - W.z0, 0xb7b2a6); // granite edging
+    for (const x of [W.x0 - 0.08, W.x1 + 0.08]) box.add(x, 0.05, (W.z0 + W.z1) / 2, 0.16, 0.1, W.z1 - W.z0, 0xb7b2a6);
+    for (const [x0, x1] of [[W.x0 - 1.4, W.x0 - 0.16], [W.x1 + 0.16, W.x1 + 1.4]]) {
+      box.add((x0 + x1) / 2, 0.03, (W.z0 + W.z1) / 2, x1 - x0, 0.04, W.z1 - W.z0, 0x6f7275); // the bed
+      for (let i = 0; i < 70; i++) {
+        const rx = x0 + 0.1 + rng(7300 + i + x0) * (x1 - x0 - 0.2), rz = W.z0 + 0.2 + rng(7500 + i + x0) * (W.z1 - W.z0 - 0.4), r = 0.08 + rng(7700 + i) * 0.07;
+        box.add(rx, 0.06, rz, r * 2.2, r, r * 1.6, [0x8d9196, 0xa5a9ad, 0x6c7075, 0xb9bcbf][i % 4], rng(i) * 3);
+      }
+    }
   }
   // the glass volume: tinted see-through glass (darker than Zelnick's, the inside half-hidden), slim dark mullions, with
   // real rooms behind it: two floors, lab benches, lights, a back wall
