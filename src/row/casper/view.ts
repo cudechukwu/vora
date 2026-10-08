@@ -270,6 +270,7 @@ export class CasperView {
         }
         continue;
       }
+      if (w.finish === 'woodWindows') { this.woodWithWindows(w); continue; }
       const mat = w.finish === 'wood' ? M.veneer : w.finish === 'dark' ? M.edge : M.white;
       this.wall(w.level, w.x0, w.x1, w.z0, w.z1, mat, y0, w.finish === 'dark' ? y0 + 1.1 : y1);
       if (w.finish === 'wood') this.cove(w.x0, w.x1, w.z0, w.z1, y1);
@@ -282,6 +283,37 @@ export class CasperView {
       else if (r.kind === 'lab') this.plane(r.x0 - 0.36, y + 0.6, (r.z0 + r.z1) / 2, 1.1, 0.28, -Math.PI / 2, mat);
       else this.plane((r.x0 + r.x1) / 2, y + 0.4, r.z0 - 0.42, 1.4, 0.35, Math.PI, mat);
     }
+  }
+
+  /**
+   * A veneer wall along z (the labs' fronts upstairs) with big windows and a white door cut into it: veneer above, below and
+   * between the openings, glass in them with slim frames, a cove light along its top, a screen on one pier.
+   */
+  private woodWithWindows(w: (typeof CWALLS)[number]) {
+    const M = this.mats, y0 = w.level * FH, y1 = y0 + CEIL, x0 = w.x0, x1 = w.x1, mx = (x0 + x1) / 2;
+    const opens = [...(w.windows ?? []).map(([a, b]) => ({ a, b, lo: y0 + 0.75, hi: y0 + 2.85, door: false })),
+      ...(w.door ? [{ a: w.door.at - w.door.w / 2, b: w.door.at + w.door.w / 2, lo: y0, hi: y0 + 2.3, door: true }] : [])].sort((p, q) => p.a - q.a);
+    let z = w.z0;
+    for (const o of opens) {
+      if (o.a > z) this.wall(w.level, x0, x1, z, o.a, M.veneer, y0, y1);
+      this.wall(w.level, x0, x1, o.a, o.b, M.veneer, o.hi, y1);
+      if (o.lo > y0) this.wall(w.level, x0, x1, o.a, o.b, M.veneer, y0, o.lo);
+      if (o.door) { // the white door with its tall pane
+        this.boxes.add(mx, (o.lo + o.hi) / 2, (o.a + o.b) / 2, 0.06, o.hi - o.lo, o.b - o.a, 0xf2f2ef);
+        this.plane(x0 - 0.04, o.lo + 1.25, (o.a + o.b) / 2, 0.4, 1.7, -Math.PI / 2, M.glass);
+      } else {
+        const g = this.plane(mx, (o.lo + o.hi) / 2, (o.a + o.b) / 2, o.b - o.a, o.hi - o.lo, Math.PI / 2, M.glass);
+        g.renderOrder = 2;
+        for (const zz of [o.a, o.b]) this.boxes.add(x0 - 0.02, (o.lo + o.hi) / 2, zz, 0.08, o.hi - o.lo, 0.06, 0xb9bcbf);
+        for (const yy of [o.lo, o.hi]) this.boxes.add(x0 - 0.02, yy, (o.a + o.b) / 2, 0.08, 0.06, o.b - o.a, 0xb9bcbf);
+      }
+      z = o.b;
+    }
+    if (w.z1 > z) this.wall(w.level, x0, x1, z, w.z1, M.veneer, y0, y1);
+    this.cove(x0 - 0.02, x0, w.z0, w.z1, y1);
+    // a screen and two little panels on the pier by the door (the photos), and a whiteboard opposite in the lounge
+    this.glow.add(x0 - 0.04, y0 + 1.75, 163.9, 0.03, 0.55, 0.95, 0x1e3a58);
+    for (const dz of [-0.25, 0.25]) this.boxes.add(x0 - 0.04, y0 + 1.15, 163.9 + dz, 0.03, 0.18, 0.14, 0x2b2c2e);
   }
 
   // ── the atrium: slab edges (dark bands), glass balustrades with wood handrails, the angled soffits ──
@@ -593,7 +625,16 @@ export class CasperView {
     // the posters, a corkboard on the north wall
     B.add(4.5, 1.7, IN_L0.z0 + 0.02, 2.2, 1.4, 0.03, 0xb98d5c);
     for (let i = 0; i < 14; i++) this.glow.add(3.6 + (i % 5) * 0.42, 1.25 + Math.floor(i / 5) * 0.42, IN_L0.z0 + 0.05, 0.32, 0.36, 0.01, [0xf2e6c8, 0xcfe3f0, 0xf0c9c0, 0xe8e8e8, 0xd9f0d0][i % 5]);
-    // green exit signs over the corridor
+    // a screen on the corridor's veneer wall, and the floor-number panels by the stairs on every floor (the photos' tall
+    // grey "1" panel with its little wayfinding diagram)
+    this.glow.add(12.2, 1.75, zf - 0.04, 1.3, 0.75, 0.03, 0x1e3a58);
+    for (let level = 0; level < 4; level++) {
+      const y = level * FH, tex = sign(String(level + 1), '#f2f2f0', '#8e9599', 128, 256, '300 150px sans-serif');
+      const m = this.plane(-12.6, y + 1.7, IN_UP.z0 + 0.03, 0.9, 1.8, 0, new MeshBasicMaterial({ map: tex }));
+      m.renderOrder = 1;
+      for (let i = 0; i < 3; i++) this.glow.add(-12.6 + (i - 1) * 0.22, y + 1.1, IN_UP.z0 + 0.04, 0.16, 0.2, 0.01, 0x3a4044);
+    }
+        // green exit signs over the corridor
     for (const x of [-10, 6, 19]) this.glow.add(x, CEIL - 0.2, (IN_L0.z0 + 152.4) / 2, 0.36, 0.16, 0.05, 0x3ee07a);
     // the vestibule at the north door: a ribbed mat, its glass doors (open), lights in the slat ceiling
     const N = SCI_NDOOR;

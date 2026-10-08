@@ -119,8 +119,8 @@ function plates(level: number): Box[] {
 }
 
 // ── rooms: what's behind the glass (look-only), and the walls ──
-export type Finish = 'wood' | 'glass' | 'dark' | 'white';
-export interface CWall { level: CLevel; x0: number; x1: number; z0: number; z1: number; finish: Finish; door?: { at: number; w: number } }
+export type Finish = 'wood' | 'glass' | 'dark' | 'white' | 'woodWindows';
+export interface CWall { level: CLevel; x0: number; x1: number; z0: number; z1: number; finish: Finish; door?: { at: number; w: number }; windows?: [number, number][] }
 export interface CRoom { level: CLevel; kind: 'classroom' | 'teaching' | 'lab' | 'seminar'; name: string; x0: number; x1: number; z0: number; z1: number }
 export const ROOMS: CRoom[] = [
   { level: 0, kind: 'classroom', name: 'A154', x0: 5.1, x1: IN_L0.x1, z0: 152.9, z1: 163.6 },
@@ -148,7 +148,8 @@ export const CWALLS: CWall[] = [
   { level: 0, x0: A.x1, x1: A.x1 + 0.4, z0: A.z0 - 0.25, z1: A.z1 + 0.25, finish: 'dark' },
   // upstairs: the labs' glass fronts along the east corridor, the wall between them; the seminar rooms' fronts
   ...([1, 2, 3] as const).flatMap((level) => [
-    { level, x0: 6.5, x1: 6.8, z0: 152.6, z1: IN_UP.z1, finish: 'glass' as const, door: { at: 160, w: 1.1 } },
+    // (upstairs the labs' fronts are wood-veneer walls with big windows and a white door cut into them: the photos)
+    { level, x0: 6.5, x1: 6.8, z0: 152.6, z1: IN_UP.z1, finish: 'woodWindows' as const, door: { at: 160, w: 1.1 }, windows: [[153.6, 158.4], [161.4, 163.2], [164.6, 166.2], [167.4, 173.4]] as [number, number][] },
     { level, x0: 6.8, x1: IN_UP.x1, z0: 163.6, z1: 163.9, finish: 'white' as const },
     { level, x0: VOID.x0, x1: 4.8, z0: 171.3, z1: 171.6, finish: 'glass' as const, door: { at: -6, w: 1.1 } },
     { level, x0: 4.8, x1: 6.8, z0: 171.3, z1: 171.6, finish: 'wood' as const },
